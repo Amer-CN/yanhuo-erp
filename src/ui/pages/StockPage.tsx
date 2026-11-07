@@ -1,10 +1,11 @@
 import { useMemo, useState } from 'react';
+import { Search, Boxes, TriangleAlert, ChevronRight } from 'lucide-react';
 import type { Batch, Product } from '../../db/types';
 import type { FifoResult } from '../../db/calc';
 import { batchStock } from '../../db/calc';
 import { createAdjustment } from '../../db/repo';
 import { fenToStr, localDate, qtyToStr } from '../../db/util';
-import { Btn, Card, Empty, Field, Sheet, Stat } from '../kit';
+import { Btn, Empty, Field, Sheet, Stat } from '../kit';
 
 export default function StockPage({
   products,
@@ -70,15 +71,17 @@ export default function StockPage({
   };
 
   return (
-    <div className="page">
+    <div className="page-stack">
       <div className="stat-grid">
         <Stat k="库存总件数" v={totalQty} />
-        <Stat k="库存成本" v={<span className="brand">¥{fenToStr(totalValue)}</span>} />
+        <Stat k="库存成本" v={<span>¥{fenToStr(totalValue)}</span>} tone="brand" />
       </div>
 
-      <div className="search">
+      <div className="glass-search">
+        <Search className="glass-search__icon" size={18} aria-hidden="true" />
         <input
-          className="input"
+          className="glass-input"
+          type="search"
           placeholder="搜商品"
           value={q}
           onChange={(e) => setQ(e.target.value)}
@@ -86,121 +89,144 @@ export default function StockPage({
       </div>
 
       {list.length === 0 ? (
-        <Empty icon="📦" text="还没有商品" />
+        <Empty icon={<Boxes size={24} />} text="还没有商品" />
       ) : (
-        <Card flush>
-          <div className="list">
-            {list.map((p) => {
-              const stock = inv.get(p.id) ?? 0;
-              return (
-                <div key={p.id} className="list-item" onClick={() => setOpenId(p.id)}>
-                  <div className="main">
-                    <div className="t1">
-                      {p.name}
-                      {p.boxQty > 1 ? <span className="badge">1箱={p.boxQty}{p.unitBase}</span> : null}
-                    </div>
-                    <div className="t2">
-                      库存 {qtyToStr(stock, p.boxQty, p.unitBase)}
-                    </div>
+        <ul className="glass-list">
+          {list.map((p) => {
+            const stock = inv.get(p.id) ?? 0;
+            return (
+              <li
+                key={p.id}
+                className="glass-list__item glass-list__item--interactive list-item"
+                role="button"
+                tabIndex={0}
+                onClick={() => setOpenId(p.id)}
+              >
+                <span className="glass-list__leading">
+                  {stock < 0 ? (
+                    <TriangleAlert size={22} aria-hidden="true" style={{ color: 'var(--gl-color-error)' }} />
+                  ) : (
+                    <Boxes size={22} aria-hidden="true" />
+                  )}
+                </span>
+                <div className="glass-list__content">
+                  <div className="glass-list__title-row">
+                    <div className="glass-list__title">{p.name}</div>
+                    {p.boxQty > 1 ? (
+                      <span className="glass-badge">
+                        1箱={p.boxQty}
+                        {p.unitBase}
+                      </span>
+                    ) : null}
                   </div>
-                  {stock < 0 ? <span className="badge bad">负库存</span> : null}
-                  {stock === 0 ? <span className="badge warn">0</span> : null}
-                  <span className="tiny">›</span>
+                  <div className="glass-list__subtitle">
+                    库存 {qtyToStr(stock, p.boxQty, p.unitBase)}
+                  </div>
                 </div>
-              );
-            })}
-          </div>
-        </Card>
+                <div className="glass-list__trailing">
+                  {stock < 0 ? <span className="glass-badge glass-badge--error">负库存</span> : null}
+                  <ChevronRight size={18} aria-hidden="true" />
+                </div>
+              </li>
+            );
+          })}
+        </ul>
       )}
 
       {open ? (
-        <Sheet
-          title={open.name}
-          onClose={() => setOpenId(null)}
-          footer={
-            <Btn block variant="ghost" onClick={() => setOpenId(null)}>
-              关闭
-            </Btn>
-          }
-        >
-          <div className="col">
-            <div className="row between">
-              <span className="muted">当前库存</span>
-              <span className="amount">
+        <Sheet title={open.name} onClose={() => setOpenId(null)}>
+          <div className="page-stack">
+            <div className="row-between">
+              <span className="muted-text">当前库存</span>
+              <span style={{ fontWeight: 700, fontVariantNumeric: 'tabular-nums' }}>
                 {qtyToStr(inv.get(open.id) ?? 0, open.boxQty, open.unitBase)}
               </span>
             </div>
 
-            <div className="divider" />
-            <div className="card-head">
-              <h2>批次明细</h2>
-            </div>
-            {batchStock(batches, open.id, fifo).length === 0 ? (
-              <Empty icon="🧾" text="还没录进货" />
-            ) : (
-              <div className="col">
-                {batchStock(batches, open.id, fifo).map(({ batch, remaining }) => {
-                  const days = batch.expiryDate
-                    ? Math.round(
-                        (new Date(`${batch.expiryDate}T00:00:00`).getTime() -
-                          new Date(`${localDate()}T00:00:00`).getTime()) /
-                          86400000
-                      )
-                    : null;
-                  return (
-                    <div key={batch.id} className="card" style={{ padding: 10 }}>
-                      <div className="row between">
-                        <div>
-                          <div style={{ fontWeight: 700 }}>
-                            {batch.batchNo ? `批号 ${batch.batchNo}` : '（无批号）'}
-                          </div>
-                          <div className="tiny">
-                            到货 {batch.receivedAt} · 进价 ¥{fenToStr(batch.unitCostFen)}/{open.unitBase}
-                          </div>
-                          {batch.expiryDate ? (
-                            <div className={`tiny ${days !== null && days <= 30 ? 'badge bad' : ''}`}>
-                              有效期至 {batch.expiryDate}
-                              {days !== null ? `（${days < 0 ? '已过期' : `剩 ${days} 天`}）` : ''}
+            <div>
+              <h2 className="section-title" style={{ marginBottom: 8 }}>
+                批次明细
+              </h2>
+              {batchStock(batches, open.id, fifo).length === 0 ? (
+                <Empty icon={<Boxes size={24} />} text="还没录进货" />
+              ) : (
+                <div className="stack-sm">
+                  {batchStock(batches, open.id, fifo).map(({ batch, remaining }) => {
+                    const days = batch.expiryDate
+                      ? Math.round(
+                          (new Date(`${batch.expiryDate}T00:00:00`).getTime() -
+                            new Date(`${localDate()}T00:00:00`).getTime()) /
+                            86400000
+                        )
+                      : null;
+                    return (
+                      <div key={batch.id} className="mini-card">
+                        <div className="row-between">
+                          <div>
+                            <div className="cart-line__name">
+                              {batch.batchNo ? `批号 ${batch.batchNo}` : '（无批号）'}
                             </div>
-                          ) : null}
+                            <div className="cart-line__meta">
+                              到货 {batch.receivedAt} · 进价 ¥{fenToStr(batch.unitCostFen)}/{open.unitBase}
+                            </div>
+                            {batch.expiryDate ? (
+                              <div className="cart-line__meta">
+                                有效期至 {batch.expiryDate}
+                                {days !== null
+                                  ? `（${days < 0 ? '已过期' : `剩 ${days} 天`}）`
+                                  : ''}
+                                {days !== null && days <= 30 ? (
+                                  <span className="glass-badge glass-badge--error" style={{ marginLeft: 6 }}>
+                                    临期
+                                  </span>
+                                ) : null}
+                              </div>
+                            ) : null}
+                          </div>
+                          <div style={{ fontWeight: 700, fontVariantNumeric: 'tabular-nums' }}>
+                            剩 {qtyToStr(remaining, open.boxQty, open.unitBase)}
+                          </div>
                         </div>
-                        <div className="amount">剩 {qtyToStr(remaining, open.boxQty, open.unitBase)}</div>
                       </div>
-                    </div>
-                  );
-                })}
-              </div>
-            )}
-
-            <div className="divider" />
-            <div className="card-head">
-              <h2>修正库存（盘亏/盘盈）</h2>
+                    );
+                  })}
+                </div>
+              )}
             </div>
-            <div className="tiny">盘点发现对不上时用：负数=少了，正数=多了，单位是{open.unitBase}。</div>
-            <Field label={`调整数量（${open.unitBase}）`}>
-              <input
-                className="input num"
-                inputMode="numeric"
-                value={adjust}
-                onChange={(e) => setAdjust(e.target.value)}
-                placeholder="-2"
-              />
-            </Field>
-            <Field label="原因（可空）">
-              <input
-                className="input"
-                value={reason}
-                onChange={(e) => setReason(e.target.value)}
-                placeholder="摔坏 / 数错"
-              />
-            </Field>
-            <Btn block onClick={submitAdjust} variant="soft">
-              记一笔调整
-            </Btn>
+
+            <div>
+              <h2 className="section-title" style={{ marginBottom: 8 }}>
+                修正库存（盘亏/盘盈）
+              </h2>
+              <p className="tiny-text" style={{ marginTop: 0 }}>
+                盘点发现对不上时用：负数=少了，正数=多了，单位是{open.unitBase}。
+              </p>
+              <div className="page-stack">
+                <Field label={`调整数量（${open.unitBase}）`}>
+                  <input
+                    className="glass-input"
+                    inputMode="numeric"
+                    value={adjust}
+                    onChange={(e) => setAdjust(e.target.value)}
+                    placeholder="-2"
+                  />
+                </Field>
+                <Field label="原因（可空）">
+                  <input
+                    className="glass-input"
+                    value={reason}
+                    onChange={(e) => setReason(e.target.value)}
+                    placeholder="摔坏 / 数错"
+                  />
+                </Field>
+                <Btn block variant="secondary" onClick={submitAdjust}>
+                  记一笔调整
+                </Btn>
+              </div>
+            </div>
           </div>
         </Sheet>
       ) : null}
     </div>
   );
 }
-

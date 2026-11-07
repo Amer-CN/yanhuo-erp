@@ -1,15 +1,24 @@
 <!doctype html>
-<html lang="zh-CN">
+<html lang="zh-CN" data-theme="dark">
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
-    <meta name="theme-color" content="#f97316" />
+    <meta name="theme-color" content="#070a10" />
     <meta name="apple-mobile-web-app-capable" content="yes" />
-    <meta name="apple-mobile-web-app-status-bar-style" content="default" />
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
     <meta name="apple-mobile-web-app-title" content="烟花账" />
     <link rel="apple-touch-icon" href="./apple-touch-icon.png" />
     <link rel="icon" type="image/png" href="./icon-192.png" />
     <title>烟花进销存</title>
+    <script>
+      // 打开前先定主题，避免深色闪一下
+      try {
+        if (localStorage.getItem('yh-theme') === 'light') {
+          document.documentElement.setAttribute('data-theme', 'light');
+          document.documentElement.style.background = '#eef2f6';
+        }
+      } catch (e) {}
+    </script>
   </head>
   <body>
     <div id="root"></div>

@@ -1,9 +1,10 @@
 import { useMemo, useState } from 'react';
+import { Receipt, RotateCcw, Ban } from 'lucide-react';
 import type { Product, SaleLine, SalesOrder } from '../../db/types';
 import { PAY_LABEL } from '../../db/types';
 import { restoreOrder, voidOrder } from '../../db/repo';
 import { fenToStr, isoToLocalDate, isoToTime, qtyToStr } from '../../db/util';
-import { Btn, Card, Empty, Sheet } from '../kit';
+import { Btn, Empty, Sheet } from '../kit';
 
 export default function HistoryPage({
   products,
@@ -44,68 +45,91 @@ export default function HistoryPage({
   const openLines = open ? lines.filter((l) => l.orderId === open.id) : [];
 
   return (
-    <div className="page">
+    <div className="page-stack">
       {grouped.length === 0 ? (
-        <Empty icon="🧾" text="还没有销售记录" />
+        <Empty icon={<Receipt size={24} />} text="还没有销售记录" />
       ) : (
         grouped.map(([day, list]) => {
           const total = list.filter((o) => !o.voided).reduce((s, o) => s + o.totalFen, 0);
           return (
-            <Card key={day} flush>
-              <div className="list-item" style={{ background: '#fffaf4', cursor: 'default' }}>
-                <div className="main">
-                  <div className="t1">{day}</div>
-                  <div className="t2">
-                    {list.length} 单 · 合计 ¥{fenToStr(total)}
-                  </div>
-                </div>
+            <div key={day}>
+              <div className="day-header">
+                <span>{day}</span>
+                <span className="sub">
+                  {list.length} 单 · 合计 ¥{fenToStr(total)}
+                </span>
               </div>
-              <div className="list">
+              <ul className="glass-list">
                 {list.map((o) => {
                   const n = lines.filter((l) => l.orderId === o.id).length;
                   return (
-                    <div key={o.id} className="list-item" onClick={() => setOpenId(o.id)}>
-                      <div className="main">
-                        <div className="t1">
-                          {isoToTime(o.createdAt)} · {o.operator}
-                          <span className={`badge ${o.payMethod === 'cash' ? '' : 'ok'}`}>
+                    <li
+                      key={o.id}
+                      className="glass-list__item glass-list__item--interactive list-item"
+                      role="button"
+                      tabIndex={0}
+                      onClick={() => setOpenId(o.id)}
+                    >
+                      <span className="glass-list__leading">
+                        <Receipt size={22} aria-hidden="true" />
+                      </span>
+                      <div className="glass-list__content">
+                        <div className="glass-list__title-row">
+                          <div className="glass-list__title">
+                            {isoToTime(o.createdAt)} · {o.operator}
+                          </div>
+                          <span
+                            className={`glass-badge ${
+                              o.payMethod === 'cash' ? '' : 'glass-badge--primary'
+                            }`}
+                          >
                             {PAY_LABEL[o.payMethod]}
                           </span>
-                          {o.voided ? <span className="badge bad">已作废</span> : null}
+                          {o.voided ? (
+                            <span className="glass-badge glass-badge--error">已作废</span>
+                          ) : null}
                         </div>
-                        <div className="t2">{n} 个商品</div>
+                        <div className="glass-list__subtitle">{n} 个商品</div>
                       </div>
-                      <div
-                        className="amount"
-                        style={{ textDecoration: o.voided ? 'line-through' : undefined }}
-                      >
-                        ¥{fenToStr(o.totalFen)}
+                      <div className="glass-list__trailing">
+                        <span
+                          style={{
+                            fontWeight: 700,
+                            fontVariantNumeric: 'tabular-nums',
+                            textDecoration: o.voided ? 'line-through' : undefined
+                          }}
+                        >
+                          ¥{fenToStr(o.totalFen)}
+                        </span>
                       </div>
-                    </div>
+                    </li>
                   );
                 })}
-              </div>
-            </Card>
+              </ul>
+            </div>
           );
         })
       )}
 
       {open ? (
         <Sheet
-          title={`${isoToLocalDate(open.createdAt)} ${isoToTime(open.createdAt)} · ${open.operator}`}
+          title={`${isoToLocalDate(open.createdAt)} ${isoToTime(open.createdAt)}`}
+          subtitle={`${open.operator} · ${PAY_LABEL[open.payMethod]}${open.voided ? ' · 已作废' : ''}`}
           onClose={() => setOpenId(null)}
           footer={
             open.voided ? (
               <Btn
                 block
-                variant="ghost"
+                variant="secondary"
                 onClick={async () => {
                   await restoreOrder(open.id);
                   onDone('已恢复');
                   setOpenId(null);
                 }}
               >
-                撤销作废
+                <span className="icon-text">
+                  <RotateCcw size={18} aria-hidden="true" /> 撤销作废
+                </span>
               </Btn>
             ) : (
               <Btn
@@ -118,37 +142,46 @@ export default function HistoryPage({
                   setOpenId(null);
                 }}
               >
-                整单作废
+                <span className="icon-text">
+                  <Ban size={18} aria-hidden="true" /> 整单作废
+                </span>
               </Btn>
             )
           }
         >
-          <div className="col">
-            <div className="row between muted">
-              <span>收款方式</span>
-              <span>{PAY_LABEL[open.payMethod]}</span>
-            </div>
-            <div className="divider" />
+          <div className="page-stack">
             {openLines.map((l) => {
               const p = productById.get(l.productId);
               return (
-                <div key={l.id} className="row between">
-                  <div className="grow">
-                    <div style={{ fontWeight: 600 }}>{p?.name ?? '(已删)'}</div>
-                    <div className="tiny">
-                      {qtyToStr(l.qtyBase, p?.boxQty ?? 0, p?.unitBase ?? '个')} × ¥
-                      {fenToStr(l.unitPriceFen)}
-                      {l.discountFen > 0 ? ` · 让利 ¥${fenToStr(l.discountFen)}` : ''}
+                <div key={l.id} className="mini-card">
+                  <div className="row-between">
+                    <div className="grow">
+                      <div className="cart-line__name">{p?.name ?? '(已删)'}</div>
+                      <div className="cart-line__meta">
+                        {qtyToStr(l.qtyBase, p?.boxQty ?? 0, p?.unitBase ?? '个')} × ¥
+                        {fenToStr(l.unitPriceFen)}
+                        {l.discountFen > 0 ? ` · 让利 ¥${fenToStr(l.discountFen)}` : ''}
+                      </div>
+                    </div>
+                    <div style={{ fontWeight: 700, fontVariantNumeric: 'tabular-nums' }}>
+                      ¥{fenToStr(l.amountFen)}
                     </div>
                   </div>
-                  <div className="amount">¥{fenToStr(l.amountFen)}</div>
                 </div>
               );
             })}
-            <div className="divider" />
-            <div className="row between">
-              <span style={{ fontWeight: 700 }}>合计</span>
-              <span className="amount big">¥{fenToStr(open.totalFen)}</span>
+            <div className="row-between" style={{ padding: '4px 2px' }}>
+              <span style={{ fontWeight: 600 }}>合计</span>
+              <span
+                style={{
+                  fontWeight: 700,
+                  fontSize: 22,
+                  color: 'var(--gl-color-primary)',
+                  fontVariantNumeric: 'tabular-nums'
+                }}
+              >
+                ¥{fenToStr(open.totalFen)}
+              </span>
             </div>
           </div>
         </Sheet>

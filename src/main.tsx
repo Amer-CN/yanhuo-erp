@@ -1,7 +1,8 @@
 import { StrictMode } from 'react';
 import { createRoot } from 'react-dom/client';
-import App from './App';
+import '@jungherz-de/glasskit/glasskit.min.css';
 import './styles.css';
+import App from './App';
 
 createRoot(document.getElementById('root')!).render(
   <StrictMode>

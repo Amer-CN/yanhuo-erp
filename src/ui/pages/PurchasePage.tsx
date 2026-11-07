@@ -1,4 +1,5 @@
 import { useMemo, useState } from 'react';
+import { Plus, Trash2, PackagePlus } from 'lucide-react';
 import type { Batch, Product } from '../../db/types';
 import { createBatch, createProduct, deleteBatch } from '../../db/repo';
 import { fenToStr, localDate, qtyToStr, strToFen } from '../../db/util';
@@ -37,7 +38,7 @@ export default function PurchasePage({
   const qtyNum = Number(qty) || 0;
   const qtyBase = Math.round(qtyNum * factor);
   const costFen = strToFen(cost) ?? 0;
-  const unitCostFen = unitCostBase(costFen, factor);
+  const unitCostFen = Math.max(0, Math.round(costFen / factor));
   const totalCost = qtyBase * unitCostFen;
 
   const today = localDate();
@@ -91,19 +92,27 @@ export default function PurchasePage({
   };
 
   return (
-    <div className="page">
+    <div className="page-stack">
       <Card>
-        <div className="col">
-          <div className="row between">
-            <span style={{ fontWeight: 700 }}>录入进货</span>
-            <Btn variant="ghost" size="sm" onClick={() => setNewProduct(true)}>
-              ＋ 新建商品
-            </Btn>
-          </div>
+        <div className="form-head">
+          <h2>录入进货</h2>
+          <Btn block={false} variant="tertiary" size="sm" onClick={() => setNewProduct(true)}>
+            <span className="icon-text">
+              <Plus size={16} aria-hidden="true" /> 新建商品
+            </span>
+          </Btn>
+        </div>
 
+        <div className="page-stack" style={{ marginTop: 10 }}>
           <Field label="商品">
-            <select className="select" value={productId} onChange={(e) => setProductId(e.target.value)}>
-              <option value="">选择商品…</option>
+            <select
+              className="glass-select"
+              value={productId}
+              onChange={(e) => setProductId(e.target.value)}
+            >
+              <option value="" disabled hidden>
+                选择商品…
+              </option>
               {active.map((p) => (
                 <option key={p.id} value={p.id}>
                   {p.name}
@@ -113,20 +122,31 @@ export default function PurchasePage({
           </Field>
 
           {product && product.boxQty > 1 ? (
-            <div className="seg">
-              <button className={unit === 'base' ? 'on' : ''} onClick={() => setUnit('base')}>
+            <div className="glass-segmented glass-segmented--full" role="group" aria-label="进货单位">
+              <button
+                type="button"
+                className="glass-segmented__item"
+                aria-pressed={unit === 'base'}
+                onClick={() => setUnit('base')}
+              >
                 按{product.unitBase}
               </button>
-              <button className={unit === 'box' ? 'on' : ''} onClick={() => setUnit('box')}>
-                按箱（1箱={product.boxQty}{product.unitBase}）
+              <button
+                type="button"
+                className="glass-segmented__item"
+                aria-pressed={unit === 'box'}
+                onClick={() => setUnit('box')}
+              >
+                按箱（1箱={product.boxQty}
+                {product.unitBase}）
               </button>
             </div>
           ) : null}
 
-          <div className="row" style={{ gap: 10 }}>
+          <div className="form-row">
             <Field label={`数量（${unit === 'box' ? '箱' : product?.unitBase ?? '个'}）`}>
               <input
-                className="input num"
+                className="glass-input"
                 inputMode="decimal"
                 value={qty}
                 onChange={(e) => setQty(e.target.value)}
@@ -134,7 +154,7 @@ export default function PurchasePage({
             </Field>
             <Field label={`进价（元 / ${unit === 'box' ? '箱' : product?.unitBase ?? '个'}）`}>
               <input
-                className="input num"
+                className="glass-input"
                 inputMode="decimal"
                 value={cost}
                 onChange={(e) => setCost(e.target.value)}
@@ -144,19 +164,23 @@ export default function PurchasePage({
           </div>
 
           {qtyBase > 0 && strToFen(cost) !== null ? (
-            <div className="tiny">
-              折算：{qtyToStr(qtyBase, product?.boxQty ?? 0, product?.unitBase ?? '个')} ·
-              成本合计 ¥{fenToStr(totalCost)}
-            </div>
+            <p className="tiny-text" style={{ margin: 0 }}>
+              折算：{qtyToStr(qtyBase, product?.boxQty ?? 0, product?.unitBase ?? '个')} · 成本合计 ¥
+              {fenToStr(totalCost)}
+            </p>
           ) : null}
 
-          <div className="row" style={{ gap: 10 }}>
+          <div className="form-row">
             <Field label="批号（可空）">
-              <input className="input" value={batchNo} onChange={(e) => setBatchNo(e.target.value)} />
+              <input
+                className="glass-input"
+                value={batchNo}
+                onChange={(e) => setBatchNo(e.target.value)}
+              />
             </Field>
             <Field label="到货日期">
               <input
-                className="input"
+                className="glass-input"
                 type="date"
                 value={receivedAt}
                 onChange={(e) => setReceivedAt(e.target.value)}
@@ -164,10 +188,10 @@ export default function PurchasePage({
             </Field>
           </div>
 
-          <div className="row" style={{ gap: 10 }}>
+          <div className="form-row">
             <Field label="生产日期（可空）">
               <input
-                className="input"
+                className="glass-input"
                 type="date"
                 value={produceDate}
                 onChange={(e) => setProduceDate(e.target.value)}
@@ -175,7 +199,7 @@ export default function PurchasePage({
             </Field>
             <Field label="有效期至（可空）">
               <input
-                className="input"
+                className="glass-input"
                 type="date"
                 value={expiryDate}
                 onChange={(e) => setExpiryDate(e.target.value)}
@@ -184,60 +208,66 @@ export default function PurchasePage({
           </div>
 
           <Field label="供货厂家（可空）">
-            <input className="input" value={supplier} onChange={(e) => setSupplier(e.target.value)} />
+            <input
+              className="glass-input"
+              value={supplier}
+              onChange={(e) => setSupplier(e.target.value)}
+            />
           </Field>
 
-          <Btn block size="lg" onClick={save}>
+          <Btn block onClick={save}>
             保存这一条
           </Btn>
-          <div className="tiny">照着纸质送货单一条条录，录完一条这条表单会清空，商品保留。</div>
+          <p className="tiny-text" style={{ margin: 0 }}>
+            照着纸质送货单一条条录，录完一条表单会清空，商品保留。
+          </p>
         </div>
       </Card>
 
-      <Card flush>
-        <div className="list-item" onClick={() => setTodayOpen(true)}>
-          <div className="main">
-            <div className="t1">今天已录 {todayBatches.length} 条</div>
-            <div className="t2">点开看明细 / 删错</div>
+      <ul className="glass-list">
+        <li
+          className="glass-list__item glass-list__item--interactive list-item"
+          role="button"
+          tabIndex={0}
+          onClick={() => setTodayOpen(true)}
+        >
+          <span className="glass-list__leading">
+            <PackagePlus size={22} aria-hidden="true" />
+          </span>
+          <div className="glass-list__content">
+            <div className="glass-list__title">今天已录 {todayBatches.length} 条</div>
+            <div className="glass-list__subtitle">点开看明细 / 删错</div>
           </div>
-          <span className="tiny">›</span>
-        </div>
-      </Card>
+        </li>
+      </ul>
 
       {todayOpen ? (
-        <Sheet
-          title="今天录入的进货"
-          onClose={() => setTodayOpen(false)}
-          footer={
-            <Btn block variant="ghost" onClick={() => setTodayOpen(false)}>
-              关闭
-            </Btn>
-          }
-        >
+        <Sheet title="今天录入的进货" onClose={() => setTodayOpen(false)}>
           {todayBatches.length === 0 ? (
-            <Empty icon="📦" text="今天还没录进货" />
+            <Empty icon={<PackagePlus size={24} />} text="今天还没录进货" />
           ) : (
-            <div className="col">
+            <div className="stack-sm">
               {todayBatches.map((b) => {
                 const p = products.find((x) => x.id === b.productId);
                 return (
-                  <div key={b.id} className="card" style={{ padding: 12 }}>
-                    <div className="row between">
+                  <div key={b.id} className="mini-card">
+                    <div className="row-between">
                       <div className="grow">
-                        <div style={{ fontWeight: 700 }}>{pname(b.productId)}</div>
-                        <div className="tiny">
+                        <div className="cart-line__name">{pname(b.productId)}</div>
+                        <div className="cart-line__meta">
                           {qtyToStr(b.qtyBase, p?.boxQty ?? 0, p?.unitBase ?? '个')} · 进价 ¥
                           {fenToStr(b.unitCostFen)}/{p?.unitBase ?? '个'} · 合计 ¥
                           {fenToStr(b.qtyBase * b.unitCostFen)}
                         </div>
                         {b.batchNo || b.expiryDate ? (
-                          <div className="tiny">
+                          <div className="cart-line__meta">
                             {b.batchNo ? `批号 ${b.batchNo}` : ''}
                             {b.expiryDate ? ` · 有效期至 ${b.expiryDate}` : ''}
                           </div>
                         ) : null}
                       </div>
                       <Btn
+                        block={false}
                         variant="danger"
                         size="sm"
                         onClick={async () => {
@@ -246,7 +276,7 @@ export default function PurchasePage({
                           onDone('已删除');
                         }}
                       >
-                        删
+                        <Trash2 size={16} aria-hidden="true" />
                       </Btn>
                     </div>
                   </div>
@@ -270,8 +300,4 @@ export default function PurchasePage({
       ) : null}
     </div>
   );
-}
-
-function unitCostBase(costPerUnit: number, factor: number): number {
-  return Math.max(0, Math.round(costPerUnit / factor));
 }

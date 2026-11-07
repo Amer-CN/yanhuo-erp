@@ -26,7 +26,7 @@ def shot(page, name: str) -> None:
 
 
 def field_input(page, label: str):
-    return page.locator(".field").filter(has_text=label).locator("input, select").first
+    return page.locator(".glass-input-group").filter(has_text=label).locator("input, select").first
 
 
 def main() -> int:

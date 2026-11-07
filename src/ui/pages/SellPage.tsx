@@ -1,4 +1,5 @@
 import { useMemo, useState } from 'react';
+import { Search, ShoppingCart, Plus, Minus, X, Banknote, QrCode, Wallet, Sparkles } from 'lucide-react';
 import type { Category, PayMethod, Product } from '../../db/types';
 import { CATEGORIES, PAY_LABEL } from '../../db/types';
 import { checkout } from '../../db/repo';
@@ -51,29 +52,28 @@ export default function SellPage({
     return m;
   }, [products]);
 
-  const factorOf = (p: Product, unit: 'box' | 'base') => (unit === 'box' && p.boxQty > 1 ? p.boxQty : 1);
+  const factorOf = (p: Product, unit: 'box' | 'base') =>
+    unit === 'box' && p.boxQty > 1 ? p.boxQty : 1;
 
   const addProduct = (p: Product) => {
-    if (cart.some((c) => c.productId === p.id)) {
-      setCart((prev) =>
-        prev.map((c) =>
-          c.productId === p.id
-            ? { ...c, qtyBase: c.qtyBase + factorOf(p, c.unit) }
-            : c
-        )
-      );
-      return;
-    }
-    setCart((prev) => [
-      ...prev,
-      {
-        productId: p.id,
-        unit: 'base',
-        qtyBase: 1,
-        listUnitPriceFen: p.priceList,
-        unitPriceFen: p.priceList
+    setCart((prev) => {
+      const found = prev.find((c) => c.productId === p.id);
+      if (found) {
+        return prev.map((c) =>
+          c.productId === p.id ? { ...c, qtyBase: c.qtyBase + factorOf(p, c.unit) } : c
+        );
       }
-    ]);
+      return [
+        ...prev,
+        {
+          productId: p.id,
+          unit: 'base',
+          qtyBase: 1,
+          listUnitPriceFen: p.priceList,
+          unitPriceFen: p.priceList
+        }
+      ];
+    });
   };
 
   const totalFen = cart.reduce((s, c) => s + c.qtyBase * c.unitPriceFen, 0);
@@ -98,7 +98,6 @@ export default function SellPage({
         const p = productById.get(c.productId);
         if (!p || p.boxQty <= 1) return c;
         if (c.unit === 'base') {
-          // 换成箱：至少 1 箱
           return { ...c, unit: 'box' as const, qtyBase: p.boxQty };
         }
         return { ...c, unit: 'base' as const };
@@ -172,50 +171,63 @@ export default function SellPage({
   const priceLineProduct = priceLine !== null ? productById.get(cart[priceLine]?.productId ?? '') : undefined;
 
   return (
-    <div className="page" style={{ paddingBottom: cart.length ? '150px' : undefined }}>
-      <div className="search">
+    <div className="page-stack">
+      <div className="glass-search">
+        <Search className="glass-search__icon" size={18} aria-hidden="true" />
         <input
-          className="input"
+          className="glass-input"
+          type="search"
           placeholder="搜商品名"
           value={q}
           onChange={(e) => setQ(e.target.value)}
         />
       </div>
 
-      <div className="chips">
+      <div className="chip-row">
         {(['全部', ...CATEGORIES] as const).map((c) => (
-          <button key={c} className={`chip ${cat === c ? 'on' : ''}`} onClick={() => setCat(c)}>
+          <button
+            key={c}
+            type="button"
+            className={`glass-badge glass-badge--md glass-badge--interactive ${
+              cat === c ? 'glass-badge--selected' : ''
+            }`}
+            aria-pressed={cat === c}
+            onClick={() => setCat(c)}
+          >
             {c}
           </button>
         ))}
       </div>
 
-      <div className="row between">
-        <span className="tiny">谁在卖：</span>
-        <div className="seg">
-          {operators.map((o) => (
-            <button key={o} className={operator === o ? 'on' : ''} onClick={() => setOperator(o)}>
-              {o}
-            </button>
-          ))}
-        </div>
+      <div className="glass-segmented glass-segmented--full" role="group" aria-label="谁在卖">
+        {operators.map((o) => (
+          <button
+            key={o}
+            type="button"
+            className="glass-segmented__item"
+            aria-pressed={operator === o}
+            onClick={() => setOperator(o)}
+          >
+            {o}
+          </button>
+        ))}
       </div>
 
       {list.length === 0 ? (
-        <Card2Empty />
+        <Empty icon={<Sparkles size={24} />} text="没有匹配的商品，先去「更多 → 商品」里添加" />
       ) : (
-        <div className="grid">
+        <div className="product-grid">
           {list.map((p) => {
             const stock = inv.get(p.id) ?? 0;
             return (
-              <button key={p.id} className="prod-btn" onClick={() => addProduct(p)}>
-                <span className="name">{p.name}</span>
-                <span className="price">¥{fenToStr(p.priceList)}</span>
-                <span className="meta">
+              <button key={p.id} type="button" className="prod-btn" onClick={() => addProduct(p)}>
+                <span className="prod-btn__name">{p.name}</span>
+                <span className="prod-btn__price">¥{fenToStr(p.priceList)}</span>
+                <span className="prod-btn__meta">
                   /{p.unitBase}
                   {p.boxQty > 1 ? ` · 1箱${p.boxQty}${p.unitBase}` : ''}
                 </span>
-                <span className={`stock ${stock < 0 ? 'low' : ''}`}>
+                <span className={`prod-btn__stock ${stock < 0 ? 'low' : ''}`}>
                   库存 {qtyToStr(stock, p.boxQty, p.unitBase)}
                 </span>
               </button>
@@ -225,23 +237,22 @@ export default function SellPage({
       )}
 
       {cart.length > 0 ? (
-        <div className="checkout-bar">
+        <div className="checkout-dock checkout-bar">
           <button
-            className="btn ghost"
-            style={{ position: 'relative', paddingRight: 16 }}
+            className="checkout-dock__count"
+            type="button"
             onClick={() => setCartOpen(true)}
+            aria-label="打开购物车"
           >
-            🧺 {totalQty} 件
+            <ShoppingCart size={18} aria-hidden="true" />
+            {totalQty} 件
             <span className="cart-count">{cart.length}</span>
           </button>
-          <div className="grow" />
-          <div style={{ textAlign: 'right', lineHeight: 1.15 }}>
-            <div className="tiny">合计</div>
-            <div className="amount" style={{ fontSize: 20, color: 'var(--brand-dark)' }}>
-              ¥{fenToStr(totalFen)}
-            </div>
+          <div className="checkout-dock__total">
+            <div className="k">合计</div>
+            <div className="v">¥{fenToStr(totalFen)}</div>
           </div>
-          <Btn size="lg" onClick={() => setPayOpen(true)}>
+          <Btn block={false} onClick={() => setPayOpen(true)}>
             结算
           </Btn>
         </div>
@@ -250,14 +261,21 @@ export default function SellPage({
       {cartOpen ? (
         <Sheet
           title="购物车"
+          subtitle={`${totalQty} 件 · ¥${fenToStr(totalFen)}`}
           onClose={() => setCartOpen(false)}
           footer={
-            <Btn block size="lg" onClick={() => setPayOpen(true)}>
+            <Btn
+              block
+              onClick={() => {
+                setCartOpen(false);
+                setPayOpen(true);
+              }}
+            >
               去结算 ¥{fenToStr(totalFen)}
             </Btn>
           }
         >
-          <div className="col">
+          <div className="stack-sm">
             {cart.map((c, i) => {
               const p = productById.get(c.productId);
               if (!p) return null;
@@ -265,46 +283,67 @@ export default function SellPage({
               const amount = c.qtyBase * c.unitPriceFen;
               const unitLabel = c.unit === 'box' ? '箱' : p.unitBase;
               return (
-                <div key={c.productId} className="card" style={{ padding: 12 }}>
-                  <div className="row between">
+                <div key={c.productId} className="cart-line">
+                  <div className="row-between">
                     <div className="grow">
-                      <div style={{ fontWeight: 700 }}>{p.name}</div>
-                      <div className="tiny">
+                      <div className="cart-line__name">{p.name}</div>
+                      <div className="cart-line__meta">
                         ¥{fenToStr(c.unitPriceFen * f)}/{unitLabel}
                         {c.unitPriceFen < c.listUnitPriceFen ? ' · 已改价' : ''}
                       </div>
                     </div>
-                    <button
-                      className="btn danger sm"
-                      onClick={() => setCart((prev) => prev.filter((_, idx) => idx !== i))}
-                    >
-                      删
-                    </button>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                      <span style={{ fontWeight: 700, fontVariantNumeric: 'tabular-nums' }}>
+                        ¥{fenToStr(amount)}
+                      </span>
+                      <button
+                        className="icon-btn"
+                        type="button"
+                        aria-label="删除"
+                        onClick={() => setCart((prev) => prev.filter((_, idx) => idx !== i))}
+                      >
+                        <X size={18} aria-hidden="true" />
+                      </button>
+                    </div>
                   </div>
-                  <div className="row between" style={{ marginTop: 10 }}>
+
+                  <div className="row-between">
                     {p.boxQty > 1 ? (
-                      <div className="seg">
-                        <button className={c.unit === 'base' ? 'on' : ''} onClick={() => switchUnit(i)}>
+                      <div className="glass-segmented" role="group" aria-label="销售单位">
+                        <button
+                          type="button"
+                          className="glass-segmented__item"
+                          aria-pressed={c.unit === 'base'}
+                          onClick={() => switchUnit(i)}
+                        >
                           {p.unitBase}
                         </button>
-                        <button className={c.unit === 'box' ? 'on' : ''} onClick={() => switchUnit(i)}>
+                        <button
+                          type="button"
+                          className="glass-segmented__item"
+                          aria-pressed={c.unit === 'box'}
+                          onClick={() => switchUnit(i)}
+                        >
                           箱
                         </button>
                       </div>
                     ) : (
-                      <span className="tiny">{p.unitBase}</span>
+                      <span className="tiny-text">{p.unitBase}</span>
                     )}
+
                     <div className="stepper">
-                      <button onClick={() => changeQty(i, -1)}>−</button>
+                      <button type="button" aria-label="减少" onClick={() => changeQty(i, -1)}>
+                        <Minus size={18} aria-hidden="true" />
+                      </button>
                       <span className="val">{Math.round(c.qtyBase / f)}</span>
-                      <button onClick={() => changeQty(i, 1)}>＋</button>
+                      <button type="button" aria-label="增加" onClick={() => changeQty(i, 1)}>
+                        <Plus size={18} aria-hidden="true" />
+                      </button>
                     </div>
-                    <button className="btn soft sm" onClick={() => openPrice(i)}>
+
+                    <Btn block={false} variant="tertiary" size="sm" onClick={() => openPrice(i)}>
                       改价
-                    </button>
-                    <div style={{ fontWeight: 800, fontVariantNumeric: 'tabular-nums' }}>
-                      ¥{fenToStr(amount)}
-                    </div>
+                    </Btn>
                   </div>
                 </div>
               );
@@ -314,17 +353,26 @@ export default function SellPage({
       ) : null}
 
       {payOpen ? (
-        <Sheet title={`收款 ¥${fenToStr(totalFen)}`} onClose={() => setPayOpen(false)}>
-          <div className="col">
-            <div className="muted">操作人：{operator}</div>
-            <Btn block size="lg" onClick={() => submit('cash')} disabled={busy}>
-              💵 现金
+        <Sheet
+          title={`收款 ¥${fenToStr(totalFen)}`}
+          subtitle={`操作人：${operator}`}
+          onClose={() => setPayOpen(false)}
+        >
+          <div className="stack-sm">
+            <Btn block variant="secondary" onClick={() => submit('cash')} disabled={busy}>
+              <span className="icon-text">
+                <Banknote size={20} aria-hidden="true" /> 现金
+              </span>
             </Btn>
-            <Btn block size="lg" variant="soft" onClick={() => submit('wechat')} disabled={busy}>
-              💚 微信
+            <Btn block variant="secondary" onClick={() => submit('wechat')} disabled={busy}>
+              <span className="icon-text">
+                <QrCode size={20} aria-hidden="true" /> 微信
+              </span>
             </Btn>
-            <Btn block size="lg" variant="soft" onClick={() => submit('alipay')} disabled={busy}>
-              💙 支付宝
+            <Btn block variant="secondary" onClick={() => submit('alipay')} disabled={busy}>
+              <span className="icon-text">
+                <Wallet size={20} aria-hidden="true" /> 支付宝
+              </span>
             </Btn>
           </div>
         </Sheet>
@@ -335,34 +383,38 @@ export default function SellPage({
           title={`改价：${priceLineProduct?.name ?? ''}`}
           onClose={() => setPriceLine(null)}
           footer={
-            <Btn block size="lg" onClick={applyPrice}>
+            <Btn block onClick={applyPrice}>
               确定
             </Btn>
           }
         >
-          <Field label={`成交价（元 / ${cart[priceLine]?.unit === 'box' ? '箱' : priceLineProduct?.unitBase ?? '个'}）`}>
-            <input
-              className="input num"
-              inputMode="decimal"
-              value={priceInput}
-              onChange={(e) => setPriceInput(e.target.value)}
-              autoFocus
-            />
-          </Field>
-          <div className="tiny" style={{ marginTop: 8 }}>
-            原价 ¥
-            {fenToStr(
-              (priceLineProduct?.priceList ?? 0) *
-                (priceLineProduct ? factorOf(priceLineProduct, cart[priceLine]?.unit ?? 'base') : 1)
-            )}
-            ，改价会记进报表的「让利」。
+          <div className="page-stack">
+            <Field
+              label={`成交价（元 / ${
+                cart[priceLine]?.unit === 'box' ? '箱' : priceLineProduct?.unitBase ?? '个'
+              }）`}
+            >
+              <input
+                className="glass-input"
+                inputMode="decimal"
+                value={priceInput}
+                onChange={(e) => setPriceInput(e.target.value)}
+                autoFocus
+              />
+            </Field>
+            <p className="tiny-text">
+              原价 ¥
+              {fenToStr(
+                (priceLineProduct?.priceList ?? 0) *
+                  (priceLineProduct
+                    ? factorOf(priceLineProduct, cart[priceLine]?.unit ?? 'base')
+                    : 1)
+              )}
+              ，改价会记进报表的「让利」。
+            </p>
           </div>
         </Sheet>
       ) : null}
     </div>
   );
-}
-
-function Card2Empty() {
-  return <Empty icon="🧨" text="没有匹配的商品，先去「更多 → 商品」里添加" />;
 }

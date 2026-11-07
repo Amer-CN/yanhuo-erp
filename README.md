@@ -38,7 +38,14 @@ python scripts/e2e-offline.py   # 断网可用（先 build + preview）
 python scripts/e2e-merge.py     # 两设备导出导入合并（先 build + preview）
 ```
 
-界面截图在 [`docs/screenshots/`](docs/screenshots/)。
+界面截图在 [`docs/screenshots/ui/`](docs/screenshots/ui/)（含深色 / 浅色两套）。
+
+## 界面
+
+- 设计系统：[GlassKit](https://github.com/JUNGHERZ/GlassKit) v1.40（iOS 26 Liquid Glass，纯 CSS，MIT）
+- 图标：[lucide-react](https://github.com/lucide-icons/lucide)
+- 深色极光背景 + 半透明玻璃卡片 + 悬浮胶囊 Tab Bar（液滴选中动画）
+- 右上角 🌙/☀️ 一键切换深色 / 浅色
 
 ## 红线
 
