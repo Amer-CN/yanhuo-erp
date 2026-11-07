@@ -1,0 +1,326 @@
+// 核心计算：库存、FIFO 成本、日报、单品毛利、临期预警。
+// 原则：库存和毛利都是「算出来的」，不落库；合并后重算永远一致。
+
+import type { Adjustment, Batch, SaleLine, SalesOrder } from './types';
+import { addDays, isoToLocalDate, localDate } from './util';
+
+/** 有效订单（排除整单作废） */
+export function activeOrderIds(orders: SalesOrder[]): Set<string> {
+  const s = new Set<string>();
+  for (const o of orders) if (!o.voided) s.add(o.id);
+  return s;
+}
+
+/** 各商品当前库存（基本单位，可为负——负库存说明超卖或漏录进货） */
+export function inventoryMap(
+  batches: Batch[],
+  orders: SalesOrder[],
+  lines: SaleLine[],
+  adjustments: Adjustment[]
+): Map<string, number> {
+  const active = activeOrderIds(orders);
+  const m = new Map<string, number>();
+  const add = (pid: string, q: number) => m.set(pid, (m.get(pid) ?? 0) + q);
+  for (const b of batches) add(b.productId, b.qtyBase);
+  for (const l of lines) if (active.has(l.orderId)) add(l.productId, -l.qtyBase);
+  for (const a of adjustments) add(a.productId, a.qtyBase);
+  return m;
+}
+
+export interface FifoResult {
+  /** 明细 → 成本（分） */
+  lineCost: Map<string, number>;
+  /** 批次 → 剩余（基本单位） */
+  batchRemaining: Map<string, number>;
+  /** 没有批次可扣的销量（漏录进货 / 超卖） */
+  uncoveredQty: number;
+  /** 兜底成本（分）：按该商品已有的平均进价估算 */
+  uncoveredCostFen: number;
+}
+
+/**
+ * FIFO 成本重放：进货批次按到货时间先进先出，销售明细按时间顺序扣批。
+ * 两台设备的数据合并后按时间重排，结果就是合并后的真实成本。
+ */
+export function fifoAllocate(
+  batches: Batch[],
+  orders: SalesOrder[],
+  lines: SaleLine[]
+): FifoResult {
+  const orderTime = new Map<string, string>();
+  for (const o of orders) if (!o.voided) orderTime.set(o.id, o.createdAt);
+
+  // 批次排队：到货时间 → 创建时间 → id
+  const byProduct = new Map<string, Batch[]>();
+  for (const b of batches) {
+    const arr = byProduct.get(b.productId) ?? [];
+    arr.push(b);
+    byProduct.set(b.productId, arr);
+  }
+  for (const arr of byProduct.values()) {
+    arr.sort((a, b) => {
+      const ka = `${a.receivedAt}|${a.createdAt}|${a.id}`;
+      const kb = `${b.receivedAt}|${b.createdAt}|${b.id}`;
+      return ka < kb ? -1 : ka > kb ? 1 : 0;
+    });
+  }
+
+  const queueIdx = new Map<string, number>();
+  const batchRemaining = new Map<string, number>();
+  for (const b of batches) batchRemaining.set(b.id, b.qtyBase);
+
+  // 商品兜底均价（分/基本单位）
+  const avgCost = new Map<string, number>();
+  for (const [pid, arr] of byProduct) {
+    let qty = 0;
+    let cost = 0;
+    for (const b of arr) {
+      qty += b.qtyBase;
+      cost += b.qtyBase * b.unitCostFen;
+    }
+    avgCost.set(pid, qty > 0 ? Math.round(cost / qty) : 0);
+  }
+
+  // 销售明细按订单时间排序
+  const sorted = [...lines]
+    .filter((l) => orderTime.has(l.orderId))
+    .sort((a, b) => {
+      const ta = orderTime.get(a.orderId)!;
+      const tb = orderTime.get(b.orderId)!;
+      if (ta !== tb) return ta < tb ? -1 : 1;
+      return a.id < b.id ? -1 : a.id > b.id ? 1 : 0;
+    });
+
+  const lineCost = new Map<string, number>();
+  let uncoveredQty = 0;
+  let uncoveredCostFen = 0;
+
+  for (const line of sorted) {
+    let need = line.qtyBase;
+    let got = 0;
+    let idx = queueIdx.get(line.productId) ?? 0;
+    const arr = byProduct.get(line.productId) ?? [];
+
+    while (need > 0 && idx < arr.length) {
+      const b = arr[idx];
+      const remain = batchRemaining.get(b.id) ?? 0;
+      if (remain <= 0) {
+        idx++;
+        continue;
+      }
+      const take = Math.min(remain, need);
+      got += take * b.unitCostFen;
+      batchRemaining.set(b.id, remain - take);
+      need -= take;
+      if (remain - take === 0) idx++;
+    }
+
+    if (need > 0) {
+      const unit = avgCost.get(line.productId) ?? 0;
+      got += need * unit;
+      uncoveredQty += need;
+      uncoveredCostFen += need * unit;
+    }
+
+    queueIdx.set(line.productId, idx);
+    lineCost.set(line.id, got);
+  }
+
+  return { lineCost, batchRemaining, uncoveredQty, uncoveredCostFen };
+}
+
+export interface DayReport {
+  date: string;
+  orderCount: number;
+  lineCount: number;
+  revenueFen: number;
+  cashFen: number;
+  wechatFen: number;
+  alipayFen: number;
+  costFen: number;
+  grossFen: number;
+  discountFen: number;
+}
+
+function sumByDateReport(
+  date: string,
+  orders: SalesOrder[],
+  lines: SaleLine[],
+  fifo: FifoResult
+): DayReport {
+  const dayOrders = orders.filter((o) => !o.voided && isoToLocalDate(o.createdAt) === date);
+  const orderIds = new Set(dayOrders.map((o) => o.id));
+  const dayLines = lines.filter((l) => orderIds.has(l.orderId));
+
+  let cash = 0,
+    wechat = 0,
+    alipay = 0,
+    revenue = 0,
+    cost = 0,
+    discount = 0;
+  for (const o of dayOrders) {
+    if (o.payMethod === 'cash') cash += o.totalFen;
+    else if (o.payMethod === 'wechat') wechat += o.totalFen;
+    else alipay += o.totalFen;
+    revenue += o.totalFen;
+  }
+  for (const l of dayLines) {
+    cost += fifo.lineCost.get(l.id) ?? 0;
+    discount += l.discountFen;
+  }
+  return {
+    date,
+    orderCount: dayOrders.length,
+    lineCount: dayLines.length,
+    revenueFen: revenue,
+    cashFen: cash,
+    wechatFen: wechat,
+    alipayFen: alipay,
+    costFen: cost,
+    grossFen: revenue - cost,
+    discountFen: discount
+  };
+}
+
+export function dayReport(
+  date: string,
+  orders: SalesOrder[],
+  lines: SaleLine[],
+  fifo: FifoResult
+): DayReport {
+  return sumByDateReport(date, orders, lines, fifo);
+}
+
+/** 日期范围 [from, to]，含两端 */
+export function rangeReport(
+  from: string,
+  to: string,
+  orders: SalesOrder[],
+  lines: SaleLine[],
+  fifo: FifoResult
+): DayReport {
+  const inRange = orders.filter((o) => {
+    if (o.voided) return false;
+    const d = isoToLocalDate(o.createdAt);
+    return d >= from && d <= to;
+  });
+  const orderIds = new Set(inRange.map((o) => o.id));
+  const sel = lines.filter((l) => orderIds.has(l.orderId));
+  let cash = 0,
+    wechat = 0,
+    alipay = 0,
+    revenue = 0,
+    cost = 0,
+    discount = 0;
+  for (const o of inRange) {
+    if (o.payMethod === 'cash') cash += o.totalFen;
+    else if (o.payMethod === 'wechat') wechat += o.totalFen;
+    else alipay += o.totalFen;
+    revenue += o.totalFen;
+  }
+  for (const l of sel) {
+    cost += fifo.lineCost.get(l.id) ?? 0;
+    discount += l.discountFen;
+  }
+  return {
+    date: `${from}~${to}`,
+    orderCount: inRange.length,
+    lineCount: sel.length,
+    revenueFen: revenue,
+    cashFen: cash,
+    wechatFen: wechat,
+    alipayFen: alipay,
+    costFen: cost,
+    grossFen: revenue - cost,
+    discountFen: discount
+  };
+}
+
+export interface ProductMargin {
+  productId: string;
+  name: string;
+  qtyBase: number;
+  revenueFen: number;
+  costFen: number;
+  grossFen: number;
+  discountFen: number;
+}
+
+/** 单品毛利（日期范围内） */
+export function productMargins(
+  from: string,
+  to: string,
+  orders: SalesOrder[],
+  lines: SaleLine[],
+  fifo: FifoResult,
+  productName: (id: string) => string
+): ProductMargin[] {
+  const inRange = new Set(
+    orders
+      .filter((o) => !o.voided && isoToLocalDate(o.createdAt) >= from && isoToLocalDate(o.createdAt) <= to)
+      .map((o) => o.id)
+  );
+  const m = new Map<string, ProductMargin>();
+  for (const l of lines) {
+    if (!inRange.has(l.orderId)) continue;
+    const cur = m.get(l.productId) ?? {
+      productId: l.productId,
+      name: productName(l.productId),
+      qtyBase: 0,
+      revenueFen: 0,
+      costFen: 0,
+      grossFen: 0,
+      discountFen: 0
+    };
+    cur.qtyBase += l.qtyBase;
+    cur.revenueFen += l.amountFen;
+    cur.costFen += fifo.lineCost.get(l.id) ?? 0;
+    cur.discountFen += l.discountFen;
+    m.set(l.productId, cur);
+  }
+  for (const v of m.values()) v.grossFen = v.revenueFen - v.costFen;
+  return [...m.values()].sort((a, b) => b.grossFen - a.grossFen);
+}
+
+export interface ExpiryWarning {
+  batch: Batch;
+  productName: string;
+  remaining: number;
+  daysLeft: number;
+}
+
+/** 临期/过期批次（剩余 > 0 且有效期在 warnDays 内） */
+export function expiryWarnings(
+  batches: Batch[],
+  fifo: FifoResult,
+  productName: (id: string) => string,
+  warnDays: number,
+  today: string = localDate()
+): ExpiryWarning[] {
+  const limit = addDays(today, warnDays);
+  const out: ExpiryWarning[] = [];
+  for (const b of batches) {
+    if (!b.expiryDate) continue;
+    const remaining = fifo.batchRemaining.get(b.id) ?? 0;
+    if (remaining <= 0) continue;
+    if (b.expiryDate > limit) continue;
+    const daysLeft = Math.round(
+      (new Date(`${b.expiryDate}T00:00:00`).getTime() - new Date(`${today}T00:00:00`).getTime()) / 86400000
+    );
+    out.push({ batch: b, productName: productName(b.productId), remaining, daysLeft });
+  }
+  return out.sort((a, b) => a.daysLeft - b.daysLeft);
+}
+
+export interface BatchStockRow {
+  batch: Batch;
+  remaining: number;
+}
+
+/** 某个商品的批次剩余明细 */
+export function batchStock(batches: Batch[], productId: string, fifo: FifoResult): BatchStockRow[] {
+  return batches
+    .filter((b) => b.productId === productId)
+    .map((b) => ({ batch: b, remaining: fifo.batchRemaining.get(b.id) ?? 0 }))
+    .sort((a, b) => (a.batch.receivedAt < b.batch.receivedAt ? -1 : 1));
+}
