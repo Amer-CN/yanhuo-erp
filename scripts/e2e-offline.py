@@ -7,12 +7,12 @@ import os
 import sys
 import time
 
-sys.stdout.reconfigure(encoding="utf-8", errors="replace")
+sys.stdout.reconfigure(encoding="utf-8", errors="replace", line_buffering=True)
 sys.stderr.reconfigure(encoding="utf-8", errors="replace")
 
 from playwright.sync_api import sync_playwright
 
-BASE = "http://127.0.0.1:4173/"
+BASE = sys.argv[1] if len(sys.argv) > 1 else "http://127.0.0.1:4173/"
 ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
 OUT = os.path.join(ROOT, "docs", "screenshots")
 os.makedirs(OUT, exist_ok=True)
@@ -46,18 +46,23 @@ def main() -> int:
                 time.sleep(0.5)
 
         print("[1] 等待 Service Worker 激活并完成预缓存")
-        page.evaluate(
+        sw_ok = page.evaluate(
             """async () => {
-                const reg = await navigator.serviceWorker.ready;
+                const timeout = new Promise((r) => setTimeout(() => r(false), 10000));
+                const ready = navigator.serviceWorker.ready.then(() => true).catch(() => false);
+                const ok = await Promise.race([ready, timeout]);
+                if (!ok) return false;
                 if (!navigator.serviceWorker.controller) {
                     await new Promise((res) => {
                         navigator.serviceWorker.addEventListener('controllerchange', res, { once: true });
-                        setTimeout(res, 4000);
+                        setTimeout(res, 3000);
                     });
                 }
-                return !!reg.active;
+                return true;
             }"""
         )
+        if not sw_ok:
+            errors.append("Service Worker 未就绪")
         # 再给它一点时间把 precache 写完
         page.wait_for_timeout(1500)
         cached = page.evaluate("async () => (await caches.keys()).length")
