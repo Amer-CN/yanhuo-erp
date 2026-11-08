@@ -16,7 +16,7 @@ from playwright.sync_api import sync_playwright
 
 BASE = "http://127.0.0.1:4173/"
 ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
-OUT = os.path.join(ROOT, "docs", "screenshots")
+OUT = os.path.join(ROOT, "docs", "screenshots", "e2e")
 os.makedirs(OUT, exist_ok=True)
 
 errors: list[str] = []
