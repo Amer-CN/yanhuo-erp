@@ -1,5 +1,5 @@
-import { useRef, useState } from 'react';
-import { Download, Upload, Smartphone, Trash2, TriangleAlert, RotateCcw } from 'lucide-react';
+import { useEffect, useRef, useState } from 'react';
+import { Download, Upload, Smartphone, Trash2, TriangleAlert, RotateCcw, Save } from 'lucide-react';
 import { clearAllData, loadAll, setSetting } from '../../db/repo';
 import {
   exportBackup,
@@ -9,12 +9,19 @@ import {
   type BackupFile,
   type MergeResult
 } from '../../db/merge';
+import {
+  createSnapshot,
+  listSnapshots,
+  restoreSnapshot,
+  type SnapshotReason,
+  type SnapshotRow
+} from '../../db/backup';
 import { SETTING_KEYS } from '../../db/types';
 import { afterMerge, clearCloud, getSyncConfig } from '../../db/sync';
 import SyncPanel from '../SyncPanel';
 import type { SyncApi } from '../useSync';
 import { fenToStr } from '../../db/util';
-import { Btn, Card, Field, Sheet, type Done } from '../kit';
+import { Btn, Card, ConfirmSheet, Field, Sheet, type Done } from '../kit';
 
 interface PendingMerge {
   backup: BackupFile;
@@ -28,6 +35,20 @@ interface PendingMerge {
   };
   productDiffs: string[];
   settingsDiffs: string[];
+}
+
+const SNAPSHOT_REASON: Record<SnapshotReason, string> = {
+  close: '收摊自动',
+  manual: '手动',
+  'pre-migrate': '迁移前'
+};
+
+function snapshotStats(row: SnapshotRow): { orderCount: number; revenueFen: number } {
+  const orders = row.file.data.orders.filter((o) => !o.voided);
+  return {
+    orderCount: orders.length,
+    revenueFen: orders.reduce((sum, o) => sum + o.totalFen, 0)
+  };
 }
 
 export default function SettingsPage({
@@ -52,6 +73,51 @@ export default function SettingsPage({
   const [result, setResult] = useState<MergeResult | null>(null);
   const [preMerge, setPreMerge] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
+  const [snapshots, setSnapshots] = useState<SnapshotRow[]>([]);
+  const [restoreTarget, setRestoreTarget] = useState<SnapshotRow | null>(null);
+  const [snapshotBusy, setSnapshotBusy] = useState(false);
+
+  useEffect(() => {
+    void listSnapshots()
+      .then(setSnapshots)
+      .catch(() => setSnapshots([]));
+  }, []);
+
+  const refreshSnapshots = async () => {
+    try {
+      setSnapshots(await listSnapshots());
+    } catch {
+      setSnapshots([]);
+    }
+  };
+
+  const doSnapshot = async () => {
+    setSnapshotBusy(true);
+    try {
+      await createSnapshot('manual');
+      await refreshSnapshots();
+      onDone('已备份到本机');
+    } catch (e) {
+      onDone('备份失败：' + (e instanceof Error ? e.message : String(e)), 'error');
+    } finally {
+      setSnapshotBusy(false);
+    }
+  };
+
+  const doRestore = async () => {
+    if (!restoreTarget?.id) return;
+    setSnapshotBusy(true);
+    try {
+      await restoreSnapshot(restoreTarget.id);
+      setRestoreTarget(null);
+      await refreshSnapshots();
+      onDone('已恢复到这份备份，云同步已暂停；确认无误后到「云同步」重新开启', 'warning');
+    } catch (e) {
+      onDone('恢复失败：' + (e instanceof Error ? e.message : String(e)), 'error');
+    } finally {
+      setSnapshotBusy(false);
+    }
+  };
 
   const saveText = async (key: string, value: string) => {
     await setSetting(key, value);
@@ -214,6 +280,8 @@ export default function SettingsPage({
     }
   };
 
+  const restoreStats = restoreTarget ? snapshotStats(restoreTarget) : null;
+
   return (
     <div className="page-stack">
       <Card>
@@ -295,6 +363,65 @@ export default function SettingsPage({
             e.target.value = '';
           }}
         />
+      </Card>
+
+      <Card>
+        <h2 className="section-title">本地备份</h2>
+        <p className="muted-text" style={{ marginTop: 8 }}>
+          收摊结账后自动存一份在本机，保留最近 3 个日期。清缓存或换机前，先从这里导出一份发微信。
+        </p>
+        <Btn
+          block
+          variant="secondary"
+          disabled={snapshotBusy}
+          onClick={() => void doSnapshot()}
+          style={{ marginTop: 10 }}
+        >
+          <span className="icon-text">
+            <Save size={18} aria-hidden="true" /> 立即备份
+          </span>
+        </Btn>
+        {snapshots.length === 0 ? (
+          <p className="tiny-text" style={{ marginBottom: 0 }}>
+            还没有本地备份。
+          </p>
+        ) : (
+          <div className="stack-sm" style={{ marginTop: 12 }}>
+            {snapshots.slice(0, 3).map((row) => {
+              const stats = snapshotStats(row);
+              return (
+                <div key={row.id ?? row.at} className="stack-sm">
+                  <p className="tiny-text" style={{ margin: 0 }}>
+                    {row.at.slice(0, 16).replace('T', ' ')} · {SNAPSHOT_REASON[row.reason]} ·{' '}
+                    {stats.orderCount} 单 · ¥{fenToStr(stats.revenueFen)}
+                  </p>
+                  <div className="row" style={{ gap: 8 }}>
+                    <Btn
+                      block={false}
+                      variant="secondary"
+                      style={{ flex: 1 }}
+                      disabled={snapshotBusy}
+                      onClick={() => setRestoreTarget(row)}
+                    >
+                      恢复
+                    </Btn>
+                    <Btn
+                      block={false}
+                      variant="tertiary"
+                      style={{ flex: 1 }}
+                      onClick={() => {
+                        download(row.file);
+                        onDone('已导出这份备份');
+                      }}
+                    >
+                      导出
+                    </Btn>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        )}
       </Card>
 
       <SyncPanel sync={sync} onDone={onDone} />
@@ -463,6 +590,27 @@ export default function SettingsPage({
             </Btn>
           </div>
         </Sheet>
+      ) : null}
+    {restoreTarget && restoreStats ? (
+        <ConfirmSheet
+          title="恢复这份本地备份？"
+          description={
+            <div className="stack-sm">
+              <p style={{ margin: 0 }}>
+                当前本机数据会被这份备份整体替换；恢复后云同步默认暂停，避免旧数据覆盖另一台手机。
+              </p>
+              <p className="tiny-text" style={{ margin: 0 }}>
+                {restoreTarget.at.slice(0, 16).replace('T', ' ')} · {SNAPSHOT_REASON[restoreTarget.reason]} ·{' '}
+                {restoreStats.orderCount} 单 · ¥{fenToStr(restoreStats.revenueFen)}
+              </p>
+            </div>
+          }
+          confirmText="恢复并暂停云同步"
+          danger
+          busy={snapshotBusy}
+          onConfirm={() => void doRestore()}
+          onCancel={() => setRestoreTarget(null)}
+        />
       ) : null}
     </div>
   );

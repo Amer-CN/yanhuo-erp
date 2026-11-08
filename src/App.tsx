@@ -27,6 +27,7 @@ import {
 } from './db/repo';
 import { SETTING_KEYS, type Session } from './db/types';
 import { seedIfEmpty } from './db/seed';
+import { createSnapshot } from './db/backup';
 import {
   emptySessionSummary,
   fifoAllocate,
@@ -456,6 +457,10 @@ export default function App() {
       const s = await closeSession(closeOpen.id, operators[0] || '我');
       setCloseOpen(null);
       setCloseDone(s);
+      // 收摊成功即落一份本地快照；备份失败只提示，不阻断结账流程
+      void createSnapshot('close').catch(() => {
+        showToast('已结账，但本地备份没写成', 'warning');
+      });
       showToast(
         `已结账 · ${s.summary?.orderCount ?? 0} 单 ¥${fenToStr(s.summary?.revenueFen ?? 0)}`
       );
