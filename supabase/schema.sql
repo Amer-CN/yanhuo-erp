@@ -10,6 +10,8 @@ create table if not exists public.yh_records (
   updated_at bigint not null,
   -- 业务修改时间（毫秒）；冲突判定用，旧客户端不写时默认 0
   record_updated_at bigint not null default 0,
+  -- 记录格式版本；旧客户端不写时默认 1
+  schema_version int not null default 1,
   device_id text not null default '',
   deleted boolean not null default false
 );

@@ -154,6 +154,8 @@ const TABLE_BY_KIND: Record<Kind, Table<any, any>> = {
   setting: db.settings
 };
 
+const KNOWN_KINDS = new Set<Kind>(Object.keys(TABLE_BY_KIND) as Kind[]);
+
 const RECORD_TABLES = [
   db.products,
   db.batches,
@@ -208,16 +210,34 @@ interface PushRow {
   data: unknown;
   updated_at: number;
   record_updated_at?: number;
+  schema_version?: number;
   device_id: string;
   deleted: boolean;
 }
 
-/** record_updated_at 列在当前远端缺失时降级为旧格式（只提示一次） */
+/** record_updated_at / schema_version 列在当前远端缺失时降级为旧格式（只提示一次） */
 let recordColumnMissing = false;
+let schemaColumnMissing = false;
 
-function isUnknownRecordColumnError(e: unknown): boolean {
+/** PGRST204 表示列不存在；按错误文本判断缺的是哪一列 */
+function missingColumns(e: unknown): 'record' | 'schema' | 'both' | null {
   const msg = e instanceof Error ? e.message : String(e);
-  return msg.includes('PGRST204') || msg.includes('record_updated_at');
+  if (!msg.includes('PGRST204')) return null;
+  const record = msg.includes('record_updated_at');
+  const schema = msg.includes('schema_version');
+  if (record && schema) return 'both';
+  if (record) return 'record';
+  if (schema) return 'schema';
+  return 'both';
+}
+
+function stripMissingColumns(rows: PushRow[]): PushRow[] {
+  return rows.map((row) => {
+    const copy = { ...row };
+    if (recordColumnMissing) delete copy.record_updated_at;
+    if (schemaColumnMissing) delete copy.schema_version;
+    return copy;
+  });
 }
 
 async function postPayload(cfg: SyncConfig, rows: PushRow[]): Promise<void> {
@@ -259,34 +279,64 @@ async function pushOutbox(cfg: SyncConfig, deviceId: string): Promise<number> {
     if (!recordColumnMissing) {
       payloadRow.record_updated_at = local ? businessTime(local) : 0;
     }
+    if (!schemaColumnMissing) payloadRow.schema_version = 2;
     payload.push(payloadRow);
   }
 
   if (payload.length > 0) {
-    try {
-      await postPayload(cfg, payload);
-    } catch (e) {
-      if (!recordColumnMissing && isUnknownRecordColumnError(e)) {
-        // 人工还没执行 supabase/migrations，降级为旧格式，避免整条同步链路卡死
-        recordColumnMissing = true;
+    let rowsToSend = payload;
+    let attempts = 0;
+    while (attempts < 4) {
+      attempts++;
+      try {
+        await postPayload(cfg, rowsToSend);
+        break;
+      } catch (e) {
+        const missing = missingColumns(e);
+        if (!missing) throw e;
+
+        const before = `${recordColumnMissing}/${schemaColumnMissing}`;
+        if (missing === 'record' || missing === 'both') recordColumnMissing = true;
+        if (missing === 'schema' || missing === 'both') schemaColumnMissing = true;
+        if (`${recordColumnMissing}/${schemaColumnMissing}` === before) throw e;
+
         try {
-          localStorage.setItem('yh-sync-warn', '远端缺少 record_updated_at 列，已降级推送');
+          localStorage.setItem(
+            'yh-sync-warn',
+            '远端缺少 record_updated_at 或 schema_version 列，已降级推送'
+          );
         } catch {
           /* 隐私模式忽略 */
         }
-        const legacy = payload.map((row) => {
-          const copy = { ...row };
-          delete copy.record_updated_at;
-          return copy;
-        });
-        await postPayload(cfg, legacy);
-      } else {
-        throw e;
+        rowsToSend = stripMissingColumns(payload);
+        if (attempts >= 4) throw e;
       }
     }
   }
   await db.outbox.bulkDelete(rows.map((r) => r.id));
   return payload.length;
+}
+
+/**
+ * 记录本机遇到的未知 kind（新版本客户端写入的记录），最多保留 20 条 id。
+ * 不写入业务表、不删除远端行；水位仍按 updated_at 推进。
+ */
+const UNKNOWN_KINDS_KEY = 'sync-unknown-kinds';
+
+async function mergeUnknownKinds(ids: string[]): Promise<void> {
+  if (ids.length === 0) return;
+  const prev = (await db.settings.get(UNKNOWN_KINDS_KEY))?.value;
+  let arr: string[] = [];
+  if (prev) {
+    try {
+      const parsed = JSON.parse(prev) as unknown;
+      if (Array.isArray(parsed)) arr = parsed.filter((x): x is string => typeof x === 'string');
+    } catch {
+      /* 坏值按空数组处理 */
+    }
+  }
+  const merged = [...new Set([...arr, ...ids])].slice(-20);
+  await db.settings.put({ key: UNKNOWN_KINDS_KEY, value: JSON.stringify(merged) });
 }
 
 /**
@@ -305,10 +355,16 @@ async function applyRemoteBatch(rows: RemoteRow[]): Promise<void> {
   const active = rows.filter((r) => !pending.has(`${r.kind}:${r.record_id}`));
   if (active.length === 0) return;
 
+  const knownRows = active.filter((r) => KNOWN_KINDS.has(r.kind));
+  const unknownIds = active
+    .filter((r) => !KNOWN_KINDS.has(r.kind))
+    .map((r) => `${String(r.kind)}:${r.record_id}`);
+  if (knownRows.length === 0 && unknownIds.length === 0) return;
+
   await db.transaction('rw', [...RECORD_TABLES, db.conflicts], async () => {
     const conflictRows: SyncConflictRow[] = [];
     const idsByKind = new Map<Kind, string[]>();
-    for (const row of active) {
+    for (const row of knownRows) {
       const ids = idsByKind.get(row.kind) ?? [];
       ids.push(row.record_id);
       idsByKind.set(row.kind, ids);
@@ -361,7 +417,7 @@ async function applyRemoteBatch(rows: RemoteRow[]): Promise<void> {
       }
     };
 
-    for (const row of active) {
+    for (const row of knownRows) {
       if (row.deleted) {
         if (row.kind === 'order') dropLinesOfOrder(row.record_id);
         deleteRow(row.kind, row.record_id);
@@ -406,6 +462,7 @@ async function applyRemoteBatch(rows: RemoteRow[]): Promise<void> {
           break;
         }
         default:
+          // 未知 kind 已按 KNOWN_KINDS 过滤；这里处理 order/batch/line/adjustment/product
           putRow(row.kind, row.record_id, {
             ...(row.data as Record<string, unknown>),
             id: row.record_id
@@ -427,6 +484,7 @@ async function applyRemoteBatch(rows: RemoteRow[]): Promise<void> {
       if (map.size > 0) await TABLE_BY_KIND[kind].bulkPut([...map.values()]);
     }
     if (conflictRows.length > 0) await db.conflicts.bulkAdd(conflictRows);
+    await mergeUnknownKinds(unknownIds);
   });
 }
 
