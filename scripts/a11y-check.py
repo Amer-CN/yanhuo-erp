@@ -32,6 +32,7 @@ def main() -> int:
             reduced_motion="reduce",
         )
         page = ctx.new_page()
+        ctx.add_init_script("localStorage.setItem('yh-sync-disabled','1')")
         for i in range(40):
             try:
                 page.goto(BASE, wait_until="networkidle", timeout=8000)

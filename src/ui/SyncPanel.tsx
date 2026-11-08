@@ -3,6 +3,7 @@ import { Cloud, CloudOff, RefreshCw, Settings2, Trash2, Copy } from 'lucide-reac
 import {
   clearSyncConfig,
   getSyncConfig,
+  isDefaultSyncConfig,
   makeLedgerKey,
   saveSyncConfig,
   testSyncConfig,
@@ -179,6 +180,9 @@ export default function SyncPanel({ sync, onDone }: { sync: SyncApi; onDone: Don
         </div>
       ) : (
         <div className="page-stack" style={{ marginTop: 10 }}>
+          <p className="tiny-text" style={{ margin: 0 }}>
+            内置配置，打开即用；需要换账本再点「修改配置」。
+          </p>
           <div className="sync-lines">
             <div className="sync-line">
               <span>状态</span>
@@ -186,6 +190,10 @@ export default function SyncPanel({ sync, onDone }: { sync: SyncApi; onDone: Don
                 {sync.configured ? <Cloud size={16} aria-hidden="true" /> : <CloudOff size={16} aria-hidden="true" />}
                 {statusText}
               </span>
+            </div>
+            <div className="sync-line">
+              <span>配置</span>
+              <span>{isDefaultSyncConfig() ? '内置，打开即用' : '自定义'}</span>
             </div>
             <div className="sync-line">
               <span>上次同步</span>

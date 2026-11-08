@@ -30,6 +30,7 @@ def main() -> int:
             timezone_id="Asia/Shanghai",
         )
         page = ctx.new_page()
+        ctx.add_init_script("localStorage.setItem('yh-sync-disabled','1')")
         page.on(
             "console",
             lambda m: errors.append(f"console.{m.type}: {m.text}") if m.type == "error" else None,
@@ -109,3 +110,4 @@ def main() -> int:
 
 if __name__ == "__main__":
     sys.exit(main())
+

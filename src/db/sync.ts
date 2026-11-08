@@ -4,6 +4,7 @@
 import { db } from './db';
 import { loadAll } from './repo';
 import { enqueueAllLocal, pendingCount, syncWanted } from './outbox';
+import { DEFAULT_SYNC } from './syncDefaults';
 import type { Adjustment, Batch, Product, SaleLine, SalesOrder, Setting } from './types';
 
 export interface SyncConfig {
@@ -27,7 +28,8 @@ const LS = {
   ledger: 'yh-sync-ledger',
   lastPull: 'yh-sync-last-pull',
   lastSync: 'yh-sync-last-sync',
-  error: 'yh-sync-error'
+  error: 'yh-sync-error',
+  disabled: 'yh-sync-disabled'
 };
 
 /** 设备身份类设置不参与云同步 */
@@ -35,20 +37,42 @@ const SKIP_SETTINGS = new Set<string>(['deviceId', 'deviceName']);
 
 export function getSyncConfig(): SyncConfig | null {
   try {
+    if (localStorage.getItem(LS.disabled) === '1') return null;
+
     const url = localStorage.getItem(LS.url)?.trim().replace(/\/+$/, '');
     const anonKey = localStorage.getItem(LS.anonKey)?.trim();
     const ledgerKey = localStorage.getItem(LS.ledger)?.trim();
-    if (!url || !anonKey || !ledgerKey) return null;
-    return { url, anonKey, ledgerKey };
+    if (url && anonKey && ledgerKey) return { url, anonKey, ledgerKey };
+
+    // 没手动配置就用内置配置：打开即同步，零设置
+    if (DEFAULT_SYNC.url && DEFAULT_SYNC.anonKey && DEFAULT_SYNC.ledgerKey) {
+      return {
+        url: DEFAULT_SYNC.url,
+        anonKey: DEFAULT_SYNC.anonKey,
+        ledgerKey: DEFAULT_SYNC.ledgerKey
+      };
+    }
+    return null;
   } catch {
     return null;
   }
+}
+
+export function isDefaultSyncConfig(): boolean {
+  const cfg = getSyncConfig();
+  return Boolean(
+    cfg &&
+      cfg.url === DEFAULT_SYNC.url &&
+      cfg.anonKey === DEFAULT_SYNC.anonKey &&
+      cfg.ledgerKey === DEFAULT_SYNC.ledgerKey
+  );
 }
 
 export function saveSyncConfig(cfg: SyncConfig): void {
   localStorage.setItem(LS.url, cfg.url.trim().replace(/\/+$/, ''));
   localStorage.setItem(LS.anonKey, cfg.anonKey.trim());
   localStorage.setItem(LS.ledger, cfg.ledgerKey.trim());
+  localStorage.removeItem(LS.disabled);
 }
 
 export function clearSyncConfig(): void {
@@ -58,6 +82,7 @@ export function clearSyncConfig(): void {
   localStorage.removeItem(LS.lastPull);
   localStorage.removeItem(LS.lastSync);
   localStorage.removeItem(LS.error);
+  localStorage.setItem(LS.disabled, '1');
 }
 
 export function makeLedgerKey(): string {
