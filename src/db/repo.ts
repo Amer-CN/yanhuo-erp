@@ -50,6 +50,20 @@ export async function ensureDeviceId(): Promise<string> {
   });
 }
 
+/**
+ * 启动期默认设置：一次读取、一次批量写入，避免启动链上多个串行 IDB 往返。
+ * 仍按 setSetting 的语义把新写入的 key 登记到发件箱，同步行为不变。
+ */
+export async function ensureBootstrapSettings(defaults: Record<string, string>): Promise<void> {
+  const keys = Object.keys(defaults);
+  const rows = await db.settings.toArray();
+  const present = new Map(rows.map((r) => [r.key, r.value]));
+  const missing = keys.filter((k) => !present.get(k));
+  if (missing.length === 0) return;
+  await db.settings.bulkPut(missing.map((k) => ({ key: k, value: defaults[k] })));
+  await enqueueMany(missing.map((k) => ({ kind: 'setting' as const, recordId: k })));
+}
+
 /* ------------------------------------------------------------------ 商品 */
 
 export interface ProductInput {

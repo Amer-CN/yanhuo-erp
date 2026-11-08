@@ -1,7 +1,7 @@
 // 单据草稿：自动存 sessionStorage，防止补记中途被打断白做。
 // 金额一律整数分；输入框保留文本，避免受控输入跳光标。
 
-import type { PayMethod } from '../db/types';
+import type { PayMethod, SalesOrder } from '../db/types';
 import { fenToStr, strToFen } from '../db/util';
 
 export interface RecordLineDraft {
@@ -101,4 +101,34 @@ export function amountFromText(text: string): number {
 
 export function draftLineAmount(qtyBase: number, listUnitPriceFen: number): string {
   return fenToStr(Math.max(0, qtyBase * listUnitPriceFen));
+}
+
+/** 从已保存的单构造编辑草稿 */
+export function draftFromOrder(
+  order: SalesOrder,
+  lines: {
+    productId: string;
+    qtyBase: number;
+    unit: 'box' | 'base';
+    listUnitPriceFen: number;
+    amountFen: number;
+    gift?: boolean;
+  }[]
+): RecordDraft {
+  return {
+    sessionId: order.sessionId,
+    payMethod: order.payMethod,
+    operator: order.operator,
+    note: order.note ?? '',
+    lines: lines.map((l) => ({
+      productId: l.productId,
+      unit: l.unit,
+      qtyBase: l.qtyBase,
+      listUnitPriceFen: l.listUnitPriceFen,
+      amountText: fenToStr(l.amountFen),
+      amountFen: l.amountFen,
+      amountTouched: true,
+      gift: Boolean(l.gift)
+    }))
+  };
 }

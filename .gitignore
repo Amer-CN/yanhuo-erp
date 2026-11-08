@@ -5,3 +5,4 @@ dev-dist
 .DS_Store
 Thumbs.db
 docs/screenshots/e2e/
+.perf/

@@ -47,28 +47,8 @@ function newLine(p: Product): RecordLineDraft {
   };
 }
 
-/** 从已保存的单构造编辑草稿 */
-export function draftFromOrder(
-  order: SalesOrder,
-  lines: { productId: string; qtyBase: number; unit: 'box' | 'base'; listUnitPriceFen: number; amountFen: number; gift?: boolean }[]
-): RecordDraft {
-  return {
-    sessionId: order.sessionId,
-    payMethod: order.payMethod,
-    operator: order.operator,
-    note: order.note ?? '',
-    lines: lines.map((l) => ({
-      productId: l.productId,
-      unit: l.unit,
-      qtyBase: l.qtyBase,
-      listUnitPriceFen: l.listUnitPriceFen,
-      amountText: fenToStr(l.amountFen),
-      amountFen: l.amountFen,
-      amountTouched: true,
-      gift: Boolean(l.gift)
-    }))
-  };
-}
+/** 从已保存的单构造编辑草稿（实现见 recordDraft，供首屏轻量引用） */
+export { draftFromOrder } from './recordDraft';
 
 /**
  * 单据编辑（记一笔）：整页，避免 Sheet 内键盘遮挡。

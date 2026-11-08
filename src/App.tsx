@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { lazy, Suspense, useEffect, useMemo, useRef, useState } from 'react';
 import { useLiveQuery } from 'dexie-react-hooks';
 import {
   Sparkles,
@@ -18,8 +18,8 @@ import {
 } from 'lucide-react';
 import {
   closeSession,
+  ensureBootstrapSettings,
   ensureDeviceId,
-  getSetting,
   loadAll,
   migrateSessions,
   reopenSession,
@@ -38,15 +38,38 @@ import { fenToStr, isoToTime } from './db/util';
 import { Btn, Card, ConfirmSheet, Empty, Toast, type Done, type ToastTone } from './ui/kit';
 import { useSync } from './ui/useSync';
 import RecordPage from './ui/pages/RecordPage';
-import PurchasePage from './ui/pages/PurchasePage';
-import StockPage from './ui/pages/StockPage';
-import ReportPage from './ui/pages/ReportPage';
-import ProductsPage from './ui/pages/ProductsPage';
-import HistoryPage from './ui/pages/HistoryPage';
-import SettingsPage from './ui/pages/SettingsPage';
-import RecordEditor, { draftFromOrder } from './ui/RecordEditor';
 import CloseSessionSheet, { CloseSessionResult } from './ui/CloseSessionSheet';
 import type { RecordDraft } from './ui/recordDraft';
+import { draftFromOrder } from './ui/recordDraft';
+
+// 首屏只需要记账页；其余页面与弹层按需加载，避免弱网下首包过大。
+const PurchasePage = lazy(() => import('./ui/pages/PurchasePage'));
+const StockPage = lazy(() => import('./ui/pages/StockPage'));
+const ReportPage = lazy(() => import('./ui/pages/ReportPage'));
+const ProductsPage = lazy(() => import('./ui/pages/ProductsPage'));
+const HistoryPage = lazy(() => import('./ui/pages/HistoryPage'));
+const SettingsPage = lazy(() => import('./ui/pages/SettingsPage'));
+const RecordEditor = lazy(() => import('./ui/RecordEditor'));
+
+const preloadSecondaryPages = () => {
+  void import('./ui/pages/PurchasePage');
+  void import('./ui/pages/StockPage');
+  void import('./ui/pages/ReportPage');
+  void import('./ui/pages/ProductsPage');
+  void import('./ui/pages/HistoryPage');
+  void import('./ui/pages/SettingsPage');
+  void import('./ui/RecordEditor');
+};
+
+function PageLoading() {
+  return (
+    <div className="page-stack" aria-busy="true">
+      <Card>
+        <p className="muted-text" style={{ margin: 0 }}>正在打开…</p>
+      </Card>
+    </div>
+  );
+}
 
 type Tab = 'record' | 'purchase' | 'stock' | 'report' | 'more';
 type SubPage = 'products' | 'history' | 'settings' | null;
@@ -84,6 +107,72 @@ type Theme = 'dark' | 'light';
 function initialTheme(): Theme {
   const saved = localStorage.getItem('yh-theme');
   return saved === 'light' ? 'light' : 'dark';
+}
+
+/** 顶栏与底部导航独立成组件：数据未就绪时也能先渲染外壳，缩短首屏等待 */
+function AppHeader({
+  title,
+  sub,
+  theme,
+  onBack,
+  onToggleTheme
+}: {
+  title: string;
+  sub: SubPage;
+  theme: Theme;
+  onBack: () => void;
+  onToggleTheme: () => void;
+}) {
+  return (
+    <header className="glass-nav app-nav">
+      {sub ? (
+        <button className="glass-pill back-btn" onClick={onBack} aria-label="返回" type="button">
+          <ChevronLeft size={22} aria-hidden="true" />
+        </button>
+      ) : (
+        <img className="app-brand" src="./brand-128.png" alt="" aria-hidden="true" />
+      )}
+      <h1 className="glass-title">{title}</h1>
+      <button
+        className="glass-pill"
+        onClick={onToggleTheme}
+        aria-label={theme === 'dark' ? '切到浅色' : '切到深色'}
+        type="button"
+      >
+        {theme === 'dark' ? <Sun size={21} aria-hidden="true" /> : <Moon size={21} aria-hidden="true" />}
+      </button>
+    </header>
+  );
+}
+
+function TabBar({ tab, onSelect }: { tab: Tab; onSelect: (t: Tab) => void }) {
+  return (
+    <div className="glass-tab-bar-dock">
+      <nav
+        className="glass-tab-bar glass-tab-bar--floating glass-tab-bar--droplet"
+        aria-label="主导航"
+      >
+        {TABS.map((t) => {
+          const Icon = t.icon;
+          const on = tab === t.key;
+          return (
+            <button
+              key={t.key}
+              type="button"
+              className={`glass-tab-bar__item ${on ? 'is-active' : ''}`}
+              aria-current={on ? 'page' : undefined}
+              onClick={() => onSelect(t.key)}
+            >
+              <span className="glass-tab-bar__icon">
+                <Icon size={24} aria-hidden="true" />
+              </span>
+              <span className="glass-tab-bar__label">{t.label}</span>
+            </button>
+          );
+        })}
+      </nav>
+    </div>
+  );
 }
 
 function defaultDeviceName(): string {
@@ -146,14 +235,12 @@ export default function App() {
     (async () => {
       try {
         await ensureDeviceId();
-        if (!(await getSetting(SETTING_KEYS.deviceName))) {
-          await setSetting(SETTING_KEYS.deviceName, defaultDeviceName());
-        }
-        if (!(await getSetting(SETTING_KEYS.operatorA))) await setSetting(SETTING_KEYS.operatorA, '我');
-        if (!(await getSetting(SETTING_KEYS.operatorB))) await setSetting(SETTING_KEYS.operatorB, '老婆');
-        if (!(await getSetting(SETTING_KEYS.expiryWarnDays))) {
-          await setSetting(SETTING_KEYS.expiryWarnDays, '30');
-        }
+        await ensureBootstrapSettings({
+          [SETTING_KEYS.deviceName]: defaultDeviceName(),
+          [SETTING_KEYS.operatorA]: '我',
+          [SETTING_KEYS.operatorB]: '老婆',
+          [SETTING_KEYS.expiryWarnDays]: '30'
+        });
         await seedIfEmpty();
         try {
           await migrateSessions();
@@ -173,6 +260,19 @@ export default function App() {
 
   const data = useLiveQuery(() => loadAll(), []);
   const sync = useSync();
+
+  // 首屏渲染完成后再空闲预取其余页面，切 tab / 开单时不等待下载。
+  useEffect(() => {
+    if (!ready) return;
+    const canIdle = typeof window.requestIdleCallback === 'function';
+    const handle = canIdle
+      ? window.requestIdleCallback(preloadSecondaryPages, { timeout: 2500 })
+      : window.setTimeout(preloadSecondaryPages, 1200);
+    return () => {
+      if (canIdle) window.cancelIdleCallback(handle);
+      else window.clearTimeout(handle);
+    };
+  }, [ready]);
 
   const armToast = (ms: number) => {
     if (timer.current) window.clearTimeout(timer.current);
@@ -277,17 +377,35 @@ export default function App() {
     );
   }, [editingOrder, data]);
 
+  const toggleTheme = () => setTheme(theme === 'dark' ? 'light' : 'dark');
+
   if (!ready || !data) {
     return (
-      <div className="glass-bg">
+      <div className="glass-bg glass-bg--has-tab-bar-floating">
         <div className="app-shell">
-          <div style={{ marginTop: '42vh' }}>
-            <Empty
-              icon={<Sparkles size={24} />}
-              text={bootError ? `账本打不开：${bootError}` : '正在打开账本…'}
-            />
-          </div>
+          <AppHeader
+            title="记账"
+            sub={null}
+            theme={theme}
+            onBack={() => undefined}
+            onToggleTheme={toggleTheme}
+          />
+          <main className="app-main">
+            <div style={{ marginTop: '34vh' }}>
+              <Empty
+                icon={<Sparkles size={24} />}
+                text={bootError ? `账本打不开：${bootError}` : '正在打开账本…'}
+              />
+            </div>
+          </main>
         </div>
+        <TabBar
+          tab={tab}
+          onSelect={(t) => {
+            setTab(t);
+            setSub(null);
+          }}
+        />
       </div>
     );
   }
@@ -374,29 +492,13 @@ export default function App() {
     <div className={`glass-bg ${editor ? '' : 'glass-bg--has-tab-bar-floating'}`}>
       <div className="app-shell">
         {!editor ? (
-          <header className="glass-nav app-nav">
-            {sub ? (
-              <button
-                className="glass-pill back-btn"
-                onClick={() => setSub(null)}
-                aria-label="返回"
-                type="button"
-              >
-                <ChevronLeft size={22} aria-hidden="true" />
-              </button>
-            ) : (
-              <img className="app-brand" src="./icon-192.png" alt="" aria-hidden="true" />
-            )}
-            <h1 className="glass-title">{title}</h1>
-            <button
-              className="glass-pill"
-              onClick={() => setTheme(theme === 'dark' ? 'light' : 'dark')}
-              aria-label={theme === 'dark' ? '切到浅色' : '切到深色'}
-              type="button"
-            >
-              {theme === 'dark' ? <Sun size={21} aria-hidden="true" /> : <Moon size={21} aria-hidden="true" />}
-            </button>
-          </header>
+          <AppHeader
+            title={title}
+            sub={sub}
+            theme={theme}
+            onBack={() => setSub(null)}
+            onToggleTheme={toggleTheme}
+          />
         ) : null}
 
         <main className={editor ? 'app-main app-main--editor' : 'app-main'}>
@@ -427,6 +529,7 @@ export default function App() {
             </div>
           ) : null}
 
+          <Suspense fallback={<PageLoading />}>
           {editor ? (
             <RecordEditor
               key={
@@ -565,38 +668,18 @@ export default function App() {
               ) : null}
             </>
           )}
+          </Suspense>
         </main>
       </div>
 
       {!sub && !editor ? (
-        <div className="glass-tab-bar-dock">
-          <nav
-            className="glass-tab-bar glass-tab-bar--floating glass-tab-bar--droplet"
-            aria-label="主导航"
-          >
-            {TABS.map((t) => {
-              const Icon = t.icon;
-              const on = tab === t.key;
-              return (
-                <button
-                  key={t.key}
-                  type="button"
-                  className={`glass-tab-bar__item ${on ? 'is-active' : ''}`}
-                  aria-current={on ? 'page' : undefined}
-                  onClick={() => {
-                    setTab(t.key);
-                    setSub(null);
-                  }}
-                >
-                  <span className="glass-tab-bar__icon">
-                    <Icon size={24} aria-hidden="true" />
-                  </span>
-                  <span className="glass-tab-bar__label">{t.label}</span>
-                </button>
-              );
-            })}
-          </nav>
-        </div>
+        <TabBar
+          tab={tab}
+          onSelect={(t) => {
+            setTab(t);
+            setSub(null);
+          }}
+        />
       ) : null}
 
       {closeOpen ? (

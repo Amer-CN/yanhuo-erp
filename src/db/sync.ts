@@ -6,6 +6,7 @@ import { loadAll } from './repo';
 import { enqueueAllLocal, pendingCount, syncWanted } from './outbox';
 import { DEFAULT_SYNC } from './syncDefaults';
 import { mergeSessionPair } from './sessionLogic';
+import type { Table } from 'dexie';
 import type { Adjustment, Batch, Product, SaleLine, SalesOrder, Session, Setting } from './types';
 
 export interface SyncConfig {
@@ -140,51 +141,50 @@ async function rest<T = unknown>(
 
 type Kind = 'product' | 'batch' | 'order' | 'line' | 'adjustment' | 'session' | 'setting';
 
-async function getLocal(kind: Kind, recordId: string): Promise<unknown | undefined> {
-  switch (kind) {
-    case 'product':
-      return db.products.get(recordId);
-    case 'batch':
-      return db.batches.get(recordId);
-    case 'order':
-      return db.orders.get(recordId);
-    case 'line':
-      return db.lines.get(recordId);
-    case 'adjustment':
-      return db.adjustments.get(recordId);
-    case 'session':
-      return db.sessions.get(recordId);
-    case 'setting':
-      return db.settings.get(recordId);
-  }
-}
+/** 记录类型 → 本地表；同步的读写按类型批量合并，避免逐条往返。 */
+const TABLE_BY_KIND: Record<Kind, Table<any, any>> = {
+  product: db.products,
+  batch: db.batches,
+  order: db.orders,
+  line: db.lines,
+  adjustment: db.adjustments,
+  session: db.sessions,
+  setting: db.settings
+};
 
-async function deleteLocal(kind: Kind, recordId: string): Promise<void> {
-  switch (kind) {
-    case 'product':
-      await db.products.delete(recordId);
-      return;
-    case 'batch':
-      await db.batches.delete(recordId);
-      return;
-    case 'order':
-      await db.orders.delete(recordId);
-      await db.lines.where('orderId').equals(recordId).delete();
-      return;
-    case 'line':
-      await db.lines.delete(recordId);
-      return;
-    case 'adjustment':
-      await db.adjustments.delete(recordId);
-      return;
-    case 'session':
-      // 场次删除只删本机记录；单子按自己的 sessionId 处理
-      await db.sessions.delete(recordId);
-      return;
-    case 'setting':
-      await db.settings.delete(recordId);
-      return;
+const RECORD_TABLES = [
+  db.products,
+  db.batches,
+  db.orders,
+  db.lines,
+  db.adjustments,
+  db.sessions,
+  db.settings
+];
+
+/** 一次事务内按类型批量读取本地记录；缺失的 id 不放进结果。 */
+async function getLocalMany(
+  rows: { kind: Kind; recordId: string }[]
+): Promise<Map<string, unknown>> {
+  const idsByKind = new Map<Kind, string[]>();
+  for (const row of rows) {
+    if (row.kind === 'setting' && SKIP_SETTINGS.has(row.recordId)) continue;
+    const ids = idsByKind.get(row.kind) ?? [];
+    ids.push(row.recordId);
+    idsByKind.set(row.kind, ids);
   }
+
+  const found = new Map<string, unknown>();
+  if (idsByKind.size === 0) return found;
+  await db.transaction('r', RECORD_TABLES, async () => {
+    for (const [kind, ids] of idsByKind) {
+      const locals = await TABLE_BY_KIND[kind].bulkGet(ids);
+      ids.forEach((id, i) => {
+        if (locals[i] !== undefined) found.set(`${kind}:${id}`, locals[i]);
+      });
+    }
+  });
+  return found;
 }
 
 interface RemoteRow {
@@ -200,6 +200,13 @@ async function pushOutbox(cfg: SyncConfig, deviceId: string): Promise<number> {
   const rows = await db.outbox.orderBy('queuedAt').limit(300).toArray();
   if (rows.length === 0) return 0;
 
+  // 一次事务批量取本地记录（原来是逐条 get，最多 300 次串行往返）
+  const locals = await getLocalMany(
+    rows
+      .filter((row) => row.op !== 'delete')
+      .map((row) => ({ kind: row.kind, recordId: row.recordId }))
+  );
+
   const payload: {
     id: string;
     record_id: string;
@@ -213,7 +220,7 @@ async function pushOutbox(cfg: SyncConfig, deviceId: string): Promise<number> {
 
   for (const row of rows) {
     if (row.kind === 'setting' && SKIP_SETTINGS.has(row.recordId)) continue;
-    const local = row.op === 'delete' ? undefined : await getLocal(row.kind, row.recordId);
+    const local = row.op === 'delete' ? undefined : locals.get(`${row.kind}:${row.recordId}`);
     payload.push({
       id: `${row.kind}:${row.recordId}`,
       record_id: row.recordId,
@@ -237,68 +244,144 @@ async function pushOutbox(cfg: SyncConfig, deviceId: string): Promise<number> {
   return payload.length;
 }
 
-async function applyRemote(row: RemoteRow): Promise<void> {
-  const pending = await db.outbox.get(`${row.kind}:${row.record_id}`);
-  if (pending) return; // 本地还有没推上去的改动，先以本地为准
+/**
+ * 应用一页远端行：一次事务内按类型批量读、再批量写。
+ * 决策顺序与逐条应用完全一致，只是把小事务合并成每页一次。
+ */
+async function applyRemoteBatch(rows: RemoteRow[]): Promise<void> {
+  if (rows.length === 0) return;
 
-  if (row.deleted) {
-    await deleteLocal(row.kind, row.record_id);
-    return;
-  }
+  // 本地还有没推上去的改动时以本地为准
+  const queued = await db.outbox.bulkGet(rows.map((r) => `${r.kind}:${r.record_id}`));
+  const pending = new Set<string>();
+  queued.forEach((r) => {
+    if (r) pending.add(r.id);
+  });
+  const active = rows.filter((r) => !pending.has(`${r.kind}:${r.record_id}`));
+  if (active.length === 0) return;
 
-  switch (row.kind) {
-    case 'product': {
-      const remote = row.data as Product;
-      const cur = await db.products.get(row.record_id);
-      if (!cur || (remote.updatedAt ?? '') > (cur.updatedAt ?? '')) {
-        await db.products.put({ ...remote, id: row.record_id });
-      }
-      return;
+  await db.transaction('rw', RECORD_TABLES, async () => {
+    const idsByKind = new Map<Kind, string[]>();
+    for (const row of active) {
+      const ids = idsByKind.get(row.kind) ?? [];
+      ids.push(row.record_id);
+      idsByKind.set(row.kind, ids);
     }
-    case 'order': {
-      const remote = row.data as SalesOrder;
-      const cur = await db.orders.get(row.record_id);
-      if (!cur || Boolean(cur.voided) !== Boolean(remote.voided)) {
-        await db.orders.put({ ...remote, id: row.record_id });
-      }
-      return;
+
+    // 批量读当前状态，后续判断都在内存里完成
+    const current = new Map<string, unknown>();
+    for (const [kind, ids] of idsByKind) {
+      const locals = await TABLE_BY_KIND[kind].bulkGet(ids);
+      ids.forEach((id, i) => current.set(`${kind}:${id}`, locals[i]));
     }
-    case 'batch':
-      if (!(await db.batches.get(row.record_id))) {
-        await db.batches.put({ ...(row.data as Batch), id: row.record_id });
+
+    const puts = new Map<Kind, Map<string, unknown>>();
+    const deletes = new Map<Kind, Set<string>>();
+
+    const putRow = (kind: Kind, id: string, value: unknown) => {
+      let map = puts.get(kind);
+      if (!map) {
+        map = new Map();
+        puts.set(kind, map);
       }
-      return;
-    case 'line':
-      if (!(await db.lines.get(row.record_id))) {
-        await db.lines.put({ ...(row.data as SaleLine), id: row.record_id });
+      map.set(id, value);
+      deletes.get(kind)?.delete(id);
+      current.set(`${kind}:${id}`, value);
+    };
+
+    const deleteRow = (kind: Kind, id: string) => {
+      puts.get(kind)?.delete(id);
+      let set = deletes.get(kind);
+      if (!set) {
+        set = new Set();
+        deletes.set(kind, set);
       }
-      return;
-    case 'adjustment':
-      if (!(await db.adjustments.get(row.record_id))) {
-        await db.adjustments.put({ ...(row.data as Adjustment), id: row.record_id });
+      set.add(id);
+      current.set(`${kind}:${id}`, undefined);
+    };
+
+    /** 删单一并删明细；此刻之后出现的明细行仍会重新写入（与逐条顺序一致） */
+    const dropLinesOfOrder = (orderId: string) => {
+      const queuedLines = puts.get('line');
+      if (queuedLines) {
+        for (const [id, line] of queuedLines) {
+          if ((line as SaleLine).orderId === orderId) queuedLines.delete(id);
+        }
       }
-      return;
-    case 'session': {
-      const remote = row.data as Session;
-      const cur = await db.sessions.get(row.record_id);
-      if (!cur) {
-        await db.sessions.put({ ...remote, id: row.record_id });
-        return;
+      for (const [key, value] of current) {
+        if (key.startsWith('line:') && value && (value as SaleLine).orderId === orderId) {
+          current.set(key, undefined);
+        }
       }
-      // closed 优先，避免把已结账场次拉回 open；同状态取 updatedAt 新者
-      const merged = mergeSessionPair(cur, { ...remote, id: row.record_id });
-      await db.sessions.put(merged);
-      return;
+    };
+
+    for (const row of active) {
+      if (row.deleted) {
+        if (row.kind === 'order') dropLinesOfOrder(row.record_id);
+        deleteRow(row.kind, row.record_id);
+        continue;
+      }
+
+      const cur = current.get(`${row.kind}:${row.record_id}`);
+      switch (row.kind) {
+        case 'product': {
+          const remote = row.data as Product;
+          if (!cur || (remote.updatedAt ?? '') > ((cur as Product).updatedAt ?? '')) {
+            putRow('product', row.record_id, { ...remote, id: row.record_id });
+          }
+          break;
+        }
+        case 'order': {
+          const remote = row.data as SalesOrder;
+          if (!cur || Boolean((cur as SalesOrder).voided) !== Boolean(remote.voided)) {
+            putRow('order', row.record_id, { ...remote, id: row.record_id });
+          }
+          break;
+        }
+        case 'batch':
+          if (!cur) putRow('batch', row.record_id, { ...(row.data as Batch), id: row.record_id });
+          break;
+        case 'line':
+          if (!cur) putRow('line', row.record_id, { ...(row.data as SaleLine), id: row.record_id });
+          break;
+        case 'adjustment':
+          if (!cur) {
+            putRow('adjustment', row.record_id, { ...(row.data as Adjustment), id: row.record_id });
+          }
+          break;
+        case 'session': {
+          const remote = row.data as Session;
+          const merged = cur
+            ? mergeSessionPair(cur as Session, { ...remote, id: row.record_id })
+            : { ...remote, id: row.record_id };
+          putRow('session', row.record_id, merged);
+          break;
+        }
+        case 'setting': {
+          if (SKIP_SETTINGS.has(row.record_id)) break;
+          const remote = row.data as Setting;
+          if (remote && typeof remote.key === 'string') {
+            putRow('setting', row.record_id, { key: row.record_id, value: remote.value });
+          }
+          break;
+        }
+      }
     }
-    case 'setting': {
-      if (SKIP_SETTINGS.has(row.record_id)) return;
-      const remote = row.data as Setting;
-      if (remote && typeof remote.key === 'string') {
-        await db.settings.put({ key: row.record_id, value: remote.value });
-      }
-      return;
+
+    // 先删（含 order 级联明细）再写，最终状态与逐条执行一致
+    const orderIds = [...(deletes.get('order') ?? [])];
+    if (orderIds.length > 0) {
+      await db.orders.bulkDelete(orderIds);
+      await db.lines.where('orderId').anyOf(orderIds).delete();
+      deletes.delete('order');
     }
-  }
+    for (const [kind, set] of deletes) {
+      if (set.size > 0) await TABLE_BY_KIND[kind].bulkDelete([...set]);
+    }
+    for (const [kind, map] of puts) {
+      if (map.size > 0) await TABLE_BY_KIND[kind].bulkPut([...map.values()]);
+    }
+  });
 }
 
 async function pull(cfg: SyncConfig): Promise<number> {
@@ -315,8 +398,8 @@ async function pull(cfg: SyncConfig): Promise<number> {
     });
     const rows = await rest<RemoteRow[]>(cfg, `yh_records?${params.toString()}`);
     if (!Array.isArray(rows) || rows.length === 0) break;
+    await applyRemoteBatch(rows);
     for (const row of rows) {
-      await applyRemote(row);
       since = Math.max(since, Number(row.updated_at) || 0);
       pulled++;
     }

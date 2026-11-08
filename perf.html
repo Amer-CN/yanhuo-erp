@@ -1,0 +1,17 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="utf-8" />
+    <title>perf harness</title>
+  </head>
+  <body>
+    <script type="module">
+      // 临时性能基准入口：只加载数据层，不启动 React 应用，避免 UI 订阅干扰计时。
+      import * as repo from '/src/db/repo.ts';
+      import { db } from '/src/db/db.ts';
+      import * as calc from '/src/db/calc.ts';
+      window.__perf = { repo, db, calc };
+      window.__perfReady = true;
+    </script>
+  </body>
+</html>
