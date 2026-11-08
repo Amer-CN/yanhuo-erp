@@ -94,7 +94,9 @@ async function rest<T = unknown>(
     ...init,
     headers: {
       apikey: cfg.anonKey,
-      Authorization: `Bearer ${cfg.anonKey}`,
+      // 旧版 anon key 是 JWT（eyJ...），新 publishable key 不是 JWT，
+      // 后者只放在 apikey 头里，避免被 PostgREST 当成坏 token。
+      ...(cfg.anonKey.startsWith('eyJ') ? { Authorization: `Bearer ${cfg.anonKey}` } : {}),
       'Content-Type': 'application/json',
       'x-ledger-key': cfg.ledgerKey,
       ...(init?.headers ?? {})
