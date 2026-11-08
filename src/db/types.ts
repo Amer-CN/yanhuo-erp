@@ -53,6 +53,8 @@ export interface Batch {
   receivedAt: string;
   deviceId: string;
   createdAt: string;
+  /** 业务修改时间（同步冲突判定用）；旧数据缺失时用 createdAt 兜底 */
+  updatedAt?: string;
 }
 
 /** 一场（一次出摊）：第一笔记账到收摊结账之间 */
@@ -102,6 +104,8 @@ export interface SalesOrder {
   note?: string;
   /** 整单作废（退货/录错），报表里不计 */
   voided?: boolean;
+  /** 业务修改时间（同步冲突判定用）；旧数据缺失时用 createdAt 兜底 */
+  updatedAt?: string;
 }
 
 /** 销售明细 */
@@ -125,6 +129,8 @@ export interface SaleLine {
   discountFen: number;
   /** 赠品：金额 0，成本照算 */
   gift?: boolean;
+  /** 业务修改时间（同步冲突判定用）；旧数据缺失时用 createdAt 兜底 */
+  updatedAt?: string;
 }
 
 /** 库存调整：盘亏/退货/修正 */
@@ -137,6 +143,8 @@ export interface Adjustment {
   reason?: string;
   createdAt: string;
   deviceId: string;
+  /** 业务修改时间（同步冲突判定用）；旧数据缺失时用 createdAt 兜底 */
+  updatedAt?: string;
 }
 
 export interface Setting {

@@ -6,8 +6,10 @@ import { loadAll } from './repo';
 import { enqueueAllLocal, pendingCount, syncWanted } from './outbox';
 import { DEFAULT_SYNC } from './syncDefaults';
 import { mergeSessionPair } from './sessionLogic';
+import { businessTime, resolveRemote } from './syncResolve';
+import type { SyncConflictRow } from './db';
 import type { Table } from 'dexie';
-import type { Adjustment, Batch, Product, SaleLine, SalesOrder, Session, Setting } from './types';
+import type { SaleLine, Session, Setting } from './types';
 
 export interface SyncConfig {
   url: string;
@@ -193,7 +195,37 @@ interface RemoteRow {
   kind: Kind;
   data: unknown;
   updated_at: number;
+  /** 业务修改时间（毫秒）；远端没加列时缺省 */
+  record_updated_at?: number;
   deleted: boolean;
+}
+
+interface PushRow {
+  id: string;
+  record_id: string;
+  ledger: string;
+  kind: Kind;
+  data: unknown;
+  updated_at: number;
+  record_updated_at?: number;
+  device_id: string;
+  deleted: boolean;
+}
+
+/** record_updated_at 列在当前远端缺失时降级为旧格式（只提示一次） */
+let recordColumnMissing = false;
+
+function isUnknownRecordColumnError(e: unknown): boolean {
+  const msg = e instanceof Error ? e.message : String(e);
+  return msg.includes('PGRST204') || msg.includes('record_updated_at');
+}
+
+async function postPayload(cfg: SyncConfig, rows: PushRow[]): Promise<void> {
+  await rest(cfg, 'yh_records?on_conflict=id', {
+    method: 'POST',
+    headers: { Prefer: 'resolution=merge-duplicates,return=minimal' },
+    body: JSON.stringify(rows)
+  });
 }
 
 async function pushOutbox(cfg: SyncConfig, deviceId: string): Promise<number> {
@@ -207,16 +239,7 @@ async function pushOutbox(cfg: SyncConfig, deviceId: string): Promise<number> {
       .map((row) => ({ kind: row.kind, recordId: row.recordId }))
   );
 
-  const payload: {
-    id: string;
-    record_id: string;
-    ledger: string;
-    kind: Kind;
-    data: unknown;
-    updated_at: number;
-    device_id: string;
-    deleted: boolean;
-  }[] = [];
+  const payload: PushRow[] = [];
 
   for (const row of rows) {
     if (row.kind === 'setting' && SKIP_SETTINGS.has(row.recordId)) continue;
@@ -227,18 +250,36 @@ async function pushOutbox(cfg: SyncConfig, deviceId: string): Promise<number> {
       ledger: cfg.ledgerKey,
       kind: row.kind,
       data: local ?? {},
+      // 推送时刻只做增量水位；业务时间单独放 record_updated_at
       updated_at: Date.now(),
+      record_updated_at: local ? businessTime(local) : 0,
       device_id: deviceId,
       deleted: row.op === 'delete' || !local
     });
   }
 
   if (payload.length > 0) {
-    await rest(cfg, 'yh_records?on_conflict=id', {
-      method: 'POST',
-      headers: { Prefer: 'resolution=merge-duplicates,return=minimal' },
-      body: JSON.stringify(payload)
-    });
+    try {
+      await postPayload(cfg, payload);
+    } catch (e) {
+      if (!recordColumnMissing && isUnknownRecordColumnError(e)) {
+        // 人工还没执行 supabase/migrations，降级为旧格式，避免整条同步链路卡死
+        recordColumnMissing = true;
+        try {
+          localStorage.setItem('yh-sync-warn', '远端缺少 record_updated_at 列，已降级推送');
+        } catch {
+          /* 隐私模式忽略 */
+        }
+        const legacy = payload.map((row) => {
+          const copy = { ...row };
+          delete copy.record_updated_at;
+          return copy;
+        });
+        await postPayload(cfg, legacy);
+      } else {
+        throw e;
+      }
+    }
   }
   await db.outbox.bulkDelete(rows.map((r) => r.id));
   return payload.length;
@@ -260,7 +301,8 @@ async function applyRemoteBatch(rows: RemoteRow[]): Promise<void> {
   const active = rows.filter((r) => !pending.has(`${r.kind}:${r.record_id}`));
   if (active.length === 0) return;
 
-  await db.transaction('rw', RECORD_TABLES, async () => {
+  await db.transaction('rw', [...RECORD_TABLES, db.conflicts], async () => {
+    const conflictRows: SyncConflictRow[] = [];
     const idsByKind = new Map<Kind, string[]>();
     for (const row of active) {
       const ids = idsByKind.get(row.kind) ?? [];
@@ -323,32 +365,26 @@ async function applyRemoteBatch(rows: RemoteRow[]): Promise<void> {
       }
 
       const cur = current.get(`${row.kind}:${row.record_id}`);
+      const decision = resolveRemote(
+        row.kind,
+        cur,
+        row.data,
+        Number(row.record_updated_at) || 0
+      );
+
+      if (decision === 'keep-local') continue;
+      if (decision === 'conflict') {
+        conflictRows.push({
+          at: new Date().toISOString(),
+          kind: row.kind,
+          recordId: row.record_id,
+          local: JSON.stringify(cur ?? null),
+          remote: JSON.stringify(row.data ?? null)
+        });
+        continue;
+      }
+
       switch (row.kind) {
-        case 'product': {
-          const remote = row.data as Product;
-          if (!cur || (remote.updatedAt ?? '') > ((cur as Product).updatedAt ?? '')) {
-            putRow('product', row.record_id, { ...remote, id: row.record_id });
-          }
-          break;
-        }
-        case 'order': {
-          const remote = row.data as SalesOrder;
-          if (!cur || Boolean((cur as SalesOrder).voided) !== Boolean(remote.voided)) {
-            putRow('order', row.record_id, { ...remote, id: row.record_id });
-          }
-          break;
-        }
-        case 'batch':
-          if (!cur) putRow('batch', row.record_id, { ...(row.data as Batch), id: row.record_id });
-          break;
-        case 'line':
-          if (!cur) putRow('line', row.record_id, { ...(row.data as SaleLine), id: row.record_id });
-          break;
-        case 'adjustment':
-          if (!cur) {
-            putRow('adjustment', row.record_id, { ...(row.data as Adjustment), id: row.record_id });
-          }
-          break;
         case 'session': {
           const remote = row.data as Session;
           const merged = cur
@@ -365,6 +401,11 @@ async function applyRemoteBatch(rows: RemoteRow[]): Promise<void> {
           }
           break;
         }
+        default:
+          putRow(row.kind, row.record_id, {
+            ...(row.data as Record<string, unknown>),
+            id: row.record_id
+          });
       }
     }
 
@@ -381,6 +422,7 @@ async function applyRemoteBatch(rows: RemoteRow[]): Promise<void> {
     for (const [kind, map] of puts) {
       if (map.size > 0) await TABLE_BY_KIND[kind].bulkPut([...map.values()]);
     }
+    if (conflictRows.length > 0) await db.conflicts.bulkAdd(conflictRows);
   });
 }
 

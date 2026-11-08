@@ -18,8 +18,20 @@ export interface OutboxRow {
   queuedAt: number;
 }
 
+/** 同步冲突留痕：同一记录两端都改过、又无法按业务时间判定时，保留双方快照 */
+export interface SyncConflictRow {
+  id?: number;
+  at: string;
+  kind: string;
+  recordId: string;
+  /** 本地记录 JSON（本地保留，不被覆盖） */
+  local: string;
+  /** 远端记录 JSON */
+  remote: string;
+}
+
 /** 主库 schema 版本：唯一来源。升版本前先看 backup.snapshotBeforeOpen 的迁移快照 */
-export const SCHEMA_VERSION = 3;
+export const SCHEMA_VERSION = 4;
 
 export class AppDB extends Dexie {
   products!: Table<Product, string>;
@@ -30,6 +42,7 @@ export class AppDB extends Dexie {
   sessions!: Table<Session, string>;
   settings!: Table<Setting, string>;
   outbox!: Table<OutboxRow, string>;
+  conflicts!: Table<SyncConflictRow, number>;
 
   constructor() {
     super('yanhuo-erp');
@@ -45,9 +58,13 @@ export class AppDB extends Dexie {
       outbox: 'id, queuedAt'
     });
     // v3：事后记账模型。sessions 只加表；orders 加 sessionId 索引（不重建记录）。
-    this.version(SCHEMA_VERSION).stores({
+    this.version(3).stores({
       sessions: 'id, status, startedAt, closedAt, deviceId',
       orders: 'id, createdAt, deviceId, payMethod, voided, sessionId'
+    });
+    // v4：同步冲突留痕（不改任何业务表，只加 conflicts）
+    this.version(SCHEMA_VERSION).stores({
+      conflicts: '++id, at, kind, recordId'
     });
   }
 }

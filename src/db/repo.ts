@@ -141,6 +141,7 @@ export interface BatchInput {
 }
 
 export async function createBatch(input: BatchInput, deviceId: string): Promise<Batch> {
+  const createdAt = nowIso();
   const b: Batch = {
     id: uuid(),
     productId: input.productId,
@@ -152,7 +153,8 @@ export async function createBatch(input: BatchInput, deviceId: string): Promise<
     supplier: input.supplier?.trim() || undefined,
     receivedAt: input.receivedAt || localDate(),
     deviceId,
-    createdAt: nowIso()
+    createdAt,
+    updatedAt: createdAt
   };
   await db.batches.put(b);
   await enqueue('batch', b.id);
@@ -248,7 +250,7 @@ export interface RecordInput {
   lines: RecordLineInput[];
 }
 
-function buildLines(orderId: string, input: RecordLineInput[]): SaleLine[] {
+function buildLines(orderId: string, input: RecordLineInput[], updatedAt: string = nowIso()): SaleLine[] {
   if (input.length === 0) throw new RecordError('EMPTY_LINES', '先加一个商品');
   return input.map((l) => {
     const qtyBase = Math.round(l.qtyBase);
@@ -275,6 +277,7 @@ function buildLines(orderId: string, input: RecordLineInput[]): SaleLine[] {
       unitPriceFen: gift ? 0 : Math.round(amountFen / qtyBase),
       amountFen,
       discountFen: gift ? 0 : Math.max(0, listAmount - amountFen),
+      updatedAt,
       ...(gift ? { gift: true as const } : {})
     };
   });
@@ -291,17 +294,19 @@ export async function saveRecord(input: RecordInput): Promise<SalesOrder> {
   }
 
   const orderId = uuid();
-  const lines = buildLines(orderId, input.lines);
+  const at = nowIso();
+  const lines = buildLines(orderId, input.lines, at);
   const totalFen = lines.reduce((s, l) => s + l.amountFen, 0);
   const order: SalesOrder = {
     id: orderId,
     deviceId: input.deviceId,
     operator: input.operator,
-    createdAt: nowIso(),
+    createdAt: at,
     payMethod: input.payMethod,
     totalFen,
     sessionId: session.id,
-    note: input.note?.trim() || undefined
+    note: input.note?.trim() || undefined,
+    updatedAt: at
   };
 
   await db.transaction('rw', db.orders, db.lines, async () => {
@@ -325,14 +330,16 @@ export async function updateRecord(id: string, input: RecordInput): Promise<Sale
   }
 
   const oldLines = await db.lines.where('orderId').equals(id).toArray();
-  const lines = buildLines(id, input.lines);
+  const at = nowIso();
+  const lines = buildLines(id, input.lines, at);
   const totalFen = lines.reduce((s, l) => s + l.amountFen, 0);
   const order: SalesOrder = {
     ...old,
     operator: input.operator || old.operator,
     payMethod: input.payMethod,
     totalFen,
-    note: input.note?.trim() || undefined
+    note: input.note?.trim() || undefined,
+    updatedAt: at
   };
 
   await db.transaction('rw', db.orders, db.lines, async () => {
@@ -466,9 +473,9 @@ export async function addPatchedRecord(input: RecordInput & { sessionId: string 
   }
 
   const orderId = uuid();
-  const lines = buildLines(orderId, input.lines);
-  const totalFen = lines.reduce((s, l) => s + l.amountFen, 0);
   const createdAt = nowIso();
+  const lines = buildLines(orderId, input.lines, createdAt);
+  const totalFen = lines.reduce((s, l) => s + l.amountFen, 0);
   const order: SalesOrder = {
     id: orderId,
     deviceId: input.deviceId,
@@ -477,7 +484,8 @@ export async function addPatchedRecord(input: RecordInput & { sessionId: string 
     payMethod: input.payMethod,
     totalFen,
     sessionId: session.id,
-    note: input.note?.trim() || undefined
+    note: input.note?.trim() || undefined,
+    updatedAt: createdAt
   };
 
   const [orders, allLines, batches] = await Promise.all([
@@ -599,14 +607,14 @@ export async function migrateSessions(): Promise<number> {
 export async function voidOrder(id: string): Promise<void> {
   const o = await db.orders.get(id);
   if (!o) return;
-  await db.orders.put({ ...o, voided: true });
+  await db.orders.put({ ...o, voided: true, updatedAt: nowIso() });
   await enqueue('order', id);
 }
 
 export async function restoreOrder(id: string): Promise<void> {
   const o = await db.orders.get(id);
   if (!o) return;
-  const next = { ...o };
+  const next = { ...o, updatedAt: nowIso() };
   delete next.voided;
   await db.orders.put(next);
   await enqueue('order', id);
@@ -618,14 +626,16 @@ export async function createAdjustment(
   input: { productId: string; qtyBase: number; type: AdjustType; reason?: string },
   deviceId: string
 ): Promise<Adjustment> {
+  const createdAt = nowIso();
   const a: Adjustment = {
     id: uuid(),
     productId: input.productId,
     qtyBase: Math.round(input.qtyBase),
     type: input.type,
     reason: input.reason?.trim() || undefined,
-    createdAt: nowIso(),
-    deviceId
+    createdAt,
+    deviceId,
+    updatedAt: createdAt
   };
   await db.adjustments.put(a);
   await enqueue('adjustment', a.id);

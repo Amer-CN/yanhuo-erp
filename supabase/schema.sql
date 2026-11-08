@@ -8,12 +8,17 @@ create table if not exists public.yh_records (
   kind text not null,
   data jsonb not null default '{}'::jsonb,
   updated_at bigint not null,
+  -- 业务修改时间（毫秒）；冲突判定用，旧客户端不写时默认 0
+  record_updated_at bigint not null default 0,
   device_id text not null default '',
   deleted boolean not null default false
 );
 
 create index if not exists yh_records_ledger_updated
   on public.yh_records (ledger, updated_at);
+
+create index if not exists yh_records_ledger_record_updated
+  on public.yh_records (ledger, record_updated_at);
 
 alter table public.yh_records enable row level security;
 

@@ -1,5 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
+import { useLiveQuery } from 'dexie-react-hooks';
 import { Download, Upload, Smartphone, Trash2, TriangleAlert, RotateCcw, Save } from 'lucide-react';
+import { db } from '../../db/db';
 import { clearAllData, loadAll, setSetting } from '../../db/repo';
 import {
   exportBackup,
@@ -76,6 +78,7 @@ export default function SettingsPage({
   const [snapshots, setSnapshots] = useState<SnapshotRow[]>([]);
   const [restoreTarget, setRestoreTarget] = useState<SnapshotRow | null>(null);
   const [snapshotBusy, setSnapshotBusy] = useState(false);
+  const conflictCount = useLiveQuery(() => db.conflicts.count(), [], 0) ?? 0;
 
   useEffect(() => {
     void listSnapshots()
@@ -425,6 +428,15 @@ export default function SettingsPage({
       </Card>
 
       <SyncPanel sync={sync} onDone={onDone} />
+
+      {conflictCount > 0 ? (
+        <Card>
+          <h2 className="section-title">同步冲突</h2>
+          <p className="muted-text" style={{ marginTop: 8 }}>
+            待核对 {conflictCount} 条。两台设备改过同一条记录时会出现；本地记录已保留，没有自动覆盖。
+          </p>
+        </Card>
+      ) : null}
 
       <Card>
         <h2 className="section-title">装到手机桌面</h2>

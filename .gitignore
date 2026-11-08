@@ -6,3 +6,4 @@ dev-dist
 Thumbs.db
 docs/screenshots/e2e/
 .perf/
+coverage/

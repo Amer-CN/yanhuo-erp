@@ -7,6 +7,7 @@ import {
   syncPending,
   type SyncStatus
 } from '../db/sync';
+import { nextBackoff } from '../db/syncResolve';
 
 export interface SyncApi extends SyncStatus {
   syncNow: (silent?: boolean) => Promise<void>;
@@ -22,6 +23,9 @@ export function useSync(): SyncApi {
   const [last, setLast] = useState<number | null>(() => lastSyncAt());
   const [error, setError] = useState<string | null>(() => lastSyncError());
   const busy = useRef(false);
+  const backoff = useRef(0);
+  const retryTimer = useRef<number | undefined>(undefined);
+  const syncRef = useRef<(silent?: boolean) => Promise<void>>(async () => undefined);
 
   const refresh = useCallback(async () => {
     setConfigured(!!getSyncConfig());
@@ -45,8 +49,22 @@ export function useSync(): SyncApi {
       try {
         await runSync(cfg);
         setError(null);
+        backoff.current = 0;
+        if (retryTimer.current) {
+          window.clearTimeout(retryTimer.current);
+          retryTimer.current = undefined;
+        }
       } catch (e) {
         setError(e instanceof Error ? e.message : String(e));
+        // 失败后按 1s→2s→4s…→60s 退避重试；网络恢复由 online 事件另触发
+        if (navigator.onLine) {
+          backoff.current = nextBackoff(backoff.current);
+          if (retryTimer.current) window.clearTimeout(retryTimer.current);
+          retryTimer.current = window.setTimeout(() => {
+            retryTimer.current = undefined;
+            void syncRef.current(true);
+          }, backoff.current);
+        }
         if (!silent) throw e;
       } finally {
         busy.current = false;
@@ -56,6 +74,7 @@ export function useSync(): SyncApi {
     },
     [refresh]
   );
+  syncRef.current = syncNow;
 
   useEffect(() => {
     const onOnline = () => {
@@ -83,6 +102,7 @@ export function useSync(): SyncApi {
     if (getSyncConfig()) void syncNow(true);
 
     const timer = window.setInterval(() => {
+      if (retryTimer.current) return;
       if (document.visibilityState === 'visible' && navigator.onLine) void syncNow(true);
     }, PULL_INTERVAL);
 
@@ -93,6 +113,7 @@ export function useSync(): SyncApi {
       window.removeEventListener('yh-sync-config', onConfig);
       document.removeEventListener('visibilitychange', onVis);
       window.clearInterval(timer);
+      if (retryTimer.current) window.clearTimeout(retryTimer.current);
       if (debounce) window.clearTimeout(debounce);
     };
   }, [refresh, syncNow]);
