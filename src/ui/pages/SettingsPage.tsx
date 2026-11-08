@@ -336,7 +336,7 @@ export default function SettingsPage({
           </Btn>
         </div>
         <p className="tiny-text" style={{ marginBottom: 0 }}>
-          烟花账 v0.3 · 本地存储 · 不上传任何服务器
+          烟花账 v0.4 · 本地优先 · 云同步已内置
         </p>
       </Card>
 

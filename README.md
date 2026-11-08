@@ -2,7 +2,7 @@
 
 **线上地址（手机装到桌面就是这个）：<https://amer-cn.github.io/yanhuo-erp/>**
 
-自用工具。两个人、两台手机/平板、摊位断网也能开单、收摊合并对账。
+自用工具。两个人、两台手机/平板、摊位断网也能开单、联网自动同步。
 
 - 项目路径：`F:\AIXM\烟花爆竹`
 - 需求定稿与技术方案：[`docs/01-需求与设计.md`](docs/01-需求与设计.md)
@@ -16,12 +16,13 @@
 - [x] M1 骨架 + 商品/进货/库存
 - [x] M2 开单 + 日结
 - [x] M3 报表
-- [x] M4 同步合并（导出/导入，E2E 已验证两设备合并）
+- [x] M4 双设备同步（手动导出/导入 + Supabase 自动云同步，E2E 已验证）
 - [x] PWA 离线（E2E 已验证断网刷新 + 断网开单）
 - [x] 设计评审（Nielsen 22/40）并完成 P0×2 / P1×3 / P2 十余项修复
 - [x] 无障碍回归（标签关联 / 弹层焦点 / Esc / 键盘行 / 44px / 减动效）
-- [x] 云同步：Supabase 主账 + 本地发件箱，离线开单、联网自动推拉（配置见 [`docs/03-云同步设置.md`](docs/03-云同步设置.md)）
-- [ ] M5 真机部署 / 打包（需要 HTTPS 才能安装离线）
+- [x] 云同步：Supabase 主账 + 本地发件箱，离线开单、联网自动推拉；零配置内置，配不配置都能用（配置见 [`docs/03-云同步设置.md`](docs/03-云同步设置.md)）
+- [x] 上线 + 线上验证（GitHub Pages HTTPS、PWA 可安装、真实 Supabase 双设备同步已验证）
+- [ ] 真机摊位上跑一遍（等你俩春节前实际使用）
 
 ## 开发
 
@@ -39,7 +40,7 @@ pnpm test         # 核心计算单元测试
 python scripts/e2e-smoke.py     # 开单/进货/报表/库存全流程
 python scripts/e2e-offline.py   # 断网可用（先 build + preview）
 python scripts/e2e-merge.py     # 两设备导出导入合并（先 build + preview）
-python scripts/e2e-sync.py      # 两设备自动云同步 + 断网补发（本地假 Supabase）
+python scripts/e2e-sync.py      # 两设备自动云同步 + 断网补发（默认本地假 Supabase，可连真实项目）
 python scripts/a11y-check.py    # 标签/焦点/Esc/键盘/44px/减动效
 ```
 
