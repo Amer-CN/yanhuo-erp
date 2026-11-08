@@ -8,6 +8,15 @@ import type {
   Setting
 } from './types';
 
+export interface OutboxRow {
+  /** `${kind}:${recordId}` */
+  id: string;
+  kind: 'product' | 'batch' | 'order' | 'line' | 'adjustment' | 'setting';
+  recordId: string;
+  op: 'upsert' | 'delete';
+  queuedAt: number;
+}
+
 export class AppDB extends Dexie {
   products!: Table<Product, string>;
   batches!: Table<Batch, string>;
@@ -15,6 +24,7 @@ export class AppDB extends Dexie {
   lines!: Table<SaleLine, string>;
   adjustments!: Table<Adjustment, string>;
   settings!: Table<Setting, string>;
+  outbox!: Table<OutboxRow, string>;
 
   constructor() {
     super('yanhuo-erp');
@@ -25,6 +35,9 @@ export class AppDB extends Dexie {
       lines: 'id, orderId, productId',
       adjustments: 'id, productId, createdAt',
       settings: 'key'
+    });
+    this.version(2).stores({
+      outbox: 'id, queuedAt'
     });
   }
 }

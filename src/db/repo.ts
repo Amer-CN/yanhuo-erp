@@ -15,6 +15,7 @@ import type {
 } from './types';
 import { SETTING_KEYS } from './types';
 import { localDate, nowIso, uuid } from './util';
+import { enqueue } from './outbox';
 
 /* ------------------------------------------------------------------ 设置 */
 
@@ -24,6 +25,7 @@ export async function getSetting(key: string): Promise<string | undefined> {
 
 export async function setSetting(key: string, value: string): Promise<void> {
   await db.settings.put({ key, value });
+  await enqueue('setting', key);
 }
 
 export async function getAllSettings(): Promise<Record<string, string>> {
@@ -72,6 +74,7 @@ export async function createProduct(input: ProductInput): Promise<Product> {
     updatedAt: t
   };
   await db.products.put(p);
+  await enqueue('product', p.id);
   return p;
 }
 
@@ -89,6 +92,7 @@ export async function updateProduct(id: string, patch: Partial<ProductInput> & {
   if (patch.boxQty !== undefined) next.boxQty = Math.max(0, Math.floor(patch.boxQty));
   if (patch.priceList !== undefined) next.priceList = Math.max(0, Math.round(patch.priceList));
   await db.products.put(next);
+  await enqueue('product', id);
 }
 
 export async function deleteProduct(id: string): Promise<void> {
@@ -102,6 +106,7 @@ export async function deleteProduct(id: string): Promise<void> {
     return;
   }
   await db.products.delete(id);
+  await enqueue('product', id, 'delete');
 }
 
 /* ------------------------------------------------------------------ 进货 */
@@ -132,11 +137,13 @@ export async function createBatch(input: BatchInput, deviceId: string): Promise<
     createdAt: nowIso()
   };
   await db.batches.put(b);
+  await enqueue('batch', b.id);
   return b;
 }
 
 export async function deleteBatch(id: string): Promise<void> {
   await db.batches.delete(id);
+  await enqueue('batch', id, 'delete');
 }
 
 /* ------------------------------------------------------------------ 开单 */
@@ -190,6 +197,8 @@ export async function checkout(input: CheckoutInput): Promise<SalesOrder> {
     await db.orders.put(order);
     await db.lines.bulkPut(lines);
   });
+  await enqueue('order', order.id);
+  for (const l of lines) await enqueue('line', l.id);
   return order;
 }
 
@@ -197,6 +206,7 @@ export async function voidOrder(id: string): Promise<void> {
   const o = await db.orders.get(id);
   if (!o) return;
   await db.orders.put({ ...o, voided: true });
+  await enqueue('order', id);
 }
 
 export async function restoreOrder(id: string): Promise<void> {
@@ -205,6 +215,7 @@ export async function restoreOrder(id: string): Promise<void> {
   const next = { ...o };
   delete next.voided;
   await db.orders.put(next);
+  await enqueue('order', id);
 }
 
 /* ------------------------------------------------------------------ 调整 */
@@ -223,6 +234,7 @@ export async function createAdjustment(
     deviceId
   };
   await db.adjustments.put(a);
+  await enqueue('adjustment', a.id);
   return a;
 }
 
@@ -255,6 +267,7 @@ export async function clearAllData(): Promise<void> {
     }
   );
   await setSetting(SETTING_KEYS.seeded, '');
+  await db.outbox.clear();
 }
 
 export type { Setting };

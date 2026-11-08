@@ -20,6 +20,7 @@ import { seedIfEmpty } from './db/seed';
 import { fifoAllocate, inventoryMap, dayReport } from './db/calc';
 import { fenToStr, localDate } from './db/util';
 import { Card, Empty, Toast, type Done, type ToastTone } from './ui/kit';
+import { useSync } from './ui/useSync';
 import { loadSell, saveSell, type SellState } from './ui/sellSession';
 import SellPage from './ui/pages/SellPage';
 import PurchasePage from './ui/pages/PurchasePage';
@@ -126,6 +127,7 @@ export default function App() {
   }, []);
 
   const data = useLiveQuery(() => loadAll(), []);
+  const sync = useSync();
 
   const showToast: Done = (msg, tone = 'success', action) => {
     setToast({ msg, tone, action });
@@ -277,6 +279,7 @@ export default function App() {
               todayRevenue={today.revenueFen}
               todayCount={today.orderCount}
               deviceName={deviceName}
+              sync={sync}
               onOpen={setSub}
             />
           ) : null}
@@ -295,7 +298,12 @@ export default function App() {
           ) : null}
 
           {sub === 'settings' ? (
-            <SettingsPage settings={settings} deviceId={deviceId} onDone={showToast} />
+            <SettingsPage
+              settings={settings}
+              deviceId={deviceId}
+              sync={sync}
+              onDone={showToast}
+            />
           ) : null}
         </main>
       </div>
@@ -357,6 +365,7 @@ function MorePage({
   todayRevenue,
   todayCount,
   deviceName,
+  sync,
   onOpen
 }: {
   products: number;
@@ -364,8 +373,24 @@ function MorePage({
   todayRevenue: number;
   todayCount: number;
   deviceName: string;
+  sync: {
+    configured: boolean;
+    online: boolean;
+    syncing: boolean;
+    pending: number;
+    error: string | null;
+  };
   onOpen: (p: Exclude<SubPage, null>) => void;
 }) {
+  const syncText = !sync.configured
+    ? '未开启（点设置与同步）'
+    : !sync.online
+      ? '离线，联网后自动同步'
+      : sync.syncing
+        ? '同步中…'
+        : sync.error
+          ? '同步出错'
+          : `已连接 · 待推送 ${sync.pending} 条`;
   return (
     <div className="page-stack">
       <Card flush>
@@ -390,7 +415,7 @@ function MorePage({
           </div>
         </div>
         <div className="tiny-text" style={{ marginTop: 8 }}>
-          设备：{deviceName}
+          设备：{deviceName} · 云同步：{syncText}
         </div>
       </Card>
 

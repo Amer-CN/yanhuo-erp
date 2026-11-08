@@ -774,6 +774,39 @@ body {
   margin: 2px 0;
 }
 
+/* 云同步面板 */
+.sync-lines {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.sync-line {
+  display: flex;
+  justify-content: space-between;
+  gap: 10px;
+  font-size: 13px;
+  color: var(--gl-color-text-muted);
+}
+
+.sync-line .icon-text {
+  color: var(--gl-color-text);
+}
+
+.sql-block {
+  background: var(--gl-surface-1);
+  border: 1px solid var(--gl-border-subtle);
+  border-radius: 12px;
+  padding: 10px;
+  margin: 8px 0;
+  font-size: 11px;
+  line-height: 1.45;
+  overflow-x: auto;
+  white-space: pre;
+  max-height: 240px;
+  color: var(--gl-color-text);
+}
+
 /* 报表：两个主数字 + 收款行 */
 .hero-stats {
   display: grid;

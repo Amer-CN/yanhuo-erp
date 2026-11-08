@@ -10,6 +10,9 @@ import {
   type MergeResult
 } from '../../db/merge';
 import { SETTING_KEYS } from '../../db/types';
+import { afterMerge, clearCloud, getSyncConfig } from '../../db/sync';
+import SyncPanel from '../SyncPanel';
+import type { SyncApi } from '../useSync';
 import { fenToStr } from '../../db/util';
 import { Btn, Card, Field, Sheet, type Done } from '../kit';
 
@@ -30,10 +33,12 @@ interface PendingMerge {
 export default function SettingsPage({
   settings,
   deviceId,
+  sync,
   onDone
 }: {
   settings: Record<string, string>;
   deviceId: string;
+  sync: SyncApi;
   onDone: Done;
 }) {
   const [deviceName, setDeviceName] = useState(settings[SETTING_KEYS.deviceName] ?? '');
@@ -177,6 +182,7 @@ export default function SettingsPage({
         }
       }
       const r = await importMerge(pending.backup);
+      await afterMerge();
       await setSetting(SETTING_KEYS.lastImportAt, new Date().toISOString());
       setPreMerge(snapshot);
       setPending(null);
@@ -194,6 +200,12 @@ export default function SettingsPage({
     if (!confirm('撤销这次合并？会把账本恢复到合并前的状态。')) return;
     try {
       await replaceAll(JSON.parse(preMerge) as BackupFile);
+      const cfg = getSyncConfig();
+      if (cfg) {
+        // 云端也可能已经有合并后的记录，先清再推送，避免又被拉回来
+        await clearCloud(cfg);
+      }
+      await afterMerge();
       setPreMerge(null);
       setResult(null);
       onDone('已撤销合并，账本回到合并前', 'warning');
@@ -285,6 +297,8 @@ export default function SettingsPage({
         />
       </Card>
 
+      <SyncPanel sync={sync} onDone={onDone} />
+
       <Card>
         <h2 className="section-title">装到手机桌面</h2>
         <p className="muted-text" style={{ marginTop: 8 }}>
@@ -308,6 +322,10 @@ export default function SettingsPage({
             onClick={async () => {
               if (!confirm('清空所有商品、进货、销售数据？导出备份后再操作。')) return;
               if (!confirm('再确认一次：清空后无法恢复（除了导入之前导出的备份）。')) return;
+              const cfg = getSyncConfig();
+              if (cfg && confirm('同时清空云端账本？两台手机都会被清空。')) {
+                await clearCloud(cfg);
+              }
               await clearAllData();
               onDone('已清空', 'warning');
             }}
