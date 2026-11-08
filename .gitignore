@@ -4,3 +4,4 @@ dev-dist
 *.local
 .DS_Store
 Thumbs.db
+docs/screenshots/e2e/
