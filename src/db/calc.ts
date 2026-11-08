@@ -1,7 +1,7 @@
 // 核心计算：库存、FIFO 成本、日报、单品毛利、临期预警。
 // 原则：库存和毛利都是「算出来的」，不落库；合并后重算永远一致。
 
-import type { Adjustment, Batch, SaleLine, SalesOrder } from './types';
+import type { Adjustment, Batch, SaleLine, SalesOrder, SessionSummary } from './types';
 import { addDays, isoToLocalDate, localDate } from './util';
 
 /** 有效订单（排除整单作废） */
@@ -39,6 +39,22 @@ export interface FifoResult {
 }
 
 /**
+ * 各商品加权平均进价（分/基本单位）。用于成本缺失时的兜底估算，
+ * 以及记账页给赠品显示"约 ¥X 成本"。
+ */
+export function productAvgCostFen(batches: Batch[]): Map<string, number> {
+  const qty = new Map<string, number>();
+  const cost = new Map<string, number>();
+  for (const b of batches) {
+    qty.set(b.productId, (qty.get(b.productId) ?? 0) + b.qtyBase);
+    cost.set(b.productId, (cost.get(b.productId) ?? 0) + b.qtyBase * b.unitCostFen);
+  }
+  const avg = new Map<string, number>();
+  for (const [pid, q] of qty) avg.set(pid, q > 0 ? Math.round((cost.get(pid) ?? 0) / q) : 0);
+  return avg;
+}
+
+/**
  * FIFO 成本重放：进货批次按到货时间先进先出，销售明细按时间顺序扣批。
  * 两台设备的数据合并后按时间重排，结果就是合并后的真实成本。
  */
@@ -70,16 +86,7 @@ export function fifoAllocate(
   for (const b of batches) batchRemaining.set(b.id, b.qtyBase);
 
   // 商品兜底均价（分/基本单位）
-  const avgCost = new Map<string, number>();
-  for (const [pid, arr] of byProduct) {
-    let qty = 0;
-    let cost = 0;
-    for (const b of arr) {
-      qty += b.qtyBase;
-      cost += b.qtyBase * b.unitCostFen;
-    }
-    avgCost.set(pid, qty > 0 ? Math.round(cost / qty) : 0);
-  }
+  const avgCost = productAvgCostFen(batches);
 
   // 销售明细按订单时间排序
   const sorted = [...lines]
@@ -244,6 +251,10 @@ export interface ProductMargin {
   costFen: number;
   grossFen: number;
   discountFen: number;
+  giftQty?: number;
+  giftCostFen?: number;
+  /** 该商品在本场有销量没有批次可扣（成本是估算的） */
+  costIncomplete?: boolean;
 }
 
 /** 单品毛利（日期范围内） */
@@ -280,6 +291,123 @@ export function productMargins(
   }
   for (const v of m.values()) v.grossFen = v.revenueFen - v.costFen;
   return [...m.values()].sort((a, b) => b.grossFen - a.grossFen);
+}
+
+/**
+ * 场次汇总：只统计属于该场次、且未作废的单。
+ * 收款按 payMethod；成本含赠品行；赠品不让利。
+ */
+export function sessionReport(
+  sessionId: string,
+  orders: SalesOrder[],
+  lines: SaleLine[],
+  fifo: FifoResult
+): SessionSummary {
+  const sel = orders.filter((o) => o.sessionId === sessionId && !o.voided);
+  const orderIds = new Set(sel.map((o) => o.id));
+  const selLines = lines.filter((l) => orderIds.has(l.orderId));
+
+  let cash = 0;
+  let wechat = 0;
+  let alipay = 0;
+  let revenue = 0;
+  for (const o of sel) {
+    if (o.payMethod === 'cash') cash += o.totalFen;
+    else if (o.payMethod === 'wechat') wechat += o.totalFen;
+    else alipay += o.totalFen;
+    revenue += o.totalFen;
+  }
+
+  let cost = 0;
+  let discount = 0;
+  let giftCost = 0;
+  let giftQty = 0;
+  for (const l of selLines) {
+    const lineCost = fifo.lineCost.get(l.id) ?? 0;
+    cost += lineCost;
+    if (l.gift) {
+      giftCost += lineCost;
+      giftQty += l.qtyBase;
+    } else {
+      // 赠品行即使历史数据里带了 discountFen，也不计入让利
+      discount += l.discountFen;
+    }
+  }
+
+  return {
+    orderCount: sel.length,
+    lineCount: selLines.length,
+    revenueFen: revenue,
+    cashFen: cash,
+    wechatFen: wechat,
+    alipayFen: alipay,
+    costFen: cost,
+    grossFen: revenue - cost,
+    discountFen: discount,
+    giftCostFen: giftCost,
+    giftQty
+  };
+}
+
+/** 单品毛利（按场次）；成本缺失的商品排在最后 */
+export function productMarginsBySession(
+  sessionId: string,
+  orders: SalesOrder[],
+  lines: SaleLine[],
+  fifo: FifoResult,
+  productName: (id: string) => string
+): ProductMargin[] {
+  const orderIds = new Set(
+    orders.filter((o) => o.sessionId === sessionId && !o.voided).map((o) => o.id)
+  );
+  const m = new Map<string, ProductMargin>();
+  for (const l of lines) {
+    if (!orderIds.has(l.orderId)) continue;
+    const cur = m.get(l.productId) ?? {
+      productId: l.productId,
+      name: productName(l.productId),
+      qtyBase: 0,
+      revenueFen: 0,
+      costFen: 0,
+      grossFen: 0,
+      discountFen: 0,
+      giftQty: 0,
+      giftCostFen: 0,
+      costIncomplete: false
+    };
+    const lineCost = fifo.lineCost.get(l.id);
+    cur.qtyBase += l.qtyBase;
+    cur.revenueFen += l.amountFen;
+    cur.costFen += lineCost ?? 0;
+    if (l.gift) {
+      cur.giftQty = (cur.giftQty ?? 0) + l.qtyBase;
+      cur.giftCostFen = (cur.giftCostFen ?? 0) + (lineCost ?? 0);
+    } else {
+      cur.discountFen += l.discountFen;
+    }
+    m.set(l.productId, cur);
+  }
+  for (const v of m.values()) v.grossFen = v.revenueFen - v.costFen;
+  return [...m.values()].sort((a, b) => {
+    if (a.costIncomplete !== b.costIncomplete) return a.costIncomplete ? 1 : -1;
+    return b.grossFen - a.grossFen;
+  });
+}
+
+export function emptySessionSummary(): SessionSummary {
+  return {
+    orderCount: 0,
+    lineCount: 0,
+    revenueFen: 0,
+    cashFen: 0,
+    wechatFen: 0,
+    alipayFen: 0,
+    costFen: 0,
+    grossFen: 0,
+    discountFen: 0,
+    giftCostFen: 0,
+    giftQty: 0
+  };
 }
 
 export interface ExpiryWarning {

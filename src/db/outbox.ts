@@ -51,12 +51,13 @@ export async function pendingCount(): Promise<number> {
 
 /** 把当前本地所有记录重新登记（合并/导入之后调用） */
 export async function enqueueAllLocal(): Promise<void> {
-  const [products, batches, orders, lines, adjustments, settings] = await Promise.all([
+  const [products, batches, orders, lines, adjustments, sessions, settings] = await Promise.all([
     db.products.toArray(),
     db.batches.toArray(),
     db.orders.toArray(),
     db.lines.toArray(),
     db.adjustments.toArray(),
+    db.sessions.toArray(),
     db.settings.toArray()
   ]);
   const rows: { kind: SyncKind; recordId: string; op?: 'upsert' }[] = [];
@@ -65,6 +66,7 @@ export async function enqueueAllLocal(): Promise<void> {
   for (const o of orders) rows.push({ kind: 'order', recordId: o.id });
   for (const l of lines) rows.push({ kind: 'line', recordId: l.id });
   for (const a of adjustments) rows.push({ kind: 'adjustment', recordId: a.id });
+  for (const s of sessions) rows.push({ kind: 'session', recordId: s.id });
   for (const s of settings) rows.push({ kind: 'setting', recordId: s.key });
   await enqueueMany(rows);
 }

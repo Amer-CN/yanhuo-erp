@@ -55,6 +55,40 @@ export interface Batch {
   createdAt: string;
 }
 
+/** 一场（一次出摊）：第一笔记账到收摊结账之间 */
+export interface Session {
+  id: string;
+  deviceId: string;
+  /** 第一笔记账时间，ISO */
+  startedAt: string;
+  /** 结账时间；空 = 进行中 */
+  closedAt?: string;
+  status: 'open' | 'closed';
+  openedBy: string;
+  closedBy?: string;
+  /** 结账后补记的单数 */
+  patchedCount: number;
+  /** 结账汇总快照；避免历史被后续补录影响，补记后重算 */
+  summary?: SessionSummary;
+  note?: string;
+  /** 合并/同步冲突用 */
+  updatedAt: string;
+}
+
+export interface SessionSummary {
+  orderCount: number;
+  lineCount: number;
+  revenueFen: number;
+  cashFen: number;
+  wechatFen: number;
+  alipayFen: number;
+  costFen: number;
+  grossFen: number;
+  discountFen: number;
+  giftCostFen: number;
+  giftQty: number;
+}
+
 /** 销售单头 */
 export interface SalesOrder {
   id: string;
@@ -63,6 +97,8 @@ export interface SalesOrder {
   createdAt: string;
   payMethod: PayMethod;
   totalFen: number;
+  /** 所属场次；迁移前的旧数据为空，由 migrateSessions 补齐 */
+  sessionId?: string;
   note?: string;
   /** 整单作废（退货/录错），报表里不计 */
   voided?: boolean;
@@ -85,8 +121,10 @@ export interface SaleLine {
   unitPriceFen: number;
   /** 成交金额（分） */
   amountFen: number;
-  /** 砍价让利（分） */
+  /** 砍价让利（分）；赠品行恒为 0 */
   discountFen: number;
+  /** 赠品：金额 0，成本照算 */
+  gift?: boolean;
 }
 
 /** 库存调整：盘亏/退货/修正 */
@@ -115,7 +153,9 @@ export const SETTING_KEYS = {
   lastExportAt: 'lastExportAt',
   lastImportAt: 'lastImportAt',
   sampleNoticeDismissed: 'sampleNoticeDismissed',
-  seeded: 'seeded'
+  seeded: 'seeded',
+  /** 历史订单已聚合出场次 */
+  sessionsMigrated: 'sessionsMigrated'
 } as const;
 
 export interface AppData {
@@ -124,6 +164,7 @@ export interface AppData {
   orders: SalesOrder[];
   lines: SaleLine[];
   adjustments: Adjustment[];
+  sessions: Session[];
   settings: Setting[];
 }
 
@@ -133,5 +174,6 @@ export const EMPTY_DATA: AppData = {
   orders: [],
   lines: [],
   adjustments: [],
+  sessions: [],
   settings: []
 };

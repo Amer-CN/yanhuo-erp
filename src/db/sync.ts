@@ -5,7 +5,8 @@ import { db } from './db';
 import { loadAll } from './repo';
 import { enqueueAllLocal, pendingCount, syncWanted } from './outbox';
 import { DEFAULT_SYNC } from './syncDefaults';
-import type { Adjustment, Batch, Product, SaleLine, SalesOrder, Setting } from './types';
+import { mergeSessionPair } from './sessionLogic';
+import type { Adjustment, Batch, Product, SaleLine, SalesOrder, Session, Setting } from './types';
 
 export interface SyncConfig {
   url: string;
@@ -137,7 +138,7 @@ async function rest<T = unknown>(
 
 /* ------------------------------------------------------------------ 记录映射 */
 
-type Kind = 'product' | 'batch' | 'order' | 'line' | 'adjustment' | 'setting';
+type Kind = 'product' | 'batch' | 'order' | 'line' | 'adjustment' | 'session' | 'setting';
 
 async function getLocal(kind: Kind, recordId: string): Promise<unknown | undefined> {
   switch (kind) {
@@ -151,6 +152,8 @@ async function getLocal(kind: Kind, recordId: string): Promise<unknown | undefin
       return db.lines.get(recordId);
     case 'adjustment':
       return db.adjustments.get(recordId);
+    case 'session':
+      return db.sessions.get(recordId);
     case 'setting':
       return db.settings.get(recordId);
   }
@@ -173,6 +176,10 @@ async function deleteLocal(kind: Kind, recordId: string): Promise<void> {
       return;
     case 'adjustment':
       await db.adjustments.delete(recordId);
+      return;
+    case 'session':
+      // 场次删除只删本机记录；单子按自己的 sessionId 处理
+      await db.sessions.delete(recordId);
       return;
     case 'setting':
       await db.settings.delete(recordId);
@@ -271,6 +278,18 @@ async function applyRemote(row: RemoteRow): Promise<void> {
         await db.adjustments.put({ ...(row.data as Adjustment), id: row.record_id });
       }
       return;
+    case 'session': {
+      const remote = row.data as Session;
+      const cur = await db.sessions.get(row.record_id);
+      if (!cur) {
+        await db.sessions.put({ ...remote, id: row.record_id });
+        return;
+      }
+      // closed 优先，避免把已结账场次拉回 open；同状态取 updatedAt 新者
+      const merged = mergeSessionPair(cur, { ...remote, id: row.record_id });
+      await db.sessions.put(merged);
+      return;
+    }
     case 'setting': {
       if (SKIP_SETTINGS.has(row.record_id)) return;
       const remote = row.data as Setting;

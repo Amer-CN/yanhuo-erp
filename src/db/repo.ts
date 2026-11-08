@@ -11,11 +11,15 @@ import type {
   Product,
   SaleLine,
   SalesOrder,
+  Session,
+  SessionSummary,
   Setting
 } from './types';
 import { SETTING_KEYS } from './types';
+import { fifoAllocate, sessionReport } from './calc';
+import { groupOrdersBySession } from './sessionLogic';
 import { localDate, nowIso, uuid } from './util';
-import { enqueue } from './outbox';
+import { enqueue, enqueueMany } from './outbox';
 
 /* ------------------------------------------------------------------ 设置 */
 
@@ -146,7 +150,439 @@ export async function deleteBatch(id: string): Promise<void> {
   await enqueue('batch', id, 'delete');
 }
 
-/* ------------------------------------------------------------------ 开单 */
+/* ------------------------------------------------------------------ 场次 */
+
+export type RecordErrorCode =
+  | 'EMPTY_LINES'
+  | 'INVALID_QTY'
+  | 'INVALID_AMOUNT'
+  | 'ZERO_AMOUNT_NOT_GIFT'
+  | 'SESSION_CLOSED'
+  | 'SESSION_NOT_FOUND'
+  | 'ALREADY_CLOSED'
+  | 'NOT_CLOSED'
+  | 'NEXT_SESSION_STARTED';
+
+export class RecordError extends Error {
+  code: RecordErrorCode;
+  constructor(code: RecordErrorCode, message?: string) {
+    super(message ?? code);
+    this.name = 'RecordError';
+    this.code = code;
+  }
+}
+
+/** 本机正在进行中的场次（异常情况下有多条时取最晚开始的一场） */
+export async function getOpenSession(deviceId: string): Promise<Session | undefined> {
+  const rows = await db.sessions.where('status').equals('open').toArray();
+  return rows
+    .filter((s) => s.deviceId === deviceId)
+    .sort((a, b) => (a.startedAt < b.startedAt ? 1 : -1))[0];
+}
+
+/** 取本机 open 场次；没有就开一场（第一笔记账时调用） */
+export async function ensureOpenSession(deviceId: string, operator: string): Promise<Session> {
+  const existing = await getOpenSession(deviceId);
+  if (existing) return existing;
+
+  const now = nowIso();
+  const session: Session = {
+    id: uuid(),
+    deviceId,
+    startedAt: now,
+    status: 'open',
+    openedBy: operator,
+    patchedCount: 0,
+    updatedAt: now
+  };
+  await db.sessions.put(session);
+  await enqueue('session', session.id);
+  return session;
+}
+
+export async function getSession(id: string): Promise<Session | undefined> {
+  return db.sessions.get(id);
+}
+
+/** 本机最近一场（含已结账） */
+export async function getLastSession(deviceId: string): Promise<Session | undefined> {
+  const rows = await db.sessions.where('deviceId').equals(deviceId).toArray();
+  return rows.sort((a, b) => (a.startedAt < b.startedAt ? 1 : -1))[0];
+}
+
+/* ------------------------------------------------------------------ 单据 */
+
+export interface RecordLineInput {
+  productId: string;
+  qtyBase: number;
+  unit: 'box' | 'base';
+  qty: number;
+  listUnitPriceFen: number;
+  /** 展示用；以 amountFen 为准，repo 内会重算 */
+  unitPriceFen: number;
+  amountFen: number;
+  gift?: boolean;
+}
+
+export interface RecordInput {
+  deviceId: string;
+  operator: string;
+  payMethod: PayMethod;
+  /** 补记到已结账场次时传；正常记账不传 */
+  sessionId?: string;
+  note?: string;
+  lines: RecordLineInput[];
+}
+
+function buildLines(orderId: string, input: RecordLineInput[]): SaleLine[] {
+  if (input.length === 0) throw new RecordError('EMPTY_LINES', '先加一个商品');
+  return input.map((l) => {
+    const qtyBase = Math.round(l.qtyBase);
+    if (!Number.isFinite(qtyBase) || qtyBase <= 0) {
+      throw new RecordError('INVALID_QTY', '数量要大于 0');
+    }
+    if (!Number.isFinite(l.amountFen) || l.amountFen < 0) {
+      throw new RecordError('INVALID_AMOUNT', '成交金额填个数字');
+    }
+    const gift = Boolean(l.gift);
+    if (!gift && Math.round(l.amountFen) === 0) {
+      throw new RecordError('ZERO_AMOUNT_NOT_GIFT', '0 元，是赠品吗？');
+    }
+    const amountFen = gift ? 0 : Math.round(l.amountFen);
+    const listAmount = Math.max(0, Math.round(l.listUnitPriceFen)) * qtyBase;
+    return {
+      id: uuid(),
+      orderId,
+      productId: l.productId,
+      qtyBase,
+      unit: l.unit,
+      qty: Number.isFinite(l.qty) && l.qty > 0 ? Math.round(l.qty) : qtyBase,
+      listUnitPriceFen: Math.max(0, Math.round(l.listUnitPriceFen)),
+      unitPriceFen: gift ? 0 : Math.round(amountFen / qtyBase),
+      amountFen,
+      discountFen: gift ? 0 : Math.max(0, listAmount - amountFen),
+      ...(gift ? { gift: true as const } : {})
+    };
+  });
+}
+
+/** 保存一单：事务内写 order + lines；自动挂到本机 open 场次 */
+export async function saveRecord(input: RecordInput): Promise<SalesOrder> {
+  const session = input.sessionId
+    ? await getSession(input.sessionId)
+    : await ensureOpenSession(input.deviceId, input.operator);
+  if (!session) throw new RecordError('SESSION_NOT_FOUND', '这场找不到了，刷新看看');
+  if (session.status !== 'open') {
+    throw new RecordError('SESSION_CLOSED', '这一场已结账，用补记');
+  }
+
+  const orderId = uuid();
+  const lines = buildLines(orderId, input.lines);
+  const totalFen = lines.reduce((s, l) => s + l.amountFen, 0);
+  const order: SalesOrder = {
+    id: orderId,
+    deviceId: input.deviceId,
+    operator: input.operator,
+    createdAt: nowIso(),
+    payMethod: input.payMethod,
+    totalFen,
+    sessionId: session.id,
+    note: input.note?.trim() || undefined
+  };
+
+  await db.transaction('rw', db.orders, db.lines, async () => {
+    await db.orders.put(order);
+    await db.lines.bulkPut(lines);
+  });
+  await enqueueMany([
+    { kind: 'order', recordId: order.id },
+    ...lines.map((l) => ({ kind: 'line' as const, recordId: l.id }))
+  ]);
+  return order;
+}
+
+/** 编辑进行中的单（仅本场 open）。明细整组替换。 */
+export async function updateRecord(id: string, input: RecordInput): Promise<SalesOrder> {
+  const old = await db.orders.get(id);
+  if (!old) throw new RecordError('SESSION_NOT_FOUND', '这单找不到了，刷新看看');
+  const session = old.sessionId ? await db.sessions.get(old.sessionId) : undefined;
+  if (!session || session.status !== 'open') {
+    throw new RecordError('SESSION_CLOSED', '这一场已结账，用补记');
+  }
+
+  const oldLines = await db.lines.where('orderId').equals(id).toArray();
+  const lines = buildLines(id, input.lines);
+  const totalFen = lines.reduce((s, l) => s + l.amountFen, 0);
+  const order: SalesOrder = {
+    ...old,
+    operator: input.operator || old.operator,
+    payMethod: input.payMethod,
+    totalFen,
+    note: input.note?.trim() || undefined
+  };
+
+  await db.transaction('rw', db.orders, db.lines, async () => {
+    await db.lines.where('orderId').equals(id).delete();
+    await db.orders.put(order);
+    await db.lines.bulkPut(lines);
+  });
+  await enqueueMany([
+    { kind: 'order', recordId: id },
+    ...oldLines.map((l) => ({ kind: 'line' as const, recordId: l.id, op: 'delete' as const })),
+    ...lines.map((l) => ({ kind: 'line' as const, recordId: l.id }))
+  ]);
+  return order;
+}
+
+/** 删除进行中的单（仅本场 open）。已结账场次只能补记/作废。 */
+export async function deleteRecord(id: string): Promise<void> {
+  const order = await db.orders.get(id);
+  if (!order) return;
+  const session = order.sessionId ? await db.sessions.get(order.sessionId) : undefined;
+  if (!session || session.status !== 'open') {
+    throw new RecordError('SESSION_CLOSED', '这一场已结账，不能删除');
+  }
+  const lines = await db.lines.where('orderId').equals(id).toArray();
+  await db.transaction('rw', db.orders, db.lines, async () => {
+    await db.lines.where('orderId').equals(id).delete();
+    await db.orders.delete(id);
+  });
+  await enqueueMany([
+    { kind: 'order', recordId: id, op: 'delete' },
+    ...lines.map((l) => ({ kind: 'line' as const, recordId: l.id, op: 'delete' as const }))
+  ]);
+}
+
+/** 撤销补记：删除已结账场次里的补记单，补记计数 −1，重算快照 */
+export async function undoPatchedRecord(id: string): Promise<void> {
+  const order = await db.orders.get(id);
+  if (!order?.sessionId) return;
+  const session = await db.sessions.get(order.sessionId);
+  if (!session || session.status !== 'closed') {
+    await deleteRecord(id);
+    return;
+  }
+  const lines = await db.lines.where('orderId').equals(id).toArray();
+  const [orders, allLines, batches] = await Promise.all([
+    db.orders.toArray(),
+    db.lines.toArray(),
+    db.batches.toArray()
+  ]);
+  const nextOrders = orders.filter((o) => o.id !== id);
+  const nextLines = allLines.filter((l) => l.orderId !== id);
+  const summary = sessionReport(
+    session.id,
+    nextOrders,
+    nextLines,
+    fifoAllocate(batches, nextOrders, nextLines)
+  );
+  const nextSession: Session = {
+    ...session,
+    patchedCount: Math.max(0, session.patchedCount - 1),
+    summary,
+    updatedAt: nowIso()
+  };
+  await db.transaction('rw', db.sessions, db.orders, db.lines, async () => {
+    await db.lines.where('orderId').equals(id).delete();
+    await db.orders.delete(id);
+    await db.sessions.put(nextSession);
+  });
+  await enqueueMany([
+    { kind: 'order', recordId: id, op: 'delete' },
+    ...lines.map((l) => ({ kind: 'line' as const, recordId: l.id, op: 'delete' as const })),
+    { kind: 'session', recordId: session.id }
+  ]);
+}
+
+/** 收摊结账：算快照 → 标记 closed；不删任何单 */
+export async function closeSession(sessionId: string, operator: string): Promise<Session> {
+  const session = await db.sessions.get(sessionId);
+  if (!session) throw new RecordError('SESSION_NOT_FOUND', '这场找不到了，刷新看看');
+  if (session.status === 'closed') {
+    throw new RecordError('ALREADY_CLOSED', '这一场已经结过账了');
+  }
+
+  const [orders, lines, batches] = await Promise.all([
+    db.orders.toArray(),
+    db.lines.toArray(),
+    db.batches.toArray()
+  ]);
+  const fifo = fifoAllocate(batches, orders, lines);
+  const summary = sessionReport(sessionId, orders, lines, fifo);
+
+  const next: Session = {
+    ...session,
+    status: 'closed',
+    closedAt: nowIso(),
+    closedBy: operator,
+    summary,
+    updatedAt: nowIso()
+  };
+  await db.sessions.put(next);
+  await enqueue('session', sessionId);
+  return next;
+}
+
+/** 撤销结账：仅下一场尚未开始时允许 */
+export async function reopenSession(sessionId: string): Promise<Session> {
+  const session = await db.sessions.get(sessionId);
+  if (!session) throw new RecordError('SESSION_NOT_FOUND', '这场找不到了，刷新看看');
+  if (session.status !== 'closed') {
+    throw new RecordError('NOT_CLOSED', '这一场还没结账');
+  }
+  const later = await db.sessions.where('startedAt').above(session.startedAt).count();
+  if (later > 0) {
+    throw new RecordError('NEXT_SESSION_STARTED', '下一场已经开始，不能撤销结账');
+  }
+  const next: Session = { ...session, status: 'open', updatedAt: nowIso() };
+  delete next.closedAt;
+  delete next.closedBy;
+  delete next.summary;
+  await db.sessions.put(next);
+  await enqueue('session', sessionId);
+  return next;
+}
+
+/** 补记到已结账场次：写单 + patchedCount +1 + 重算快照 */
+export async function addPatchedRecord(input: RecordInput & { sessionId: string }): Promise<SalesOrder> {
+  const session = await db.sessions.get(input.sessionId);
+  if (!session) throw new RecordError('SESSION_NOT_FOUND', '这场找不到了，刷新看看');
+  if (session.status !== 'closed') {
+    throw new RecordError('NOT_CLOSED', '这一场还在进行中，直接记一笔就行');
+  }
+
+  const orderId = uuid();
+  const lines = buildLines(orderId, input.lines);
+  const totalFen = lines.reduce((s, l) => s + l.amountFen, 0);
+  const createdAt = nowIso();
+  const order: SalesOrder = {
+    id: orderId,
+    deviceId: input.deviceId,
+    operator: input.operator,
+    createdAt,
+    payMethod: input.payMethod,
+    totalFen,
+    sessionId: session.id,
+    note: input.note?.trim() || undefined
+  };
+
+  const [orders, allLines, batches] = await Promise.all([
+    db.orders.toArray(),
+    db.lines.toArray(),
+    db.batches.toArray()
+  ]);
+  const nextOrders = [...orders, order];
+  const nextLines = [...allLines, ...lines];
+  const summary = sessionReport(
+    session.id,
+    nextOrders,
+    nextLines,
+    fifoAllocate(batches, nextOrders, nextLines)
+  );
+  const nextSession: Session = {
+    ...session,
+    patchedCount: session.patchedCount + 1,
+    summary,
+    updatedAt: createdAt
+  };
+
+  await db.transaction('rw', db.sessions, db.orders, db.lines, async () => {
+    await db.orders.put(order);
+    await db.lines.bulkPut(lines);
+    await db.sessions.put(nextSession);
+  });
+  await enqueueMany([
+    { kind: 'order', recordId: order.id },
+    ...lines.map((l) => ({ kind: 'line' as const, recordId: l.id })),
+    { kind: 'session', recordId: session.id }
+  ]);
+  return order;
+}
+
+/** 重算并写回某场次的快照（编辑/删除后调用） */
+export async function refreshSessionSummary(sessionId: string): Promise<SessionSummary | undefined> {
+  const session = await db.sessions.get(sessionId);
+  if (!session) return undefined;
+  const [orders, lines, batches] = await Promise.all([
+    db.orders.toArray(),
+    db.lines.toArray(),
+    db.batches.toArray()
+  ]);
+  const summary = sessionReport(sessionId, orders, lines, fifoAllocate(batches, orders, lines));
+  await db.sessions.put({ ...session, summary, updatedAt: nowIso() });
+  await enqueue('session', sessionId);
+  return summary;
+}
+
+/* ------------------------------------------------------------------ 迁移 */
+
+/**
+ * 历史订单 → 场次。按本地自然日分组，相邻单间隔 > 4h 视作新的一场。
+ * 幂等：完成后写 setting sessionsMigrated=1。
+ */
+export async function migrateSessions(): Promise<number> {
+  const done = (await db.settings.get(SETTING_KEYS.sessionsMigrated))?.value;
+  const pending = (await db.orders.toArray())
+    .filter((o) => !o.sessionId)
+    .sort((a, b) => (a.createdAt < b.createdAt ? -1 : a.createdAt > b.createdAt ? 1 : 0));
+  if (pending.length === 0) {
+    if (done !== '1') await setSetting(SETTING_KEYS.sessionsMigrated, '1');
+    return 0;
+  }
+
+  const groups = groupOrdersBySession(pending);
+
+  const [allOrders, allLines, batches] = await Promise.all([
+    db.orders.toArray(),
+    db.lines.toArray(),
+    db.batches.toArray()
+  ]);
+  const sessionOfOrder = new Map<string, string>();
+  const sessions: Session[] = [];
+
+  for (const group of groups) {
+    const first = group[0];
+    const last = group[group.length - 1];
+    const now = nowIso();
+    const s: Session = {
+      id: uuid(),
+      deviceId: first.deviceId,
+      startedAt: first.createdAt,
+      closedAt: last.createdAt,
+      status: 'closed',
+      openedBy: first.operator,
+      closedBy: first.operator,
+      patchedCount: 0,
+      updatedAt: now
+    };
+    for (const o of group) sessionOfOrder.set(o.id, s.id);
+    sessions.push(s);
+  }
+
+  // 用迁移后的订单集合算快照
+  const migratedOrders = allOrders.map((o) => {
+    const sid = sessionOfOrder.get(o.id);
+    return sid ? { ...o, sessionId: sid } : o;
+  });
+  const fifo = fifoAllocate(batches, migratedOrders, allLines);
+  for (const s of sessions) s.summary = sessionReport(s.id, migratedOrders, allLines, fifo);
+
+  await db.transaction('rw', db.sessions, db.orders, db.settings, async () => {
+    await db.sessions.bulkPut(sessions);
+    await db.orders.bulkPut(migratedOrders.filter((o) => sessionOfOrder.has(o.id)));
+    await db.settings.put({ key: SETTING_KEYS.sessionsMigrated, value: '1' });
+  });
+
+  await enqueueMany([
+    ...sessions.map((s) => ({ kind: 'session' as const, recordId: s.id })),
+    ...migratedOrders
+      .filter((o) => sessionOfOrder.has(o.id))
+      .map((o) => ({ kind: 'order' as const, recordId: o.id }))
+  ]);
+  return sessions.length;
+}
+
+/* ------------------------------------------------------------------ 旧开单接口（保留一版，UI 不再调用） */
 
 export interface CartLineInput {
   productId: string;
@@ -165,7 +601,9 @@ export interface CheckoutInput {
   note?: string;
 }
 
+/** @deprecated 由 saveRecord 取代；保留用于旧页面回滚。仍会挂到本机 open 场次。 */
 export async function checkout(input: CheckoutInput): Promise<SalesOrder> {
+  const session = await ensureOpenSession(input.deviceId, input.operator);
   const orderId = uuid();
   const createdAt = nowIso();
   const lines: SaleLine[] = input.lines.map((l) => {
@@ -191,6 +629,7 @@ export async function checkout(input: CheckoutInput): Promise<SalesOrder> {
     createdAt,
     payMethod: input.payMethod,
     totalFen,
+    sessionId: session.id,
     note: input.note?.trim() || undefined
   };
   await db.transaction('rw', db.orders, db.lines, async () => {
@@ -241,32 +680,35 @@ export async function createAdjustment(
 /* ------------------------------------------------------------------ 统计辅助 */
 
 export async function loadAll(): Promise<AppData> {
-  const [products, batches, orders, lines, adjustments, settings] = await Promise.all([
+  const [products, batches, orders, lines, adjustments, sessions, settings] = await Promise.all([
     db.products.toArray(),
     db.batches.toArray(),
     db.orders.toArray(),
     db.lines.toArray(),
     db.adjustments.toArray(),
+    db.sessions.toArray(),
     db.settings.toArray()
   ]);
-  return { products, batches, orders, lines, adjustments, settings };
+  return { products, batches, orders, lines, adjustments, sessions, settings };
 }
 
 export async function clearAllData(): Promise<void> {
   await db.transaction(
     'rw',
-    [db.products, db.batches, db.orders, db.lines, db.adjustments],
+    [db.products, db.batches, db.orders, db.lines, db.adjustments, db.sessions],
     async () => {
       await Promise.all([
         db.products.clear(),
         db.batches.clear(),
         db.orders.clear(),
         db.lines.clear(),
-        db.adjustments.clear()
+        db.adjustments.clear(),
+        db.sessions.clear()
       ]);
     }
   );
   await setSetting(SETTING_KEYS.seeded, '');
+  await setSetting(SETTING_KEYS.sessionsMigrated, '');
   await db.outbox.clear();
 }
 

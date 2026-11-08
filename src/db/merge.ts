@@ -3,33 +3,40 @@
 //       商品和设置是可变数据，按 updatedAt / 导入优先。
 
 import { db } from './db';
-import type { AppData } from './types';
+import type { AppData, Session } from './types';
 import { SETTING_KEYS } from './types';
+import { mergeSessionPair } from './sessionLogic';
 import { nowIso } from './util';
 
 export interface BackupFile {
   app: 'yanhuo-erp';
-  version: 1;
+  /** 1 = 实时收银；2 = 场次记账（多了 sessions） */
+  version: 1 | 2;
   exportedAt: string;
   deviceId: string;
   data: AppData;
 }
 
+export function backupVersion(): 2 {
+  return 2;
+}
+
 export async function exportBackup(deviceId: string): Promise<BackupFile> {
-  const [products, batches, orders, lines, adjustments, settings] = await Promise.all([
+  const [products, batches, orders, lines, adjustments, sessions, settings] = await Promise.all([
     db.products.toArray(),
     db.batches.toArray(),
     db.orders.toArray(),
     db.lines.toArray(),
     db.adjustments.toArray(),
+    db.sessions.toArray(),
     db.settings.toArray()
   ]);
   return {
     app: 'yanhuo-erp',
-    version: 1,
+    version: 2,
     exportedAt: nowIso(),
     deviceId,
-    data: { products, batches, orders, lines, adjustments, settings }
+    data: { products, batches, orders, lines, adjustments, sessions, settings }
   };
 }
 
@@ -41,6 +48,8 @@ export interface MergeResult {
   ordersAdded: number;
   linesAdded: number;
   adjustmentsAdded: number;
+  sessionsAdded: number;
+  sessionsUpdated: number;
   settingsImported: number;
 }
 
@@ -55,7 +64,7 @@ export function parseBackup(text: string): BackupFile {
   }
   return {
     app: 'yanhuo-erp',
-    version: 1,
+    version: obj.version === 2 ? 2 : 1,
     exportedAt: obj.exportedAt ?? nowIso(),
     deviceId: obj.deviceId ?? '',
     data: {
@@ -64,6 +73,7 @@ export function parseBackup(text: string): BackupFile {
       orders: d.orders ?? [],
       lines: d.lines ?? [],
       adjustments: d.adjustments ?? [],
+      sessions: d.sessions ?? [],
       settings: d.settings ?? []
     }
   };
@@ -80,12 +90,14 @@ export async function importMerge(backup: BackupFile): Promise<MergeResult> {
     ordersAdded: 0,
     linesAdded: 0,
     adjustmentsAdded: 0,
+    sessionsAdded: 0,
+    sessionsUpdated: 0,
     settingsImported: 0
   };
 
   await db.transaction(
     'rw',
-    [db.products, db.batches, db.orders, db.lines, db.adjustments, db.settings],
+    [db.products, db.batches, db.orders, db.lines, db.adjustments, db.sessions, db.settings],
     async () => {
       // 商品：id 不存在则新增；存在则比 updatedAt
       const existingProducts = await db.products.bulkGet(data.products.map((p) => p.id));
@@ -134,6 +146,24 @@ export async function importMerge(backup: BackupFile): Promise<MergeResult> {
         result.adjustmentsAdded = newAdj.length;
       }
 
+      // 场次：同 id 合并；closed 优先，其次 updatedAt 新者胜；补记计数取 max
+      const incomingSessions = data.sessions ?? [];
+      const existingSessions = await db.sessions.bulkGet(incomingSessions.map((s) => s.id));
+      const toPutSessions: Session[] = [];
+      for (let i = 0; i < incomingSessions.length; i++) {
+        const inc = incomingSessions[i];
+        const cur = existingSessions[i];
+        if (!cur) {
+          toPutSessions.push(inc);
+          result.sessionsAdded++;
+          continue;
+        }
+        const merged = mergeSessionPair(cur, inc);
+        toPutSessions.push(merged);
+        result.sessionsUpdated++;
+      }
+      if (toPutSessions.length) await db.sessions.bulkPut(toPutSessions);
+
       // 设置：本机身份与操作人不覆盖（操作人按设备走）
       const skip = new Set<string>([
         SETTING_KEYS.deviceId,
@@ -157,7 +187,7 @@ export async function replaceAll(backup: BackupFile): Promise<void> {
   const d = backup.data;
   await db.transaction(
     'rw',
-    [db.products, db.batches, db.orders, db.lines, db.adjustments, db.settings],
+    [db.products, db.batches, db.orders, db.lines, db.adjustments, db.sessions, db.settings],
     async () => {
       await Promise.all([
         db.products.clear(),
@@ -165,6 +195,7 @@ export async function replaceAll(backup: BackupFile): Promise<void> {
         db.orders.clear(),
         db.lines.clear(),
         db.adjustments.clear(),
+        db.sessions.clear(),
         db.settings.clear()
       ]);
       await db.products.bulkPut(d.products);
@@ -172,6 +203,7 @@ export async function replaceAll(backup: BackupFile): Promise<void> {
       await db.orders.bulkPut(d.orders);
       await db.lines.bulkPut(d.lines);
       await db.adjustments.bulkPut(d.adjustments);
+      await db.sessions.bulkPut(d.sessions ?? []);
       await db.settings.bulkPut(d.settings);
     }
   );

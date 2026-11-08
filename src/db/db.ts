@@ -5,13 +5,14 @@ import type {
   Product,
   SaleLine,
   SalesOrder,
+  Session,
   Setting
 } from './types';
 
 export interface OutboxRow {
   /** `${kind}:${recordId}` */
   id: string;
-  kind: 'product' | 'batch' | 'order' | 'line' | 'adjustment' | 'setting';
+  kind: 'product' | 'batch' | 'order' | 'line' | 'adjustment' | 'session' | 'setting';
   recordId: string;
   op: 'upsert' | 'delete';
   queuedAt: number;
@@ -23,6 +24,7 @@ export class AppDB extends Dexie {
   orders!: Table<SalesOrder, string>;
   lines!: Table<SaleLine, string>;
   adjustments!: Table<Adjustment, string>;
+  sessions!: Table<Session, string>;
   settings!: Table<Setting, string>;
   outbox!: Table<OutboxRow, string>;
 
@@ -38,6 +40,11 @@ export class AppDB extends Dexie {
     });
     this.version(2).stores({
       outbox: 'id, queuedAt'
+    });
+    // v3：事后记账模型。sessions 只加表；orders 加 sessionId 索引（不重建记录）。
+    this.version(3).stores({
+      sessions: 'id, status, startedAt, closedAt, deviceId',
+      orders: 'id, createdAt, deviceId, payMethod, voided, sessionId'
     });
   }
 }
