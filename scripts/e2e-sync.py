@@ -1,11 +1,12 @@
-"""两台设备自动云同步端到端验证（不需要真的 Supabase）。
+"""两台设备自动云同步端到端验证（v2 场次记账，不需要真的 Supabase）。
 
 用法（先 pnpm dev）：
     python scripts/e2e-sync.py
+
+断言面使用「更多 → 销售记录」：它按本机收到的全部订单聚合，不受场次归属设备限制。
 """
 
 import os
-import re
 import subprocess
 import sys
 import time
@@ -48,14 +49,10 @@ def init_script():
 def cleanup_cloud():
     if USE_MOCK:
         return
-    import json
     import urllib.parse
     import urllib.request
 
-    target = (
-        f"{REAL_URL}/rest/v1/yh_records?ledger=eq."
-        + urllib.parse.quote(REAL_LEDGER)
-    )
+    target = f"{REAL_URL}/rest/v1/yh_records?ledger=eq." + urllib.parse.quote(REAL_LEDGER)
     req = urllib.request.Request(
         target,
         method="DELETE",
@@ -81,10 +78,16 @@ def new_page(browser, tag):
     )
     ctx.add_init_script(init_script())
     page = ctx.new_page()
-    page.on(
-        "console",
-        lambda m: errors.append(f"[{tag}] console.{m.type}: {m.text}") if m.type == "error" else None,
-    )
+
+    def on_console(m):
+        if m.type != "error":
+            return
+        # 断网补发用例会主动断网，轮询失败的浏览器噪音不算缺陷
+        if any(s in m.text for s in ("ERR_INTERNET_DISCONNECTED", "Failed to fetch", "net::ERR")):
+            return
+        errors.append(f"[{tag}] console.{m.type}: {m.text}")
+
+    page.on("console", on_console)
     page.on("pageerror", lambda e: errors.append(f"[{tag}] pageerror: {e}"))
     for i in range(40):
         try:
@@ -94,38 +97,47 @@ def new_page(browser, tag):
             if i == 39:
                 raise
             time.sleep(0.5)
-    page.wait_for_selector("text=大地红 1000 响", timeout=20000)
+    page.get_by_role("button", name="记一笔").last.wait_for(timeout=20000)
     return ctx, page
 
 
-def sell(page, idx: int, pay="现金"):
-    page.get_by_role("button", name="开单").click()
-    page.wait_for_selector(".prod-btn", timeout=5000)
-    page.locator(".prod-btn").nth(idx).click()
-    page.wait_for_selector(".checkout-bar", timeout=5000)
-    page.get_by_role("button", name="结算").click()
-    page.wait_for_selector("text=收款 ¥", timeout=5000)
-    page.get_by_role("button", name=pay).click()
-    if pay == "现金":
-        page.wait_for_selector("text=现金收款", timeout=5000)
-        page.get_by_role("button", name=re.compile("^正好")).click()
-        page.get_by_role("button", name=re.compile("^确认收款")).click()
-    page.wait_for_selector("text=收款完成", timeout=5000)
-    page.get_by_role("button", name="完成").click()
+def sell(page, product: str) -> None:
+    """v2：记一笔 → 选商品 → 保存并记下一单 → 返回首页。"""
+    page.get_by_role("button", name="记一笔").last.click()
+    page.get_by_role("button", name="添加商品").first.wait_for(timeout=5000)
+    page.get_by_role("button", name="添加商品").first.click()
+    page.get_by_role("button", name=product, exact=False).first.click()
+    page.get_by_role("button", name="完成（回单据）").click()
+    page.get_by_role("button", name="保存并记下一单").click()
+    page.wait_for_selector(".toast", timeout=8000)
+    page.wait_for_timeout(400)
+    page.get_by_role("button", name="返回").click()
     page.wait_for_timeout(500)
 
 
-def revenue(page) -> str:
-    page.get_by_role("button", name="报表").click()
-    page.wait_for_selector("text=销售额", timeout=5000)
-    return page.locator(".stat").filter(has_text="销售额").locator(".v").inner_text()
+def open_history(page) -> None:
+    page.get_by_role("button", name="更多").click()
+    page.locator(".list-item", has_text="销售记录").click()
+    # 页面加载即可；数据可能还没同步到，交给 wait_history 轮询
+    page.locator(".back-btn").wait_for(timeout=8000)
 
 
-def wait_revenue(page, want: str, timeout=30) -> bool:
+def history_total(page) -> str:
+    loc = page.locator(".day-header .sub").first
+    return loc.inner_text() if loc.count() else "0 单 · 合计 ¥0.00"
+
+
+def back_home(page) -> None:
+    page.get_by_role("button", name="返回").click()
+    page.wait_for_timeout(300)
+    page.get_by_role("button", name="记账").click()
+    page.wait_for_timeout(400)
+
+
+def wait_history(page, want: str, timeout: int = 35) -> bool:
     end = time.time() + timeout
     while time.time() < end:
-        v = revenue(page)
-        if want in v:
+        if want in history_total(page):
             return True
         page.wait_for_timeout(1000)
     return False
@@ -155,34 +167,37 @@ def main() -> int:
             ctx_b, b = new_page(browser, "B")
             print("[1] 两台设备已带同一个同步码启动")
 
-            print("[2] A 卖一单，等 B 自动看到（不导出/导入）")
-            sell(a, 0)
-            seen = wait_revenue(b, "¥25.00", timeout=35)
-            print("    B 报表销售额：", revenue(b), "->", "OK" if seen else "TIMEOUT")
+            print("[2] A 记一单 ¥25.00，等 B 自动看到")
+            sell(a, "大地红 1000 响")
+            open_history(b)
+            seen = wait_history(b, "1 单 · 合计 ¥25.00")
+            print("    B 销售记录：", history_total(b), "->", "OK" if seen else "TIMEOUT")
             if not seen:
                 errors.append("B 没有自动拉到 A 的销售")
             b.screenshot(path=os.path.join(OUT, "20-同步-B看到A的单.png"))
+            back_home(b)
 
-            print("[3] B 卖一单，等 A 自动看到")
-            sell(b, 1)
-            seen2 = wait_revenue(a, "¥26.50", timeout=35)
-            print("    A 报表销售额：", revenue(a), "->", "OK" if seen2 else "TIMEOUT")
+            print("[3] B 记一单 ¥1.50，等 A 自动看到两单 ¥26.50")
+            sell(b, "二踢脚")
+            open_history(a)
+            seen2 = wait_history(a, "2 单 · 合计 ¥26.50")
+            print("    A 销售记录：", history_total(a), "->", "OK" if seen2 else "TIMEOUT")
             if not seen2:
                 errors.append("A 没有自动拉到 B 的销售")
             a.screenshot(path=os.path.join(OUT, "21-同步-A看到两单.png"))
 
-            print("[4] B 断网再卖一单，恢复网络后 A 自动收到")
+            print("[4] B 断网记一单 ¥15.00，恢复网络后 A 自动收到三单 ¥41.50")
             ctx_b.set_offline(True)
-            sell(b, 2)  # 加特林 ¥15
-            local_seen = wait_revenue(b, "¥41.50", timeout=8)
-            print("    B 本地报表：", revenue(b), "->", "OK" if local_seen else "TIMEOUT")
+            sell(b, "加特林")
+            open_history(b)
+            local_seen = wait_history(b, "3 单 · 合计 ¥41.50", timeout=8)
+            print("    B 本地销售记录：", history_total(b), "->", "OK" if local_seen else "TIMEOUT")
             if not local_seen:
                 errors.append("B 离线时本地没有记上这一单")
-            a_now = revenue(a)
-            print("    断网期间 A 报表：", a_now)
+            print("    断网期间 A 销售记录：", history_total(a))
             ctx_b.set_offline(False)
-            seen3 = wait_revenue(a, "¥41.50", timeout=45)
-            print("    恢复网络后 A 报表：", revenue(a), "->", "OK" if seen3 else "TIMEOUT")
+            seen3 = wait_history(a, "3 单 · 合计 ¥41.50", timeout=45)
+            print("    恢复网络后 A 销售记录：", history_total(a), "->", "OK" if seen3 else "TIMEOUT")
             if not seen3:
                 errors.append("B 恢复网络后 A 没有自动收到补发的单")
             a.screenshot(path=os.path.join(OUT, "22-同步-离线补发.png"))

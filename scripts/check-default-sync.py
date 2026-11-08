@@ -27,7 +27,8 @@ with sync_playwright() as p:
 
     page.route("**/rest/v1/**", handler)
     page.goto(BASE, wait_until="networkidle")
-    page.wait_for_selector("text=大地红 1000 响", timeout=20000)
+    # v2 首页：等业务入口出现即可（旧版等的是 SellPage 商品网格）
+    page.get_by_role("button", name="记一笔").last.wait_for(timeout=20000)
     page.wait_for_timeout(4000)
 
     print("拦截到同步请求：", len(seen))

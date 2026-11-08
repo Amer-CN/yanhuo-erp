@@ -1,19 +1,17 @@
-"""端到端冒烟测试：用真实 Chromium 跑一遍「开单 → 进货 → 报表 → 库存」。
+"""端到端冒烟测试（v2 场次记账）：开单 → 进货 → 库存 → 报表 → 商品 → 设置。
 用法（先 pnpm dev）：
     python scripts/e2e-smoke.py
 """
 
 import os
-import re
 import sys
-import time
 
 sys.stdout.reconfigure(encoding="utf-8", errors="replace")
 sys.stderr.reconfigure(encoding="utf-8", errors="replace")
 
 from playwright.sync_api import sync_playwright
 
-BASE = "http://127.0.0.1:5173/"
+BASE = os.environ.get("SMOKE_BASE", "http://127.0.0.1:5173/")
 ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
 OUT = os.path.join(ROOT, "docs", "screenshots", "e2e")
 os.makedirs(OUT, exist_ok=True)
@@ -23,11 +21,21 @@ errors: list[str] = []
 
 def shot(page, name: str) -> None:
     page.screenshot(path=os.path.join(OUT, name))
-    print(f"  screenshot -> docs/screenshots/{name}")
+    print(f"  screenshot -> docs/screenshots/e2e/{name}")
 
 
-def field_input(page, label: str):
-    return page.locator(".glass-input-group").filter(has_text=label).locator("input, select").first
+def expect_text(page, text: str, timeout: int = 8000) -> None:
+    try:
+        page.get_by_text(text, exact=False).first.wait_for(timeout=timeout)
+    except Exception as exc:  # noqa: BLE001
+        shot(page, f"FAIL-{text[:12]}.png")
+        errors.append(f"找不到文本：{text}")
+        raise AssertionError(f"找不到文本：{text}") from exc
+
+
+def add_product(page, name: str) -> None:
+    page.get_by_role("button", name=name, exact=False).first.click()
+    page.wait_for_timeout(150)
 
 
 def main() -> int:
@@ -47,44 +55,36 @@ def main() -> int:
         )
         page.on("pageerror", lambda e: errors.append(f"pageerror: {e}"))
 
-        # 等 dev server 起来
-        for i in range(60):
-            try:
-                page.goto(BASE, wait_until="networkidle", timeout=8000)
-                break
-            except Exception:
-                if i == 59:
-                    raise
-                time.sleep(0.5)
-
+        page.goto(BASE, wait_until="networkidle")
         print("[1] 首屏")
-        page.wait_for_selector("text=大地红 1000 响", timeout=20000)
-        shot(page, "01-开单.png")
+        page.get_by_role("button", name="记一笔").last.wait_for(timeout=25000)
+        expect_text(page, "还没开张")
+        shot(page, "01-首屏.png")
 
-        print("[2] 加购 + 结算现金")
-        page.locator(".prod-btn").first.click()
-        page.wait_for_selector(".checkout-bar", timeout=5000)
-        shot(page, "02-购物车.png")
-        page.get_by_role("button", name="结算").click()
-        page.wait_for_selector("text=收款 ¥", timeout=5000)
-        page.get_by_role("button", name="现金").click()
-        page.wait_for_selector("text=现金收款", timeout=5000)
-        page.get_by_role("button", name=re.compile("^正好")).click()
-        page.get_by_role("button", name=re.compile("^确认收款")).click()
-        page.wait_for_selector(".toast", timeout=5000)
-        print("    toast:", page.locator(".toast").inner_text())
-        page.wait_for_selector("text=收款完成", timeout=5000)
-        page.get_by_role("button", name="完成").click()
+        print("[2] 记一笔（两种商品）")
+        page.get_by_role("button", name="记一笔").last.click()
+        page.get_by_role("button", name="添加商品").first.wait_for(timeout=5000)
+        page.get_by_role("button", name="添加商品").first.click()
+        expect_text(page, "选商品")
+        add_product(page, "大地红 1000 响")
+        add_product(page, "二踢脚")
+        page.get_by_role("button", name="完成（回单据）").click()
+        expect_text(page, "成交金额")
+        shot(page, "02-记一笔.png")
+        page.get_by_role("button", name="保存并记下一单").click()
+        expect_text(page, "已记 1 单")
         page.wait_for_timeout(400)
-        shot(page, "03-已收款.png")
+        page.get_by_role("button", name="返回").click()
+        page.wait_for_timeout(400)
+        expect_text(page, "¥26.50")
+        shot(page, "03-已记一单.png")
 
-        print("[3] 录入进货")
-        page.wait_for_selector(".toast", state="detached", timeout=8000)
+        print("[3] 进货")
         page.get_by_role("button", name="进货").click()
         page.wait_for_selector("select", timeout=5000)
         page.locator("select").first.select_option(index=1)
-        field_input(page, "数量").fill("3")
-        field_input(page, "进价").fill("12")
+        page.get_by_label("数量", exact=False).fill("3")
+        page.get_by_label("进价", exact=False).fill("12")
         shot(page, "04-进货.png")
         page.get_by_role("button", name="保存这一条").click()
         page.wait_for_selector(".toast", timeout=5000)
@@ -95,31 +95,29 @@ def main() -> int:
 
         print("[4] 库存")
         page.get_by_role("button", name="库存").click()
-        page.wait_for_selector("text=库存总件数", timeout=5000)
+        expect_text(page, "库存总件数")
         page.wait_for_timeout(300)
         shot(page, "05-库存.png")
 
         print("[5] 报表")
         page.get_by_role("button", name="报表").click()
-        page.wait_for_selector("text=销售额", timeout=5000)
+        expect_text(page, "销售额")
+        expect_text(page, "¥26.50")
         page.wait_for_timeout(300)
-        revenue = page.locator(".stat").filter(has_text="销售额").locator(".v").inner_text()
-        gross = page.locator(".stat").filter(has_text="毛利").locator(".v").inner_text()
-        print(f"    销售额={revenue} 毛利={gross}")
         shot(page, "06-报表.png")
 
         print("[6] 商品管理")
         page.get_by_role("button", name="更多").click()
-        page.wait_for_selector("text=商品管理", timeout=5000)
+        expect_text(page, "商品管理")
         page.locator(".list-item", has_text="商品管理").click()
-        page.wait_for_selector("text=新建", timeout=5000)
+        expect_text(page, "新建")
         page.wait_for_timeout(300)
         shot(page, "07-商品.png")
 
         print("[7] 设置")
         page.locator(".back-btn").click()
         page.locator(".list-item", has_text="设置与同步").click()
-        page.wait_for_selector("text=导出备份", timeout=5000)
+        expect_text(page, "导出备份")
         page.wait_for_timeout(300)
         shot(page, "08-设置.png")
 
@@ -130,10 +128,9 @@ def main() -> int:
         for e in errors:
             print("   ", e)
         return 1
-    print("\nOK：全流程无 console/page 报错")
+    print("\nOK：v2 开单/进货/库存/报表/设置全流程通过")
     return 0
 
 
 if __name__ == "__main__":
     sys.exit(main())
-
