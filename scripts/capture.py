@@ -3,6 +3,7 @@
 """
 
 import os
+import re
 import sys
 import time
 
@@ -41,6 +42,16 @@ def main() -> int:
 
         page.wait_for_selector("text=大地红 1000 响", timeout=20000)
         page.wait_for_timeout(600)
+        if page.locator(".first-run-card").count():
+            page.locator(".first-run-card").get_by_role("button", name="我").click()
+            page.wait_for_selector(".toast", timeout=5000)
+            page.wait_for_selector(".toast", state="detached", timeout=8000)
+            page.wait_for_timeout(300)
+        if page.locator(".first-run-card--sample").count():
+            page.locator(".first-run-card--sample").get_by_role("button", name="知道了").click()
+            page.wait_for_selector(".toast", timeout=5000)
+            page.wait_for_selector(".toast", state="detached", timeout=8000)
+            page.wait_for_timeout(300)
 
         def shot(name):
             page.wait_for_timeout(350)
@@ -64,7 +75,14 @@ def main() -> int:
         page.wait_for_timeout(500)
         shot("03-结算.png")
         page.get_by_role("button", name="现金").click()
-        page.wait_for_selector(".toast")
+        page.wait_for_selector("text=现金收款", timeout=5000)
+        shot("03b-现金找零.png")
+        page.get_by_role("button", name=re.compile("^正好")).click()
+        page.get_by_role("button", name=re.compile("^确认收款")).click()
+        page.wait_for_selector(".toast", timeout=5000)
+        page.wait_for_selector("text=收款完成", timeout=5000)
+        shot("03c-收款完成.png")
+        page.get_by_role("button", name="完成").click()
         page.wait_for_selector(".toast", state="detached", timeout=8000)
 
         print("[ui] 进货")

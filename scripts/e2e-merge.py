@@ -4,6 +4,7 @@
 """
 
 import os
+import re
 import sys
 import tempfile
 import time
@@ -55,8 +56,14 @@ def sell_product(page, idx: int, pay="现金"):
     page.get_by_role("button", name="结算").click()
     page.wait_for_selector("text=收款 ¥", timeout=5000)
     page.get_by_role("button", name=pay).click()
+    if pay == "现金":
+        page.wait_for_selector("text=现金收款", timeout=5000)
+        page.get_by_role("button", name=re.compile("^正好")).click()
+        page.get_by_role("button", name=re.compile("^确认收款")).click()
     page.wait_for_selector(".toast", timeout=5000)
     text = page.locator(".toast").inner_text()
+    page.wait_for_selector("text=收款完成", timeout=5000)
+    page.get_by_role("button", name="完成").click()
     page.wait_for_selector(".toast", state="detached", timeout=8000)
     return text
 
@@ -93,14 +100,20 @@ def main() -> int:
         b.locator(".list-item", has_text="设置与同步").click()
         b.wait_for_selector("text=导入并合并", timeout=5000)
         b.set_input_files("input[type=file]", backup_path)
+        b.wait_for_selector("text=确认合并", timeout=10000)
+        b.screenshot(path=os.path.join(OUT, "13-合并预览.png"))
+        b.get_by_role("button", name="合并这些数据").click()
         b.wait_for_selector(".toast", timeout=10000)
         toast = b.locator(".toast").inner_text()
         print("[B] 合并结果 toast：", toast)
         if "合并完成" not in toast:
             errors.append(f"合并失败：{toast}")
 
-        # 检查商品没重复：回「更多」看商品数量
+        b.wait_for_selector("text=合并完成", timeout=8000)
+        b.get_by_role("button", name="完成").click()
         b.wait_for_selector(".toast", state="detached", timeout=8000)
+
+        # 检查商品没重复：回「更多」看商品数量
         b.locator(".back-btn").click()
         b.wait_for_selector("text=商品管理", timeout=5000)
         more_text = b.locator(".list-item", has_text="商品管理").inner_text()
@@ -114,7 +127,7 @@ def main() -> int:
         b.get_by_role("button", name="全部").click()
         b.wait_for_timeout(400)
         rev = b.locator(".stat").filter(has_text="销售额").locator(".v").inner_text()
-        cnt = b.locator(".stat").filter(has_text="营业单数").locator(".v").inner_text()
+        cnt = b.locator(".stat").filter(has_text="单数").locator(".v").inner_text()
         print(f"[B] 合并后 全部销售额={rev} 单数={cnt}")
         if "26.50" not in rev:
             errors.append(f"合并后销售额不对：{rev}（应 26.50）")

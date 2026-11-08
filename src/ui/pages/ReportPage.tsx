@@ -57,6 +57,8 @@ export default function ReportPage({
     [batches, fifo, warnDays, products]
   );
 
+  const costMissing = fifo.uncoveredQty > 0;
+
   return (
     <div className="page-stack">
       <Card>
@@ -86,22 +88,42 @@ export default function ReportPage({
               value={date}
               onChange={(e) => setDate(e.target.value)}
               style={{ width: 150, height: 40 }}
+              aria-label="统计日期"
             />
           ) : null}
         </div>
 
-        <div className="stat-grid">
-          <Stat k="营业单数" v={rep.orderCount} />
-          <Stat k="卖出件数" v={rep.lineCount} />
-          <Stat k="销售额" v={`¥${fenToStr(rep.revenueFen)}`} tone="brand" />
-          <Stat
-            k="毛利"
-            v={`¥${fenToStr(rep.grossFen)}`}
-            tone={rep.grossFen >= 0 ? 'ok' : 'bad'}
-          />
-          <Stat k="现金" v={`¥${fenToStr(rep.cashFen)}`} />
-          <Stat k="微信" v={`¥${fenToStr(rep.wechatFen)}`} />
-          <Stat k="支付宝" v={`¥${fenToStr(rep.alipayFen)}`} />
+        <div className="hero-stats">
+          <div className="stat stat--hero">
+            <div className="k">销售额</div>
+            <div className="v brand">¥{fenToStr(rep.revenueFen)}</div>
+          </div>
+          <div className="stat stat--hero">
+            <div className="k">毛利{costMissing ? '（成本待补）' : ''}</div>
+            <div className={`v ${costMissing ? '' : rep.grossFen >= 0 ? 'ok' : 'bad'}`}>
+              {costMissing ? '—' : `¥${fenToStr(rep.grossFen)}`}
+            </div>
+          </div>
+        </div>
+
+        <div className="pay-rows">
+          <div className="pay-row">
+            <span>现金</span>
+            <span>¥{fenToStr(rep.cashFen)}</span>
+          </div>
+          <div className="pay-row">
+            <span>微信</span>
+            <span>¥{fenToStr(rep.wechatFen)}</span>
+          </div>
+          <div className="pay-row">
+            <span>支付宝</span>
+            <span>¥{fenToStr(rep.alipayFen)}</span>
+          </div>
+        </div>
+
+        <div className="stat-grid stat-grid--compact">
+          <Stat k="单数" v={rep.orderCount} />
+          <Stat k="明细行数" v={rep.lineCount} />
           <Stat k="砍价让利" v={`¥${fenToStr(rep.discountFen)}`} tone="bad" />
         </div>
 
@@ -110,12 +132,12 @@ export default function ReportPage({
         </p>
       </Card>
 
-      {fifo.uncoveredQty > 0 ? (
+      {costMissing ? (
         <div className="glass-status">
           <TriangleAlert size={20} aria-hidden="true" />
           <p>
-            有 {fifo.uncoveredQty} 件销量没有对应的进货批次（漏录进货或超卖），这部分成本用均价估算，毛利会偏高。
-            建议去「进货」补录。
+            有 {fifo.uncoveredQty} 件销量没有对应的进货批次（漏录进货或超卖），这部分成本用均价估算，毛利先显示为「—」。
+            去「进货」补录后会自动恢复。
           </p>
         </div>
       ) : null}
@@ -135,7 +157,7 @@ export default function ReportPage({
                   <th>商品</th>
                   <th className="glass-table__num">数量</th>
                   <th className="glass-table__num">销售额</th>
-                  <th className="glass-table__num">成本</th>
+                  <th className="glass-table__num hide-sm">成本</th>
                   <th className="glass-table__num">毛利</th>
                 </tr>
               </thead>
@@ -149,11 +171,11 @@ export default function ReportPage({
                         {qtyToStr(m.qtyBase, p?.boxQty ?? 0, p?.unitBase ?? '个')}
                       </td>
                       <td className="glass-table__num">¥{fenToStr(m.revenueFen)}</td>
-                      <td className="glass-table__num">¥{fenToStr(m.costFen)}</td>
+                      <td className="glass-table__num hide-sm">¥{fenToStr(m.costFen)}</td>
                       <td
                         className="glass-table__num"
                         style={{
-                          color: m.grossFen >= 0 ? 'var(--gl-color-success)' : 'var(--gl-color-error)',
+                          color: m.grossFen >= 0 ? 'var(--yh-ok-ink)' : 'var(--yh-bad-ink)',
                           fontWeight: 600
                         }}
                       >
@@ -183,7 +205,9 @@ export default function ReportPage({
                   <TriangleAlert
                     size={22}
                     aria-hidden="true"
-                    style={{ color: w.daysLeft < 0 ? 'var(--gl-color-error)' : 'var(--gl-color-warning)' }}
+                    style={{
+                      color: w.daysLeft < 0 ? 'var(--yh-bad-ink)' : 'var(--gl-color-warning)'
+                    }}
                   />
                 </span>
                 <div className="glass-list__content">

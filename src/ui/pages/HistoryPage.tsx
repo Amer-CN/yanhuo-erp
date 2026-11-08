@@ -4,7 +4,7 @@ import type { Product, SaleLine, SalesOrder } from '../../db/types';
 import { PAY_LABEL } from '../../db/types';
 import { restoreOrder, voidOrder } from '../../db/repo';
 import { fenToStr, isoToLocalDate, isoToTime, qtyToStr } from '../../db/util';
-import { Btn, Empty, Sheet } from '../kit';
+import { Btn, Empty, Sheet, rowProps, type Done } from '../kit';
 
 export default function HistoryPage({
   products,
@@ -15,7 +15,7 @@ export default function HistoryPage({
   products: Product[];
   orders: SalesOrder[];
   lines: SaleLine[];
-  onDone: (msg: string) => void;
+  onDone: Done;
 }) {
   const [openId, setOpenId] = useState<string | null>(null);
 
@@ -66,9 +66,7 @@ export default function HistoryPage({
                     <li
                       key={o.id}
                       className="glass-list__item glass-list__item--interactive list-item"
-                      role="button"
-                      tabIndex={0}
-                      onClick={() => setOpenId(o.id)}
+                      {...rowProps(() => setOpenId(o.id))}
                     >
                       <span className="glass-list__leading">
                         <Receipt size={22} aria-hidden="true" />

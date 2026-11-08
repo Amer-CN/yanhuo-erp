@@ -79,6 +79,11 @@ export async function updateProduct(id: string, patch: Partial<ProductInput> & {
   const old = await db.products.get(id);
   if (!old) return;
   const next: Product = { ...old, ...patch, updatedAt: nowIso() } as Product;
+  // 用户动过商品内容，就不再算示例
+  const touched = ['name', 'category', 'unitBase', 'boxQty', 'priceList', 'negotiable'].some(
+    (k) => (patch as Record<string, unknown>)[k] !== undefined
+  );
+  if (touched) next.sample = false;
   if (patch.name !== undefined) next.name = patch.name.trim();
   if (patch.unitBase !== undefined) next.unitBase = patch.unitBase.trim() || '个';
   if (patch.boxQty !== undefined) next.boxQty = Math.max(0, Math.floor(patch.boxQty));

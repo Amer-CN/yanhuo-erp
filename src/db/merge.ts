@@ -134,8 +134,14 @@ export async function importMerge(backup: BackupFile): Promise<MergeResult> {
         result.adjustmentsAdded = newAdj.length;
       }
 
-      // 设置：本机身份（deviceId/deviceName）不覆盖
-      const skip = new Set<string>([SETTING_KEYS.deviceId, SETTING_KEYS.deviceName]);
+      // 设置：本机身份与操作人不覆盖（操作人按设备走）
+      const skip = new Set<string>([
+        SETTING_KEYS.deviceId,
+        SETTING_KEYS.deviceName,
+        SETTING_KEYS.operatorA,
+        SETTING_KEYS.operatorB,
+        SETTING_KEYS.defaultOperator
+      ]);
       const incoming = data.settings.filter((s) => !skip.has(s.key));
       if (incoming.length) {
         await db.settings.bulkPut(incoming);
@@ -145,4 +151,29 @@ export async function importMerge(backup: BackupFile): Promise<MergeResult> {
   );
 
   return result;
+}
+
+/** 整库替换（撤销合并用）：清空后写入给定备份 */
+export async function replaceAll(backup: BackupFile): Promise<void> {
+  const d = backup.data;
+  await db.transaction(
+    'rw',
+    [db.products, db.batches, db.orders, db.lines, db.adjustments, db.settings],
+    async () => {
+      await Promise.all([
+        db.products.clear(),
+        db.batches.clear(),
+        db.orders.clear(),
+        db.lines.clear(),
+        db.adjustments.clear(),
+        db.settings.clear()
+      ]);
+      await db.products.bulkPut(d.products);
+      await db.batches.bulkPut(d.batches);
+      await db.orders.bulkPut(d.orders);
+      await db.lines.bulkPut(d.lines);
+      await db.adjustments.bulkPut(d.adjustments);
+      await db.settings.bulkPut(d.settings);
+    }
+  );
 }

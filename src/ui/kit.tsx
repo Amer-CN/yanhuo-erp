@@ -1,5 +1,16 @@
-import { useEffect, useState, type ButtonHTMLAttributes, type ReactNode } from 'react';
-import { X, CheckCircle2 } from 'lucide-react';
+import {
+  cloneElement,
+  isValidElement,
+  useEffect,
+  useId,
+  useRef,
+  useState,
+  type ButtonHTMLAttributes,
+  type KeyboardEvent,
+  type ReactElement,
+  type ReactNode
+} from 'react';
+import { X, CheckCircle2, TriangleAlert } from 'lucide-react';
 import type { Category, Product } from '../db/types';
 import { CATEGORIES } from '../db/types';
 import { fenToStr, strToFen } from '../db/util';
@@ -61,20 +72,51 @@ export function Card({
   );
 }
 
+/** 给 label + 控件做程序化关联；错误/提示自动挂 aria-describedby */
 export function Field({
   label,
   children,
-  hint
+  hint,
+  error
 }: {
   label?: string;
   children: ReactNode;
   hint?: string;
+  error?: string;
 }) {
+  const auto = useId();
+  const id = `f-${auto}`;
+  const desc = error || hint;
+  const describedBy = desc ? `${id}-desc` : undefined;
+
+  let control = children;
+  if (isValidElement(children)) {
+    const el = children as ReactElement<{ id?: string; className?: string; 'aria-describedby'?: string }>;
+    const ownClass = el.props.className ?? '';
+    control = cloneElement(el, {
+      id,
+      'aria-describedby': describedBy,
+      className: error ? `${ownClass} glass-input--error`.trim() : ownClass
+    });
+  }
+
   return (
     <div className="glass-input-group">
-      {label ? <label className="glass-label">{label}</label> : null}
-      {children}
-      {hint ? <span className="glass-hint">{hint}</span> : null}
+      {label ? (
+        <label className="glass-label" htmlFor={id}>
+          {label}
+        </label>
+      ) : null}
+      {control}
+      {error ? (
+        <span className="glass-hint glass-hint--error" id={describedBy}>
+          {error}
+        </span>
+      ) : hint ? (
+        <span className="glass-hint" id={describedBy}>
+          {hint}
+        </span>
+      ) : null}
     </div>
   );
 }
@@ -110,13 +152,64 @@ export function Empty({
   );
 }
 
+/** li 行也能用键盘：Enter / Space 触发 */
+export function rowProps(onClick: () => void) {
+  return {
+    role: 'button' as const,
+    tabIndex: 0,
+    onClick,
+    onKeyDown: (e: KeyboardEvent<HTMLElement>) => {
+      if (e.key === 'Enter' || e.key === ' ') {
+        e.preventDefault();
+        onClick();
+      }
+    }
+  };
+}
+
 /* ---------------------------------------------------------------- 提示条 */
 
-export function Toast({ message }: { message: string }) {
+export type ToastTone = 'success' | 'error' | 'warning';
+
+/** 页面统一的反馈回调：第二个参数决定语气，第三个参数可带“撤销”等动作 */
+export type Done = (
+  msg: string,
+  tone?: ToastTone,
+  action?: { label: string; onClick: () => void }
+) => void;
+
+export function Toast({
+  message,
+  tone = 'success',
+  action,
+  onAction,
+  onClose
+}: {
+  message: string;
+  tone?: ToastTone;
+  action?: string;
+  onAction?: () => void;
+  onClose?: () => void;
+}) {
+  const Icon = tone === 'success' ? CheckCircle2 : tone === 'error' ? X : TriangleAlert;
   return (
-    <div className="glass-toast glass-toast--success is-visible toast" role="status">
-      <CheckCircle2 className="glass-toast__icon" size={20} aria-hidden="true" />
+    <div
+      className={`glass-toast glass-toast--${tone} is-visible toast`}
+      role={tone === 'error' ? 'alert' : 'status'}
+      aria-live={tone === 'error' ? 'assertive' : 'polite'}
+    >
+      <Icon className="glass-toast__icon" size={20} aria-hidden="true" />
       <span className="glass-toast__text">{message}</span>
+      {action && onAction ? (
+        <button className="glass-toast__action" type="button" onClick={onAction}>
+          {action}
+        </button>
+      ) : null}
+      {onClose ? (
+        <button className="glass-toast__close" type="button" aria-label="关闭" onClick={onClose}>
+          <X size={16} aria-hidden="true" />
+        </button>
+      ) : null}
     </div>
   );
 }
@@ -137,32 +230,91 @@ export function Sheet({
   footer?: ReactNode;
 }) {
   const [active, setActive] = useState(false);
+  const panelRef = useRef<HTMLDivElement>(null);
+  const titleId = useId();
+  const closeRef = useRef<HTMLButtonElement>(null);
+  const onCloseRef = useRef(onClose);
+  onCloseRef.current = onClose;
 
   useEffect(() => {
     const raf = requestAnimationFrame(() => setActive(true));
     return () => cancelAnimationFrame(raf);
   }, []);
 
+  useEffect(() => {
+    const prevFocus = document.activeElement as HTMLElement | null;
+    const scrollY = window.scrollY;
+    document.body.style.position = 'fixed';
+    document.body.style.top = `-${scrollY}px`;
+    document.body.style.width = '100%';
+
+    const focusable = () =>
+      Array.from(
+        panelRef.current?.querySelectorAll<HTMLElement>(
+          'button:not([disabled]), [href], input:not([disabled]), select:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex="-1"])'
+        ) ?? []
+      );
+
+    const first = focusable()[0];
+    (first ?? panelRef.current)?.focus({ preventScroll: true });
+
+    const onKey = (e: globalThis.KeyboardEvent) => {
+      if (e.key === 'Escape') {
+        e.preventDefault();
+        close();
+        return;
+      }
+      if (e.key !== 'Tab') return;
+      const items = focusable();
+      if (items.length === 0) return;
+      const firstEl = items[0];
+      const lastEl = items[items.length - 1];
+      if (e.shiftKey && document.activeElement === firstEl) {
+        e.preventDefault();
+        lastEl.focus();
+      } else if (!e.shiftKey && document.activeElement === lastEl) {
+        e.preventDefault();
+        firstEl.focus();
+      }
+    };
+    document.addEventListener('keydown', onKey);
+
+    return () => {
+      document.removeEventListener('keydown', onKey);
+      document.body.style.position = '';
+      document.body.style.top = '';
+      document.body.style.width = '';
+      window.scrollTo(0, scrollY);
+      prevFocus?.focus?.({ preventScroll: true });
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
   const close = () => {
     setActive(false);
-    window.setTimeout(onClose, 260);
+    window.setTimeout(() => onCloseRef.current(), 260);
   };
 
   return (
     <div className={`glass-sheet-overlay ${active ? 'is-active' : ''}`} onClick={close}>
       <div
+        ref={panelRef}
         className="glass-sheet"
         role="dialog"
         aria-modal="true"
+        aria-labelledby={titleId}
+        tabIndex={-1}
         onClick={(e) => e.stopPropagation()}
       >
         <div className="glass-sheet__grip" aria-hidden="true" />
         <div className="glass-sheet__head">
           <div className="glass-sheet__heading">
-            <h2 className="glass-sheet__title">{title}</h2>
+            <h2 className="glass-sheet__title" id={titleId}>
+              {title}
+            </h2>
             {subtitle ? <div className="glass-sheet__subtitle">{subtitle}</div> : null}
           </div>
-          <button className="glass-sheet__close" type="button" onClick={close} aria-label="关闭">
+          <button ref={closeRef} className="glass-sheet__close" type="button" onClick={close} aria-label="关闭">
             <X size={16} aria-hidden="true" />
           </button>
         </div>
@@ -270,7 +422,7 @@ export function ProductFormModal({
               placeholder="个 / 挂 / 支"
             />
           </Field>
-          <Field label="1 箱 = ? 个">
+          <Field label={`1 箱 = ? ${unitBase || '个'}`}>
             <input
               className="glass-input"
               inputMode="numeric"

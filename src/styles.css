@@ -20,6 +20,38 @@
   --app-pad: 16px;
 }
 
+/* 关键数字/语义色专用文本令牌：主色本身当文字对比度不够 */
+[data-theme='dark'] {
+  --yh-price-ink: #ffb15c;
+  --yh-ok-ink: #7ee2a8;
+  --yh-bad-ink: #ff9b9b;
+  --gl-color-text-muted: #d6e0e2;
+  --gl-placeholder: #dce6e8;
+  --gl-color-on-primary: #2a1600;
+  --gl-tab-bar-color: #c3d0d2;
+  --gl-tab-bar-active-color: #ffc27a;
+
+  /* 品牌一致：夜间余烬，而不是 GlassKit 默认的青绿极光 */
+  --gl-bg-aurora-1: rgba(255, 138, 0, 0.16);
+  --gl-bg-aurora-2: rgba(196, 72, 24, 0.14);
+  --gl-bg-aurora-3: rgba(255, 196, 120, 0.1);
+}
+
+[data-theme='light'] {
+  --yh-price-ink: #8a3f00;
+  --yh-ok-ink: #0f7a3d;
+  --yh-bad-ink: #b3261e;
+  --gl-color-text-muted: #4a575c;
+  --gl-placeholder: #5f6d73;
+  --gl-color-on-primary: #2a1600;
+  --gl-tab-bar-color: #5b6669;
+  --gl-tab-bar-active-color: #7a3600;
+
+  --gl-bg-aurora-1: rgba(255, 176, 84, 0.22);
+  --gl-bg-aurora-2: rgba(255, 138, 60, 0.14);
+  --gl-bg-aurora-3: rgba(255, 220, 170, 0.2);
+}
+
 html {
   -webkit-text-size-adjust: 100%;
 }
@@ -199,15 +231,15 @@ body {
 }
 
 .stat .v.brand {
-  color: var(--gl-color-primary);
+  color: var(--yh-price-ink);
 }
 
 .stat .v.ok {
-  color: var(--gl-color-success);
+  color: var(--yh-ok-ink);
 }
 
 .stat .v.bad {
-  color: var(--gl-color-error);
+  color: var(--yh-bad-ink);
 }
 
 @media (min-width: 520px) {
@@ -274,7 +306,7 @@ body {
 .prod-btn__price {
   font-size: 20px;
   font-weight: 700;
-  color: var(--gl-color-primary);
+  color: var(--yh-price-ink);
   font-variant-numeric: tabular-nums;
 }
 
@@ -363,7 +395,7 @@ body {
 .checkout-dock__total .v {
   font-size: 20px;
   font-weight: 700;
-  color: var(--gl-color-primary);
+  color: var(--yh-price-ink);
   font-variant-numeric: tabular-nums;
 }
 
@@ -505,4 +537,370 @@ body {
 /* 顶栏和底部玻璃在深色下更沉稳 */
 [data-theme='dark'] .app-nav {
   background: linear-gradient(to bottom, rgba(7, 10, 16, 0.9), rgba(7, 10, 16, 0));
+}
+
+/* =====================================================================
+   2026-11-08 设计评审后的修正
+   ===================================================================== */
+
+/* 品牌标记：用应用图标里的烟花爆点，不再用通用 Sparkles 假按钮 */
+.app-brand {
+  width: 44px;
+  height: 44px;
+  border-radius: 14px;
+  display: block;
+  box-shadow: 0 6px 18px rgba(0, 0, 0, 0.35);
+}
+
+/* 开单：操作人小胶囊 + 首启选择 */
+.op-pill {
+  width: auto;
+  height: 46px;
+  padding: 0 12px;
+  gap: 6px;
+  display: inline-flex;
+  align-items: center;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--gl-color-text);
+}
+
+.first-run-card {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  padding: 12px 14px;
+  border-radius: 18px;
+  background: var(--gl-surface-2);
+  border: 1px solid var(--gl-border-subtle);
+}
+
+.first-run-card__title {
+  font-weight: 650;
+  font-size: 14px;
+}
+
+.first-run-card--sample {
+  border-color: color-mix(in srgb, var(--gl-color-warning) 45%, transparent);
+}
+
+/* 触控目标：关键控件都到 44 */
+.chip-row > * {
+  flex: 0 0 auto;
+}
+
+.chip-row .glass-badge {
+  min-height: 44px;
+  display: inline-flex;
+  align-items: center;
+}
+
+.glass-segmented__item {
+  min-height: 44px;
+}
+
+.icon-btn {
+  width: 44px;
+  height: 44px;
+}
+
+.stepper button {
+  width: 44px;
+  height: 44px;
+}
+
+.glass-sheet__close {
+  width: 44px;
+  height: 44px;
+}
+
+.checkout-dock__count {
+  min-height: 44px;
+}
+
+/* 购物车行允许换行，320 不再裁掉改价 */
+.cart-line__controls {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+/* 商品卡键盘焦点（浅色下 UA 默认环只有 2:1） */
+.prod-btn:focus-visible {
+  outline: 2px solid var(--gl-focus-ring, #ffd9a8);
+  outline-offset: 3px;
+}
+
+/* 收银 */
+.pay-recap {
+  border-radius: 16px;
+  background: var(--gl-surface-2);
+  border: 1px solid var(--gl-border-subtle);
+  padding: 10px 12px;
+}
+
+.pay-recap__line {
+  display: flex;
+  justify-content: space-between;
+  gap: 10px;
+  padding: 4px 0;
+  font-size: 13px;
+  color: var(--gl-color-text);
+  font-variant-numeric: tabular-nums;
+}
+
+.pay-recap__line--total {
+  border-top: 1px solid var(--gl-border-subtle);
+  margin-top: 4px;
+  padding-top: 8px;
+  font-weight: 700;
+}
+
+.cash-change {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  padding: 12px 14px;
+  border-radius: 16px;
+  background: var(--gl-surface-2);
+  border: 1px solid var(--gl-border-subtle);
+}
+
+.cash-change .k {
+  color: var(--gl-color-text-muted);
+  font-size: 13px;
+}
+
+.cash-change .v {
+  font-size: 24px;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+}
+
+.cash-change.is-missing .v {
+  color: var(--gl-color-text-muted);
+}
+
+.result-big {
+  text-align: center;
+  font-size: 40px;
+  font-weight: 700;
+  color: var(--yh-price-ink);
+  font-variant-numeric: tabular-nums;
+}
+
+.price-preview {
+  padding: 12px 14px;
+  border-radius: 16px;
+  background: var(--gl-surface-2);
+  border: 1px solid var(--gl-border-subtle);
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  font-variant-numeric: tabular-nums;
+}
+
+/* 进货分组 */
+.purchase-extra {
+  border-top: 1px solid var(--gl-border-subtle);
+  padding-top: 12px;
+}
+
+.purchase-extra > summary {
+  cursor: pointer;
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--gl-color-text);
+  min-height: 44px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  list-style: none;
+}
+
+.purchase-extra > summary::-webkit-details-marker {
+  display: none;
+}
+
+.purchase-extra > summary::after {
+  content: '›';
+  font-size: 20px;
+  line-height: 1;
+  color: var(--gl-color-text-muted);
+  transform: rotate(90deg);
+  transition: transform 0.15s ease;
+}
+
+.purchase-extra[open] > summary::after {
+  transform: rotate(-90deg);
+}
+
+/* 设置：备份时间与合并预览 */
+.backup-times {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  margin-top: 10px;
+  font-size: 12px;
+  color: var(--gl-color-text-muted);
+}
+
+.merge-counts {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  font-size: 13px;
+}
+
+.merge-counts span {
+  padding: 4px 10px;
+  border-radius: 999px;
+  background: var(--gl-surface-3);
+  border: 1px solid var(--gl-border-subtle);
+}
+
+.merge-diff {
+  margin: 6px 0 0;
+  padding-left: 18px;
+  font-size: 13px;
+  color: var(--gl-color-text);
+}
+
+.merge-diff li {
+  margin: 2px 0;
+}
+
+/* 报表：两个主数字 + 收款行 */
+.hero-stats {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 10px;
+  margin-bottom: 10px;
+}
+
+.stat--hero .k {
+  font-size: 13px;
+}
+
+.stat--hero .v {
+  font-size: 30px;
+  line-height: 1.1;
+}
+
+.pay-rows {
+  border-top: 1px solid var(--gl-border-subtle);
+  margin-bottom: 10px;
+}
+
+.pay-row {
+  display: flex;
+  justify-content: space-between;
+  padding: 9px 2px;
+  border-bottom: 1px solid var(--gl-border-subtle);
+  font-size: 14px;
+  font-variant-numeric: tabular-nums;
+}
+
+.stat-grid--compact {
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+
+.low-stock p {
+  margin: 0;
+}
+
+.prod-btn__stock.low {
+  color: var(--yh-bad-ink);
+}
+
+/* 复选框：不再用原生蓝框 */
+.glass-checkbox {
+  appearance: none;
+  -webkit-appearance: none;
+  width: 24px;
+  height: 24px;
+  flex: 0 0 auto;
+  border-radius: 8px;
+  border: 1.5px solid var(--gl-border-strong);
+  background: var(--gl-surface-2);
+  display: inline-grid;
+  place-items: center;
+  cursor: pointer;
+}
+
+.glass-checkbox:checked {
+  background: var(--gl-color-primary);
+  border-color: var(--gl-color-primary);
+}
+
+.glass-checkbox:checked::after {
+  content: '';
+  width: 12px;
+  height: 7px;
+  border-left: 2.5px solid var(--gl-color-on-primary);
+  border-bottom: 2.5px solid var(--gl-color-on-primary);
+  transform: rotate(-45deg);
+  margin-top: -2px;
+}
+
+.glass-checkbox:focus-visible {
+  outline: 2px solid var(--gl-focus-ring, #ffd9a8);
+  outline-offset: 2px;
+}
+
+/* 320 宽度 */
+@media (max-width: 380px) {
+  .hide-sm {
+    display: none;
+  }
+
+  .glass-table th,
+  .glass-table td {
+    padding-left: 6px;
+    padding-right: 6px;
+    font-size: 12.5px;
+  }
+
+  .hero-stats {
+    gap: 8px;
+  }
+
+  .stat--hero .v {
+    font-size: 26px;
+  }
+
+  .cart-line__controls {
+    gap: 6px;
+  }
+
+  .glass-tab-bar__label {
+    font-size: 10px;
+  }
+}
+
+/* 减动效：保留颜色/透明度反馈，去掉位移与弹层动画 */
+@media (prefers-reduced-motion: reduce) {
+  .checkout-dock {
+    animation: none;
+  }
+
+  .prod-btn,
+  .glass-tab-bar__item,
+  .glass-btn,
+  .glass-badge,
+  .glass-input,
+  .glass-pill,
+  .icon-btn,
+  .stepper button {
+    transition-duration: 0.01ms !important;
+  }
+
+  .glass-sheet-overlay,
+  .glass-sheet {
+    transition-duration: 0.01ms !important;
+  }
 }

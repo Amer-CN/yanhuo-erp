@@ -4,6 +4,7 @@
 """
 
 import os
+import re
 import sys
 import time
 
@@ -66,9 +67,14 @@ def main() -> int:
         page.get_by_role("button", name="结算").click()
         page.wait_for_selector("text=收款 ¥", timeout=5000)
         page.get_by_role("button", name="现金").click()
+        page.wait_for_selector("text=现金收款", timeout=5000)
+        page.get_by_role("button", name=re.compile("^正好")).click()
+        page.get_by_role("button", name=re.compile("^确认收款")).click()
         page.wait_for_selector(".toast", timeout=5000)
         print("    toast:", page.locator(".toast").inner_text())
-        page.wait_for_timeout(300)
+        page.wait_for_selector("text=收款完成", timeout=5000)
+        page.get_by_role("button", name="完成").click()
+        page.wait_for_timeout(400)
         shot(page, "03-已收款.png")
 
         print("[3] 录入进货")

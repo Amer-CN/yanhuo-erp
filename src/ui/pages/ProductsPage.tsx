@@ -3,7 +3,7 @@ import { Search, Plus, Package, ChevronRight, Power, Trash2 } from 'lucide-react
 import type { Product } from '../../db/types';
 import { createProduct, deleteProduct, updateProduct, type ProductInput } from '../../db/repo';
 import { fenToStr, qtyToStr } from '../../db/util';
-import { Btn, Empty, ProductFormModal } from '../kit';
+import { Btn, Empty, ProductFormModal, rowProps, type Done } from '../kit';
 
 export default function ProductsPage({
   products,
@@ -12,7 +12,7 @@ export default function ProductsPage({
 }: {
   products: Product[];
   inv: Map<string, number>;
-  onDone: (msg: string) => void;
+  onDone: Done;
 }) {
   const [q, setQ] = useState('');
   const [editing, setEditing] = useState<Product | 'new' | null>(null);
@@ -78,9 +78,7 @@ export default function ProductsPage({
               <li
                 key={p.id}
                 className="glass-list__item glass-list__item--interactive list-item"
-                role="button"
-                tabIndex={0}
-                onClick={() => setEditing(p)}
+                {...rowProps(() => setEditing(p))}
               >
                 <span className="glass-list__leading">
                   <Package size={22} aria-hidden="true" />
@@ -89,6 +87,9 @@ export default function ProductsPage({
                   <div className="glass-list__title-row">
                     <div className="glass-list__title">{p.name}</div>
                     <span className="glass-badge">{p.category}</span>
+                    {p.sample ? (
+                      <span className="glass-badge glass-badge--warning">示例</span>
+                    ) : null}
                     {p.archived ? (
                       <span className="glass-badge glass-badge--error">已停用</span>
                     ) : null}

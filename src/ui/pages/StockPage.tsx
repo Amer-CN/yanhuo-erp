@@ -5,7 +5,7 @@ import type { FifoResult } from '../../db/calc';
 import { batchStock } from '../../db/calc';
 import { createAdjustment } from '../../db/repo';
 import { fenToStr, localDate, qtyToStr } from '../../db/util';
-import { Btn, Empty, Field, Sheet, Stat } from '../kit';
+import { Btn, Empty, Field, Sheet, Stat, rowProps, type Done } from '../kit';
 
 export default function StockPage({
   products,
@@ -20,7 +20,7 @@ export default function StockPage({
   inv: Map<string, number>;
   fifo: FifoResult;
   deviceId: string;
-  onDone: (msg: string) => void;
+  onDone: Done;
 }) {
   const [q, setQ] = useState('');
   const [openId, setOpenId] = useState<string | null>(null);
@@ -35,15 +35,20 @@ export default function StockPage({
       .sort((a, b) => a.sortOrder - b.sortOrder || a.name.localeCompare(b.name, 'zh'));
   }, [products, q]);
 
-  const { totalQty, totalValue } = useMemo(() => {
+  const { totalQty, totalValue, lowCount } = useMemo(() => {
     let qty = 0;
     let value = 0;
-    for (const p of products) qty += Math.max(0, inv.get(p.id) ?? 0);
+    let low = 0;
+    for (const p of products) {
+      const s = inv.get(p.id) ?? 0;
+      qty += Math.max(0, s);
+      if (s <= 0) low++;
+    }
     for (const b of batches) {
       const remain = fifo.batchRemaining.get(b.id) ?? 0;
       if (remain > 0) value += remain * b.unitCostFen;
     }
-    return { totalQty: qty, totalValue: value };
+    return { totalQty: qty, totalValue: value, lowCount: low };
   }, [products, batches, inv, fifo]);
 
   const open = products.find((p) => p.id === openId);
@@ -52,7 +57,7 @@ export default function StockPage({
     if (!open) return;
     const n = Number(adjust);
     if (!Number.isFinite(n) || n === 0) {
-      onDone('填个非 0 的数（负数=少了，正数=多了）');
+      onDone('填个非 0 的数（负数=少了，正数=多了）', 'error');
       return;
     }
     await createAdjustment(
@@ -77,6 +82,13 @@ export default function StockPage({
         <Stat k="库存成本" v={<span>¥{fenToStr(totalValue)}</span>} tone="brand" />
       </div>
 
+      {lowCount > 0 ? (
+        <div className="glass-status low-stock">
+          <TriangleAlert size={20} aria-hidden="true" />
+          <p>{lowCount} 个商品没货了，年后进货前先看一眼。</p>
+        </div>
+      ) : null}
+
       <div className="glass-search">
         <Search className="glass-search__icon" size={18} aria-hidden="true" />
         <input
@@ -98,9 +110,7 @@ export default function StockPage({
               <li
                 key={p.id}
                 className="glass-list__item glass-list__item--interactive list-item"
-                role="button"
-                tabIndex={0}
-                onClick={() => setOpenId(p.id)}
+                {...rowProps(() => setOpenId(p.id))}
               >
                 <span className="glass-list__leading">
                   {stock < 0 ? (
@@ -124,7 +134,11 @@ export default function StockPage({
                   </div>
                 </div>
                 <div className="glass-list__trailing">
-                  {stock < 0 ? <span className="glass-badge glass-badge--error">负库存</span> : null}
+                  {stock < 0 ? (
+                    <span className="glass-badge glass-badge--error">负库存</span>
+                  ) : stock === 0 ? (
+                    <span className="glass-badge glass-badge--error">没货</span>
+                  ) : null}
                   <ChevronRight size={18} aria-hidden="true" />
                 </div>
               </li>

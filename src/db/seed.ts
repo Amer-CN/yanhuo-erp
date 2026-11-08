@@ -36,6 +36,7 @@ export async function seedIfEmpty(): Promise<boolean> {
     boxQty: s.boxQty,
     priceList: s.priceList,
     negotiable: true,
+    sample: true,
     archived: false,
     sortOrder: i,
     createdAt: t,

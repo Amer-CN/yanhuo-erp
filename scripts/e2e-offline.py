@@ -84,6 +84,8 @@ def main() -> int:
         page.get_by_role("button", name="微信").click()
         page.wait_for_selector(".toast", timeout=5000)
         print("    toast:", page.locator(".toast").inner_text())
+        page.wait_for_selector("text=收款完成", timeout=5000)
+        page.get_by_role("button", name="完成").click()
         page.wait_for_timeout(300)
         page.screenshot(path=os.path.join(OUT, "10-离线已收.png"))
 

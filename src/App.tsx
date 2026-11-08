@@ -19,7 +19,8 @@ import { SETTING_KEYS } from './db/types';
 import { seedIfEmpty } from './db/seed';
 import { fifoAllocate, inventoryMap, dayReport } from './db/calc';
 import { fenToStr, localDate } from './db/util';
-import { Card, Empty, Toast } from './ui/kit';
+import { Card, Empty, Toast, type Done, type ToastTone } from './ui/kit';
+import { loadSell, saveSell, type SellState } from './ui/sellSession';
 import SellPage from './ui/pages/SellPage';
 import PurchasePage from './ui/pages/PurchasePage';
 import StockPage from './ui/pages/StockPage';
@@ -72,8 +73,13 @@ export default function App() {
   const [ready, setReady] = useState(false);
   const [tab, setTab] = useState<Tab>('sell');
   const [sub, setSub] = useState<SubPage>(null);
-  const [toast, setToast] = useState<string | null>(null);
+  const [toast, setToast] = useState<{
+    msg: string;
+    tone: ToastTone;
+    action?: { label: string; onClick: () => void };
+  } | null>(null);
   const [theme, setTheme] = useState<Theme>(initialTheme);
+  const [sell, setSell] = useState<SellState>(() => loadSell());
   const timer = useRef<number | undefined>(undefined);
 
   useEffect(() => {
@@ -120,10 +126,12 @@ export default function App() {
   }, []);
 
   const data = useLiveQuery(() => loadAll(), []);
-  const showToast = (msg: string) => {
-    setToast(msg);
+
+  const showToast: Done = (msg, tone = 'success', action) => {
+    setToast({ msg, tone, action });
     if (timer.current) window.clearTimeout(timer.current);
-    timer.current = window.setTimeout(() => setToast(null), 2600);
+    const duration = action ? 6000 : tone === 'error' ? 5200 : tone === 'warning' ? 4000 : 2600;
+    timer.current = window.setTimeout(() => setToast(null), duration);
   };
 
   const settings = useMemo(() => {
@@ -139,6 +147,24 @@ export default function App() {
     settings[SETTING_KEYS.operatorB] ?? '老婆'
   ];
   const warnDays = Number(settings[SETTING_KEYS.expiryWarnDays] ?? '30') || 30;
+  const defaultOperator = settings[SETTING_KEYS.defaultOperator] ?? '';
+  const hasSample = (data?.products ?? []).some((p) => p.sample);
+  const sampleNoticeDismissed = settings[SETTING_KEYS.sampleNoticeDismissed] === '1';
+
+  // 操作人跟着设备走：设置里的默认操作人优先，失效时回落到第一个
+  useEffect(() => {
+    if (operators.length === 0) return;
+    const target = defaultOperator || operators[0];
+    if (!sell.operator || !operators.includes(sell.operator)) {
+      setSell((prev) => ({ ...prev, operator: target }));
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [operators.join('|'), defaultOperator]);
+
+  // 切 Tab / 刷新不再丢购物车
+  useEffect(() => {
+    saveSell(sell);
+  }, [sell]);
 
   const fifo = useMemo(
     () => fifoAllocate(data?.batches ?? [], data?.orders ?? [], data?.lines ?? []),
@@ -184,13 +210,7 @@ export default function App() {
               <ChevronLeft size={22} aria-hidden="true" />
             </button>
           ) : (
-            <span
-              className="glass-pill"
-              aria-hidden="true"
-              style={{ color: 'var(--gl-color-primary)' }}
-            >
-              <Sparkles size={22} />
-            </span>
+            <img className="app-brand" src="./icon-192.png" alt="" aria-hidden="true" />
           )}
           <h1 className="glass-title">{title}</h1>
           <button
@@ -210,6 +230,19 @@ export default function App() {
               inv={inv}
               deviceId={deviceId}
               operators={operators}
+              state={sell}
+              onChange={(patch) => setSell((prev) => ({ ...prev, ...patch }))}
+              needOperator={!defaultOperator}
+              onPickOperator={async (op) => {
+                await setSetting(SETTING_KEYS.defaultOperator, op);
+                setSell((prev) => ({ ...prev, operator: op }));
+                showToast(`记住了：这台手机由「${op}」使用`);
+              }}
+              showSampleNotice={hasSample && !sampleNoticeDismissed}
+              onDismissSample={async () => {
+                await setSetting(SETTING_KEYS.sampleNoticeDismissed, '1');
+                showToast('去「更多 → 商品管理」改成自己的货');
+              }}
               onDone={showToast}
             />
           ) : null}
@@ -306,7 +339,22 @@ export default function App() {
         </div>
       ) : null}
 
-      {toast ? <Toast message={toast} /> : null}
+      {toast ? (
+        <Toast
+          message={toast.msg}
+          tone={toast.tone}
+          action={toast.action?.label}
+          onAction={
+            toast.action
+              ? () => {
+                  toast.action?.onClick();
+                  setToast(null);
+                }
+              : undefined
+          }
+          onClose={toast.tone === 'error' ? () => setToast(null) : undefined}
+        />
+      ) : null}
     </div>
   );
 }
@@ -336,7 +384,7 @@ function MorePage({
               style={{
                 fontSize: 30,
                 fontWeight: 700,
-                color: 'var(--gl-color-primary)',
+                color: 'var(--yh-price-ink)',
                 fontVariantNumeric: 'tabular-nums',
                 lineHeight: 1.15
               }}
@@ -357,9 +405,17 @@ function MorePage({
       <ul className="glass-list">
         <li
           className="glass-list__item glass-list__item--interactive list-item"
-          role="button"
-          tabIndex={0}
-          onClick={() => onOpen('products')}
+          {...{
+            role: 'button',
+            tabIndex: 0,
+            onClick: () => onOpen('products'),
+            onKeyDown: (e: React.KeyboardEvent) => {
+              if (e.key === 'Enter' || e.key === ' ') {
+                e.preventDefault();
+                onOpen('products');
+              }
+            }
+          }}
         >
           <span className="glass-list__leading">
             <Package size={22} aria-hidden="true" />
@@ -375,9 +431,17 @@ function MorePage({
 
         <li
           className="glass-list__item glass-list__item--interactive list-item"
-          role="button"
-          tabIndex={0}
-          onClick={() => onOpen('history')}
+          {...{
+            role: 'button',
+            tabIndex: 0,
+            onClick: () => onOpen('history'),
+            onKeyDown: (e: React.KeyboardEvent) => {
+              if (e.key === 'Enter' || e.key === ' ') {
+                e.preventDefault();
+                onOpen('history');
+              }
+            }
+          }}
         >
           <span className="glass-list__leading">
             <Receipt size={22} aria-hidden="true" />
@@ -393,9 +457,17 @@ function MorePage({
 
         <li
           className="glass-list__item glass-list__item--interactive list-item"
-          role="button"
-          tabIndex={0}
-          onClick={() => onOpen('settings')}
+          {...{
+            role: 'button',
+            tabIndex: 0,
+            onClick: () => onOpen('settings'),
+            onKeyDown: (e: React.KeyboardEvent) => {
+              if (e.key === 'Enter' || e.key === ' ') {
+                e.preventDefault();
+                onOpen('settings');
+              }
+            }
+          }}
         >
           <span className="glass-list__leading">
             <Settings size={22} aria-hidden="true" />

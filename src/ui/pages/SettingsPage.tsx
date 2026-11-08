@@ -1,9 +1,31 @@
 import { useRef, useState } from 'react';
-import { Download, Upload, Smartphone, Trash2 } from 'lucide-react';
-import { clearAllData, setSetting } from '../../db/repo';
-import { exportBackup, importMerge, parseBackup } from '../../db/merge';
+import { Download, Upload, Smartphone, Trash2, TriangleAlert, RotateCcw } from 'lucide-react';
+import { clearAllData, loadAll, setSetting } from '../../db/repo';
+import {
+  exportBackup,
+  importMerge,
+  parseBackup,
+  replaceAll,
+  type BackupFile,
+  type MergeResult
+} from '../../db/merge';
 import { SETTING_KEYS } from '../../db/types';
-import { Btn, Card, Field, Sheet } from '../kit';
+import { fenToStr } from '../../db/util';
+import { Btn, Card, Field, Sheet, type Done } from '../kit';
+
+interface PendingMerge {
+  backup: BackupFile;
+  counts: {
+    products: number;
+    batches: number;
+    orders: number;
+    lines: number;
+    adjustments: number;
+    settings: number;
+  };
+  productDiffs: string[];
+  settingsDiffs: string[];
+}
 
 export default function SettingsPage({
   settings,
@@ -12,7 +34,7 @@ export default function SettingsPage({
 }: {
   settings: Record<string, string>;
   deviceId: string;
-  onDone: (msg: string) => void;
+  onDone: Done;
 }) {
   const [deviceName, setDeviceName] = useState(settings[SETTING_KEYS.deviceName] ?? '');
   const [opA, setOpA] = useState(settings[SETTING_KEYS.operatorA] ?? '我');
@@ -20,44 +42,163 @@ export default function SettingsPage({
   const [warn, setWarn] = useState(settings[SETTING_KEYS.expiryWarnDays] ?? '30');
   const fileRef = useRef<HTMLInputElement>(null);
   const [helpOpen, setHelpOpen] = useState(false);
+  const [pending, setPending] = useState<PendingMerge | null>(null);
+  const [backupFirst, setBackupFirst] = useState(true);
+  const [result, setResult] = useState<MergeResult | null>(null);
+  const [preMerge, setPreMerge] = useState<string | null>(null);
+  const [busy, setBusy] = useState(false);
 
   const saveText = async (key: string, value: string) => {
     await setSetting(key, value);
   };
 
-  const doExport = async () => {
+  const lastExport = settings[SETTING_KEYS.lastExportAt] ?? '';
+  const lastImport = settings[SETTING_KEYS.lastImportAt] ?? '';
+
+  const download = (backup: BackupFile) => {
+    const blob = new Blob([JSON.stringify(backup)], { type: 'application/json' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    const d = new Date();
+    const stamp = `${d.getFullYear()}${String(d.getMonth() + 1).padStart(2, '0')}${String(
+      d.getDate()
+    ).padStart(2, '0')}-${String(d.getHours()).padStart(2, '0')}${String(d.getMinutes()).padStart(
+      2,
+      '0'
+    )}`;
+    a.href = url;
+    a.download = `烟花账-备份-${stamp}.json`;
+    a.click();
+    setTimeout(() => URL.revokeObjectURL(url), 3000);
+  };
+
+  const doExport = async (silent = false): Promise<BackupFile | null> => {
     try {
       const backup = await exportBackup(deviceId);
-      const blob = new Blob([JSON.stringify(backup)], { type: 'application/json' });
-      const url = URL.createObjectURL(blob);
-      const a = document.createElement('a');
-      const d = new Date();
-      const stamp = `${d.getFullYear()}${String(d.getMonth() + 1).padStart(2, '0')}${String(
-        d.getDate()
-      ).padStart(2, '0')}-${String(d.getHours()).padStart(2, '0')}${String(d.getMinutes()).padStart(
-        2,
-        '0'
-      )}`;
-      a.href = url;
-      a.download = `烟花账-备份-${stamp}.json`;
-      a.click();
-      setTimeout(() => URL.revokeObjectURL(url), 3000);
-      onDone('备份已导出，记得发微信存一份');
+      const name = `烟花账-备份-${new Date().toISOString().slice(0, 10)}.json`;
+      const file = new File([JSON.stringify(backup)], name, { type: 'application/json' });
+      const nav = navigator as Navigator & {
+        canShare?: (data?: { files?: File[] }) => boolean;
+        share?: (data: { files?: File[]; title?: string }) => Promise<void>;
+      };
+      if (nav.canShare?.({ files: [file] }) && nav.share) {
+        try {
+          await nav.share({ files: [file], title: '烟花账备份' });
+        } catch {
+          download(backup);
+        }
+      } else {
+        download(backup);
+      }
+      await setSetting(SETTING_KEYS.lastExportAt, new Date().toISOString());
+      if (!silent) onDone('备份已导出，记得发微信存一份');
+      return backup;
     } catch (e) {
-      onDone('导出失败：' + (e instanceof Error ? e.message : String(e)));
+      onDone('导出失败：' + (e instanceof Error ? e.message : String(e)), 'error');
+      return null;
     }
   };
 
-  const doImport = async (file: File) => {
+  const pickFile = async (file: File) => {
     try {
       const text = await file.text();
       const backup = parseBackup(text);
-      const r = await importMerge(backup);
-      onDone(
-        `合并完成：商品 +${r.productsAdded}/改${r.productsUpdated}，进货 +${r.batchesAdded}，销售 +${r.ordersAdded} 单`
-      );
+      const current = await loadAll();
+
+      const productDiffs: string[] = [];
+      const curById = new Map(current.products.map((p) => [p.id, p]));
+      for (const inc of backup.data.products) {
+        const cur = curById.get(inc.id);
+        if (!cur) {
+          productDiffs.push(`新增：${inc.name}（¥${fenToStr(inc.priceList)}）`);
+          continue;
+        }
+        if (cur.priceList !== inc.priceList) {
+          productDiffs.push(`${inc.name}：¥${fenToStr(cur.priceList)} → ¥${fenToStr(inc.priceList)}`);
+        } else if (cur.name !== inc.name) {
+          productDiffs.push(`改名：${cur.name} → ${inc.name}`);
+        }
+      }
+
+      const settingsDiffs: string[] = [];
+      const keyName: Record<string, string> = {
+        [SETTING_KEYS.operatorA]: '操作人 A',
+        [SETTING_KEYS.operatorB]: '操作人 B',
+        [SETTING_KEYS.expiryWarnDays]: '临期预警天数'
+      };
+      for (const s of backup.data.settings) {
+        const label = keyName[s.key];
+        if (!label) continue;
+        const cur = current.settings.find((x) => x.key === s.key)?.value ?? '';
+        if (cur && cur !== s.value) settingsDiffs.push(`${label}：${cur} → ${s.value}`);
+      }
+
+      setPending({
+        backup,
+        counts: {
+          products: backup.data.products.length,
+          batches: backup.data.batches.length,
+          orders: backup.data.orders.length,
+          lines: backup.data.lines.length,
+          adjustments: backup.data.adjustments.length,
+          settings: backup.data.settings.length
+        },
+        productDiffs: productDiffs.slice(0, 8),
+        settingsDiffs
+      });
+      setBackupFirst(true);
     } catch (e) {
-      onDone('导入失败：' + (e instanceof Error ? e.message : String(e)));
+      onDone('导入失败：' + (e instanceof Error ? e.message : String(e)), 'error');
+    }
+  };
+
+  const confirmMerge = async () => {
+    if (!pending || busy) return;
+    setBusy(true);
+    try {
+      let snapshot: string | null = null;
+      if (backupFirst) {
+        const pre = await exportBackup(deviceId);
+        snapshot = JSON.stringify(pre);
+        const preName = `烟花账-合并前备份-${new Date().toISOString().slice(0, 10)}.json`;
+        const file = new File([snapshot], preName, { type: 'application/json' });
+        const nav = navigator as Navigator & {
+          canShare?: (data?: { files?: File[] }) => boolean;
+          share?: (data: { files?: File[]; title?: string }) => Promise<void>;
+        };
+        if (nav.canShare?.({ files: [file] }) && nav.share) {
+          try {
+            await nav.share({ files: [file], title: '合并前本机备份' });
+          } catch {
+            download(JSON.parse(snapshot) as BackupFile);
+          }
+        } else {
+          download(JSON.parse(snapshot) as BackupFile);
+        }
+      }
+      const r = await importMerge(pending.backup);
+      await setSetting(SETTING_KEYS.lastImportAt, new Date().toISOString());
+      setPreMerge(snapshot);
+      setPending(null);
+      setResult(r);
+      onDone('合并完成，请核对下面的数字');
+    } catch (e) {
+      onDone('合并失败：' + (e instanceof Error ? e.message : String(e)), 'error');
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const undoMerge = async () => {
+    if (!preMerge) return;
+    if (!confirm('撤销这次合并？会把账本恢复到合并前的状态。')) return;
+    try {
+      await replaceAll(JSON.parse(preMerge) as BackupFile);
+      setPreMerge(null);
+      setResult(null);
+      onDone('已撤销合并，账本回到合并前', 'warning');
+    } catch (e) {
+      onDone('撤销失败：' + (e instanceof Error ? e.message : String(e)), 'error');
     }
   };
 
@@ -114,7 +255,7 @@ export default function SettingsPage({
           两台设备各自开单，收摊后：一台点「导出」发微信，另一台点「导入合并」。同一条记录不会重复计入。
         </p>
         <div className="stack-sm" style={{ marginTop: 10 }}>
-          <Btn block onClick={doExport}>
+          <Btn block onClick={() => void doExport()}>
             <span className="icon-text">
               <Download size={18} aria-hidden="true" /> 导出备份（发微信）
             </span>
@@ -125,14 +266,20 @@ export default function SettingsPage({
             </span>
           </Btn>
         </div>
+        <div className="backup-times">
+          <span>上次导出：{lastExport ? lastExport.slice(0, 16).replace('T', ' ') : '还没导出过'}</span>
+          <span>上次导入：{lastImport ? lastImport.slice(0, 16).replace('T', ' ') : '还没导入过'}</span>
+        </div>
         <input
           ref={fileRef}
           type="file"
           accept="application/json,.json"
           style={{ display: 'none' }}
+          aria-hidden="true"
+          tabIndex={-1}
           onChange={(e) => {
             const f = e.target.files?.[0];
-            if (f) void doImport(f);
+            if (f) void pickFile(f);
             e.target.value = '';
           }}
         />
@@ -162,7 +309,7 @@ export default function SettingsPage({
               if (!confirm('清空所有商品、进货、销售数据？导出备份后再操作。')) return;
               if (!confirm('再确认一次：清空后无法恢复（除了导入之前导出的备份）。')) return;
               await clearAllData();
-              onDone('已清空');
+              onDone('已清空', 'warning');
             }}
           >
             <span className="icon-text">
@@ -171,9 +318,108 @@ export default function SettingsPage({
           </Btn>
         </div>
         <p className="tiny-text" style={{ marginBottom: 0 }}>
-          烟花账 v0.2 · 本地存储 · 不上传任何服务器
+          烟花账 v0.3 · 本地存储 · 不上传任何服务器
         </p>
       </Card>
+
+      {pending ? (
+        <Sheet
+          title="确认合并"
+          subtitle={`来源设备 ${pending.backup.deviceId ? pending.backup.deviceId.slice(0, 8) : '未知'} · 导出于 ${pending.backup.exportedAt.slice(0, 16).replace('T', ' ')}`}
+          onClose={() => setPending(null)}
+          footer={
+            <div className="row" style={{ gap: 8 }}>
+              <Btn block={false} variant="secondary" style={{ flex: 1 }} onClick={() => setPending(null)}>
+                取消
+              </Btn>
+              <Btn block={false} style={{ flex: 1 }} disabled={busy} onClick={confirmMerge}>
+                合并这些数据
+              </Btn>
+            </div>
+          }
+        >
+          <div className="page-stack">
+            <div className="merge-counts">
+              <span>商品 {pending.counts.products}</span>
+              <span>进货 {pending.counts.batches}</span>
+              <span>销售 {pending.counts.orders}</span>
+              <span>明细 {pending.counts.lines}</span>
+              <span>调整 {pending.counts.adjustments}</span>
+            </div>
+            {pending.productDiffs.length > 0 ? (
+              <div>
+                <div className="tiny-text" style={{ fontWeight: 600 }}>
+                  商品变化
+                </div>
+                <ul className="merge-diff">
+                  {pending.productDiffs.map((d) => (
+                    <li key={d}>{d}</li>
+                  ))}
+                </ul>
+              </div>
+            ) : null}
+            {pending.settingsDiffs.length > 0 ? (
+              <div>
+                <div className="tiny-text" style={{ fontWeight: 600 }}>
+                  设置变化（操作人按设备保留，不会覆盖）
+                </div>
+                <ul className="merge-diff">
+                  {pending.settingsDiffs.map((d) => (
+                    <li key={d}>{d}</li>
+                  ))}
+                </ul>
+              </div>
+            ) : null}
+            <label className="check-row">
+              <input
+                type="checkbox"
+                className="glass-checkbox"
+                checked={backupFirst}
+                onChange={(e) => setBackupFirst(e.target.checked)}
+              />
+              合并前先导出本机备份（推荐）
+            </label>
+            <div className="glass-status">
+              <TriangleAlert size={20} aria-hidden="true" />
+              <p>合并只增不减，同一条记录不会重复。设置里的操作人按设备保留。</p>
+            </div>
+          </div>
+        </Sheet>
+      ) : null}
+
+      {result ? (
+        <Sheet
+          title="合并完成"
+          onClose={() => setResult(null)}
+          footer={
+            <div className="row" style={{ gap: 8 }}>
+              <Btn block={false} variant="secondary" style={{ flex: 1 }} onClick={() => setResult(null)}>
+                完成
+              </Btn>
+              {preMerge ? (
+                <Btn block={false} variant="tertiary" style={{ flex: 1 }} onClick={undoMerge}>
+                  <span className="icon-text">
+                    <RotateCcw size={16} aria-hidden="true" /> 撤销合并
+                  </span>
+                </Btn>
+              ) : null}
+            </div>
+          }
+        >
+          <div className="page-stack">
+            <div className="merge-counts">
+              <span>商品 +{result.productsAdded} / 改 {result.productsUpdated}</span>
+              <span>进货 +{result.batchesAdded}</span>
+              <span>销售 +{result.ordersAdded} 单</span>
+              <span>明细 +{result.linesAdded}</span>
+              <span>调整 +{result.adjustmentsAdded}</span>
+            </div>
+            <p className="tiny-text" style={{ margin: 0 }}>
+              同一条记录只算一次。建议现在去「报表」对一下当日销售额。
+            </p>
+          </div>
+        </Sheet>
+      ) : null}
 
       {helpOpen ? (
         <Sheet title="添加到主屏幕" onClose={() => setHelpOpen(false)}>

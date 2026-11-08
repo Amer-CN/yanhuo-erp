@@ -27,6 +27,8 @@ export interface Product {
   priceList: number;
   /** 是否允许临时改价 */
   negotiable: boolean;
+  /** 种子示例商品（用户改过任意字段后自动清除） */
+  sample?: boolean;
   archived: boolean;
   sortOrder: number;
   createdAt: string;
@@ -109,7 +111,11 @@ export const SETTING_KEYS = {
   deviceName: 'deviceName',
   operatorA: 'operatorA',
   operatorB: 'operatorB',
+  defaultOperator: 'defaultOperator',
   expiryWarnDays: 'expiryWarnDays',
+  lastExportAt: 'lastExportAt',
+  lastImportAt: 'lastImportAt',
+  sampleNoticeDismissed: 'sampleNoticeDismissed',
   seeded: 'seeded'
 } as const;
 
