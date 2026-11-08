@@ -111,7 +111,6 @@ export const SETTING_KEYS = {
   deviceName: 'deviceName',
   operatorA: 'operatorA',
   operatorB: 'operatorB',
-  defaultOperator: 'defaultOperator',
   expiryWarnDays: 'expiryWarnDays',
   lastExportAt: 'lastExportAt',
   lastImportAt: 'lastImportAt',

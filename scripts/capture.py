@@ -42,11 +42,6 @@ def main() -> int:
 
         page.wait_for_selector("text=大地红 1000 响", timeout=20000)
         page.wait_for_timeout(600)
-        if page.locator(".first-run-card").count():
-            page.locator(".first-run-card").get_by_role("button", name="我").click()
-            page.wait_for_selector(".toast", timeout=5000)
-            page.wait_for_selector(".toast", state="detached", timeout=8000)
-            page.wait_for_timeout(300)
         if page.locator(".first-run-card--sample").count():
             page.locator(".first-run-card--sample").get_by_role("button", name="知道了").click()
             page.wait_for_selector(".toast", timeout=5000)

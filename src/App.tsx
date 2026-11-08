@@ -147,19 +147,17 @@ export default function App() {
     settings[SETTING_KEYS.operatorB] ?? '老婆'
   ];
   const warnDays = Number(settings[SETTING_KEYS.expiryWarnDays] ?? '30') || 30;
-  const defaultOperator = settings[SETTING_KEYS.defaultOperator] ?? '';
   const hasSample = (data?.products ?? []).some((p) => p.sample);
   const sampleNoticeDismissed = settings[SETTING_KEYS.sampleNoticeDismissed] === '1';
 
-  // 操作人跟着设备走：设置里的默认操作人优先，失效时回落到第一个
+  // 操作人默认第一个；可在开单页右上角切换
   useEffect(() => {
     if (operators.length === 0) return;
-    const target = defaultOperator || operators[0];
     if (!sell.operator || !operators.includes(sell.operator)) {
-      setSell((prev) => ({ ...prev, operator: target }));
+      setSell((prev) => ({ ...prev, operator: operators[0] }));
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [operators.join('|'), defaultOperator]);
+  }, [operators.join('|')]);
 
   // 切 Tab / 刷新不再丢购物车
   useEffect(() => {
@@ -232,12 +230,6 @@ export default function App() {
               operators={operators}
               state={sell}
               onChange={(patch) => setSell((prev) => ({ ...prev, ...patch }))}
-              needOperator={!defaultOperator}
-              onPickOperator={async (op) => {
-                await setSetting(SETTING_KEYS.defaultOperator, op);
-                setSell((prev) => ({ ...prev, operator: op }));
-                showToast(`记住了：这台手机由「${op}」使用`);
-              }}
               showSampleNotice={hasSample && !sampleNoticeDismissed}
               onDismissSample={async () => {
                 await setSetting(SETTING_KEYS.sampleNoticeDismissed, '1');

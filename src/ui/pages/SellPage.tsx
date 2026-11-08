@@ -26,8 +26,6 @@ export default function SellPage({
   operators,
   state,
   onChange,
-  needOperator,
-  onPickOperator,
   showSampleNotice,
   onDismissSample,
   onDone
@@ -38,8 +36,6 @@ export default function SellPage({
   operators: string[];
   state: SellState;
   onChange: (patch: Partial<SellState>) => void;
-  needOperator: boolean;
-  onPickOperator: (op: string) => void;
   showSampleNotice: boolean;
   onDismissSample: () => void;
   onDone: Done;
@@ -230,22 +226,6 @@ export default function SellPage({
 
   return (
     <div className="page-stack">
-      {needOperator ? (
-        <div className="first-run-card">
-          <div>
-            <div className="first-run-card__title">这台手机平时谁用？</div>
-            <div className="tiny-text">记住以后开单就不用每次选</div>
-          </div>
-          <div className="row" style={{ gap: 8 }}>
-            {operators.map((op) => (
-              <Btn key={op} block={false} size="sm" variant="secondary" onClick={() => onPickOperator(op)}>
-                {op}
-              </Btn>
-            ))}
-          </div>
-        </div>
-      ) : null}
-
       {showSampleNotice ? (
         <div className="first-run-card first-run-card--sample">
           <div>
@@ -346,7 +326,7 @@ export default function SellPage({
                 block
                 variant={op === operator ? 'primary' : 'secondary'}
                 onClick={async () => {
-                  await onPickOperator(op);
+                  onChange({ operator: op });
                   setOpOpen(false);
                 }}
               >

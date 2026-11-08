@@ -42,10 +42,6 @@ def main() -> int:
                 time.sleep(0.5)
         page.wait_for_selector("text=大地红 1000 响", timeout=20000)
 
-        if page.locator(".first-run-card").count():
-            page.locator(".first-run-card").get_by_role("button", name="我").click()
-            page.wait_for_selector(".toast", state="detached", timeout=8000)
-
         print("[1] 表单标签关联")
         search = page.locator(".glass-search input")
         check("搜索框有可访问名", bool(search.get_attribute("aria-label")), "aria-label 缺失")

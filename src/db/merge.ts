@@ -139,8 +139,7 @@ export async function importMerge(backup: BackupFile): Promise<MergeResult> {
         SETTING_KEYS.deviceId,
         SETTING_KEYS.deviceName,
         SETTING_KEYS.operatorA,
-        SETTING_KEYS.operatorB,
-        SETTING_KEYS.defaultOperator
+        SETTING_KEYS.operatorB
       ]);
       const incoming = data.settings.filter((s) => !skip.has(s.key));
       if (incoming.length) {
