@@ -23,6 +23,8 @@ export interface RecordLineDraft {
 export interface RecordDraft {
   /** 补记时固定；新建/编辑为空 */
   sessionId?: string;
+  /** 编辑时记录目标单据，恢复草稿前用于校验，避免串单 */
+  orderId?: string;
   payMethod: PayMethod;
   operator: string;
   note: string;
@@ -31,6 +33,21 @@ export interface RecordDraft {
 
 export const DRAFT_KEY = 'yh-record-draft';
 export const LAST_PAY_KEY = 'yh-last-pay';
+
+export type DraftMode = 'new' | 'edit' | 'patch';
+
+/**
+ * 草稿键：new 用新键并从旧键兼容读取；edit/patch 按单据/场次隔离，避免互相覆盖。
+ */
+export function draftKey(mode: DraftMode, orderId?: string, sessionId?: string): string {
+  if (mode === 'edit') return `${DRAFT_KEY}:edit:${orderId ?? ''}`;
+  if (mode === 'patch') return `${DRAFT_KEY}:patch:${sessionId ?? ''}`;
+  return `${DRAFT_KEY}:new`;
+}
+
+function legacyKeyFor(key: string): string | null {
+  return key === `${DRAFT_KEY}:new` ? DRAFT_KEY : null;
+}
 
 export function readLastPay(): PayMethod {
   try {
@@ -49,22 +66,24 @@ export function writeLastPay(pay: PayMethod): void {
   }
 }
 
-export function saveDraft(draft: RecordDraft): void {
+export function saveDraft(draft: RecordDraft, key: string = DRAFT_KEY): void {
   try {
-    sessionStorage.setItem(DRAFT_KEY, JSON.stringify(draft));
+    sessionStorage.setItem(key, JSON.stringify(draft));
   } catch {
     /* 存不下就只留在内存 */
   }
 }
 
-export function loadDraft(): RecordDraft | null {
+export function loadDraft(key: string = DRAFT_KEY): RecordDraft | null {
   try {
-    const raw = sessionStorage.getItem(DRAFT_KEY);
+    const legacy = legacyKeyFor(key);
+    const raw = sessionStorage.getItem(key) ?? (legacy ? sessionStorage.getItem(legacy) : null);
     if (!raw) return null;
     const d = JSON.parse(raw) as Partial<RecordDraft>;
     if (!Array.isArray(d.lines) || d.lines.length === 0) return null;
     return {
       sessionId: typeof d.sessionId === 'string' ? d.sessionId : undefined,
+      orderId: typeof d.orderId === 'string' ? d.orderId : undefined,
       payMethod: d.payMethod === 'wechat' || d.payMethod === 'alipay' ? d.payMethod : 'cash',
       operator: typeof d.operator === 'string' ? d.operator : '',
       note: typeof d.note === 'string' ? d.note : '',
@@ -85,9 +104,11 @@ export function loadDraft(): RecordDraft | null {
   }
 }
 
-export function clearDraft(): void {
+export function clearDraft(key: string = DRAFT_KEY): void {
   try {
-    sessionStorage.removeItem(DRAFT_KEY);
+    sessionStorage.removeItem(key);
+    const legacy = legacyKeyFor(key);
+    if (legacy) sessionStorage.removeItem(legacy);
   } catch {
     /* ignore */
   }
@@ -117,6 +138,7 @@ export function draftFromOrder(
 ): RecordDraft {
   return {
     sessionId: order.sessionId,
+    orderId: order.id,
     payMethod: order.payMethod,
     operator: order.operator,
     note: order.note ?? '',

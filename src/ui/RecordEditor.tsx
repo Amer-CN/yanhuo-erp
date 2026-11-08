@@ -20,6 +20,7 @@ import ProductPicker from './ProductPicker';
 import {
   amountFromText,
   clearDraft,
+  draftKey,
   draftLineAmount,
   loadDraft,
   readLastPay,
@@ -87,25 +88,42 @@ export default function RecordEditor({
   onOpenHistory: () => void;
   onDone: Done;
 }) {
-  const [draft, setDraft] = useState<RecordDraft>(() => {
-    if (initial) return initial;
-    const saved = mode === 'new' ? loadDraft() : null;
-    if (saved) return { ...saved, operator: saved.operator || operators[0] || '我' };
+  const draftStorageKey = draftKey(mode, orderId, sessionId);
+  const [initialDraftState] = useState<{ draft: RecordDraft; restored: boolean }>(() => {
+    const saved = loadDraft(draftStorageKey);
+    const matched =
+      Boolean(saved) &&
+      (mode === 'new' ||
+        (mode === 'edit' && Boolean(orderId) && saved?.orderId === orderId) ||
+        (mode === 'patch' && Boolean(sessionId) && saved?.sessionId === sessionId));
+    if (saved && matched) {
+      return {
+        draft: { ...saved, operator: saved.operator || operators[0] || '我' },
+        restored: true
+      };
+    }
+    if (initial) return { draft: initial, restored: false };
     return {
-      payMethod: readLastPay(),
-      operator: operators[0] || '我',
-      note: '',
-      lines: []
+      draft: {
+        payMethod: readLastPay(),
+        operator: operators[0] || '我',
+        note: '',
+        lines: []
+      },
+      restored: false
     };
   });
+  const [draft, setDraft] = useState<RecordDraft>(initialDraftState.draft);
   const [pickOpen, setPickOpen] = useState(false);
   const [confirmClose, setConfirmClose] = useState(false);
   const [busy, setBusy] = useState(false);
   const [errorIndex, setErrorIndex] = useState<number | null>(null);
   const [errorText, setErrorText] = useState('');
-  const [showDraftHint, setShowDraftHint] = useState(() => mode === 'new' && Boolean(loadDraft()));
+  const [showDraftHint, setShowDraftHint] = useState(initialDraftState.restored);
+  const [draftRestored, setDraftRestored] = useState(initialDraftState.restored);
   const addBtnRef = useRef<HTMLButtonElement>(null);
   const amountRefs = useRef<(HTMLInputElement | null)[]>([]);
+  const mountDraftRef = useRef(JSON.stringify(initialDraftState.draft));
 
   const productById = useMemo(() => {
     const m = new Map<string, Product>();
@@ -113,15 +131,25 @@ export default function RecordEditor({
     return m;
   }, [products]);
 
-  // 新建单据自动存草稿；编辑/补记不覆盖草稿
+  // 所有模式都存草稿：new 固定键，edit/patch 按目标隔离；没动过时不为 DB 原值写草稿
   useEffect(() => {
-    if (mode !== 'new') return;
-    if (draft.lines.length === 0 && !draft.note.trim()) {
-      clearDraft();
+    const empty = draft.lines.length === 0 && !draft.note.trim();
+    if (empty) {
+      clearDraft(draftStorageKey);
       return;
     }
-    saveDraft(draft);
-  }, [draft, mode]);
+    if (!draftRestored && JSON.stringify(draft) === mountDraftRef.current) {
+      return;
+    }
+    saveDraft(
+      {
+        ...draft,
+        sessionId: mode === 'patch' ? sessionId : draft.sessionId,
+        orderId: mode === 'edit' ? orderId : undefined
+      },
+      draftStorageKey
+    );
+  }, [draft, draftStorageKey, mode, orderId, sessionId, draftRestored]);
 
   const factorOf = (l: RecordLineDraft): number => {
     const p = productById.get(l.productId);
@@ -305,12 +333,12 @@ export default function RecordEditor({
             };
 
       if (andNext) {
-        clearDraft();
+        clearDraft(draftStorageKey);
         setDraft((d) => ({ ...d, note: '', lines: [] }));
         setErrorIndex(null);
         window.setTimeout(() => addBtnRef.current?.focus(), 30);
       } else {
-        clearDraft();
+        clearDraft(draftStorageKey);
       }
       onSaved(order, andNext, undo);
     } catch (e) {
@@ -366,8 +394,16 @@ export default function RecordEditor({
               size="sm"
               variant="tertiary"
               onClick={() => {
-                clearDraft();
-                setDraft({ payMethod: readLastPay(), operator: operators[0] || '我', note: '', lines: [] });
+                const reset = initial ?? {
+                  payMethod: readLastPay(),
+                  operator: operators[0] || '我',
+                  note: '',
+                  lines: []
+                };
+                clearDraft(draftStorageKey);
+                mountDraftRef.current = JSON.stringify(reset);
+                setDraft(reset);
+                setDraftRestored(false);
                 setShowDraftHint(false);
               }}
             >

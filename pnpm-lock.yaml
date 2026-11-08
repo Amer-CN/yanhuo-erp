@@ -72,6 +72,9 @@ importers:
       vitest:
         specifier: ^2.1.8
         version: 2.1.9(supports-color@7.2.0)(terser@5.51.2)
+      workbox-window:
+        specifier: ^7.4.1
+        version: 7.4.1
 
 packages:
 

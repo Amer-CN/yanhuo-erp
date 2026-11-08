@@ -40,6 +40,7 @@ import { Btn, Card, ConfirmSheet, Empty, Toast, type Done, type ToastTone } from
 import { useSync } from './ui/useSync';
 import RecordPage from './ui/pages/RecordPage';
 import CloseSessionSheet, { CloseSessionResult } from './ui/CloseSessionSheet';
+import UpdateBar from './ui/UpdateBar';
 import type { RecordDraft } from './ui/recordDraft';
 import { draftFromOrder } from './ui/recordDraft';
 
@@ -505,6 +506,8 @@ export default function App() {
             onToggleTheme={toggleTheme}
           />
         ) : null}
+
+        <UpdateBar />
 
         <main className={editor ? 'app-main app-main--editor' : 'app-main'}>
           {migrateError && !editor ? (
