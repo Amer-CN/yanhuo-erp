@@ -35,8 +35,8 @@ jobs:
       - name: Lint
         run: pnpm lint
 
-      - name: Unit tests
-        run: pnpm test
+      - name: Unit tests + coverage
+        run: pnpm test:cov
 
       - name: Build
         run: pnpm build
