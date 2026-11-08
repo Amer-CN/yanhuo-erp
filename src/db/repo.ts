@@ -596,65 +596,6 @@ export async function migrateSessions(): Promise<number> {
   return sessions.length;
 }
 
-/* ------------------------------------------------------------------ 旧开单接口（保留一版，UI 不再调用） */
-
-export interface CartLineInput {
-  productId: string;
-  qtyBase: number;
-  unit: 'box' | 'base';
-  qty: number;
-  listUnitPriceFen: number;
-  unitPriceFen: number;
-}
-
-export interface CheckoutInput {
-  deviceId: string;
-  operator: string;
-  payMethod: PayMethod;
-  lines: CartLineInput[];
-  note?: string;
-}
-
-/** @deprecated 由 saveRecord 取代；保留用于旧页面回滚。仍会挂到本机 open 场次。 */
-export async function checkout(input: CheckoutInput): Promise<SalesOrder> {
-  const session = await ensureOpenSession(input.deviceId, input.operator);
-  const orderId = uuid();
-  const createdAt = nowIso();
-  const lines: SaleLine[] = input.lines.map((l) => {
-    const amountFen = l.qtyBase * l.unitPriceFen;
-    return {
-      id: uuid(),
-      orderId,
-      productId: l.productId,
-      qtyBase: l.qtyBase,
-      unit: l.unit,
-      qty: l.qty,
-      listUnitPriceFen: l.listUnitPriceFen,
-      unitPriceFen: l.unitPriceFen,
-      amountFen,
-      discountFen: Math.max(0, (l.listUnitPriceFen - l.unitPriceFen) * l.qtyBase)
-    };
-  });
-  const totalFen = lines.reduce((s, l) => s + l.amountFen, 0);
-  const order: SalesOrder = {
-    id: orderId,
-    deviceId: input.deviceId,
-    operator: input.operator,
-    createdAt,
-    payMethod: input.payMethod,
-    totalFen,
-    sessionId: session.id,
-    note: input.note?.trim() || undefined
-  };
-  await db.transaction('rw', db.orders, db.lines, async () => {
-    await db.orders.put(order);
-    await db.lines.bulkPut(lines);
-  });
-  await enqueue('order', order.id);
-  for (const l of lines) await enqueue('line', l.id);
-  return order;
-}
-
 export async function voidOrder(id: string): Promise<void> {
   const o = await db.orders.get(id);
   if (!o) return;
