@@ -35,6 +35,8 @@ pnpm preview      # 预览生产构建 http://localhost:4173
 pnpm test         # 核心计算单元测试
 ```
 
+> ⚠️ 不要把 `vite dev` / `preview` 暴露到公网或不可信局域网；launch-editor 相关漏洞可在 dev 进程被利用。默认只监听 `127.0.0.1`；真机联调需要局域网时，临时 `pnpm dev --host` 覆盖，用完即关。
+
 端到端测试（需要 Playwright + Chromium）：
 
 ```bash

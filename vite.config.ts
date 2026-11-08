@@ -32,7 +32,8 @@ export default defineConfig({
     })
   ],
   server: {
-    host: true,
+    // 默认只监听本机；真机联调需要局域网时临时 `pnpm dev --host` 覆盖，用完即关
+    host: '127.0.0.1',
     port: 5173,
     watch: {
       ignored: ['**/*.tmpdir/**', '**/*.tmp', '**/.git/**', '**/dist/**']
