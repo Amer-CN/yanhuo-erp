@@ -1,2 +1,7 @@
 allowBuilds:
   esbuild: true
+
+# vitest 3.2.7 仍依赖 tinypool ^1.1.1（该线无修复版本）；锁到 2.1.2 消除
+# tinypool 的两条 Critical。仅在测试运行器内使用，已验证 74 个用例与覆盖率通过。
+overrides:
+  tinypool: 2.1.2
