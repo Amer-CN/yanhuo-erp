@@ -1,5 +1,6 @@
 import {
   cloneElement,
+  forwardRef,
   isValidElement,
   useEffect,
   useId,
@@ -27,19 +28,17 @@ const BTN_CLASS: Record<BtnVariant, string> = {
   danger: 'glass-btn--tertiary btn-danger'
 };
 
-export function Btn({
-  variant = 'primary',
-  size,
-  block = true,
-  className = '',
-  children,
-  type = 'button',
-  ...rest
-}: ButtonHTMLAttributes<HTMLButtonElement> & {
-  variant?: BtnVariant;
-  size?: 'sm' | 'lg';
-  block?: boolean;
-}) {
+export const Btn = forwardRef<
+  HTMLButtonElement,
+  ButtonHTMLAttributes<HTMLButtonElement> & {
+    variant?: BtnVariant;
+    size?: 'sm' | 'lg';
+    block?: boolean;
+  }
+>(function Btn(
+  { variant = 'primary', size, block = true, className = '', children, type = 'button', ...rest },
+  ref
+) {
   const cls = [
     'glass-btn',
     BTN_CLASS[variant],
@@ -50,11 +49,11 @@ export function Btn({
     .filter(Boolean)
     .join(' ');
   return (
-    <button type={type} className={cls} {...rest}>
+    <button ref={ref} type={type} className={cls} {...rest}>
       {children}
     </button>
   );
-}
+});
 
 export function Card({
   children,
@@ -183,13 +182,17 @@ export function Toast({
   tone = 'success',
   action,
   onAction,
-  onClose
+  onClose,
+  onPause,
+  onResume
 }: {
   message: string;
   tone?: ToastTone;
   action?: string;
   onAction?: () => void;
   onClose?: () => void;
+  onPause?: () => void;
+  onResume?: () => void;
 }) {
   const Icon = tone === 'success' ? CheckCircle2 : tone === 'error' ? X : TriangleAlert;
   return (
@@ -197,6 +200,10 @@ export function Toast({
       className={`glass-toast glass-toast--${tone} is-visible toast`}
       role={tone === 'error' ? 'alert' : 'status'}
       aria-live={tone === 'error' ? 'assertive' : 'polite'}
+      onMouseEnter={onPause}
+      onMouseLeave={onResume}
+      onFocus={onPause}
+      onBlur={onResume}
     >
       <Icon className="glass-toast__icon" size={20} aria-hidden="true" />
       <span className="glass-toast__text">{message}</span>
@@ -221,13 +228,16 @@ export function Sheet({
   subtitle,
   onClose,
   children,
-  footer
+  footer,
+  dismissible = true
 }: {
   title: string;
   subtitle?: string;
   onClose: () => void;
   children: ReactNode;
   footer?: ReactNode;
+  /** false = 结账中/保存中，禁止遮罩、Esc 与关闭按钮 */
+  dismissible?: boolean;
 }) {
   const [active, setActive] = useState(false);
   const panelRef = useRef<HTMLDivElement>(null);
@@ -235,6 +245,8 @@ export function Sheet({
   const closeRef = useRef<HTMLButtonElement>(null);
   const onCloseRef = useRef(onClose);
   onCloseRef.current = onClose;
+  const dismissibleRef = useRef(dismissible);
+  dismissibleRef.current = dismissible;
 
   useEffect(() => {
     const raf = requestAnimationFrame(() => setActive(true));
@@ -255,13 +267,15 @@ export function Sheet({
         ) ?? []
       );
 
-    const first = focusable()[0];
+    const items = focusable();
+    // 优先聚焦内容区第一个控件（如搜索框），关闭按钮放最后兜底
+    const first = items.find((el) => !el.classList.contains('glass-sheet__close')) ?? items[0];
     (first ?? panelRef.current)?.focus({ preventScroll: true });
 
     const onKey = (e: globalThis.KeyboardEvent) => {
       if (e.key === 'Escape') {
         e.preventDefault();
-        close();
+        if (dismissibleRef.current) close();
         return;
       }
       if (e.key !== 'Tab') return;
@@ -296,7 +310,10 @@ export function Sheet({
   };
 
   return (
-    <div className={`glass-sheet-overlay ${active ? 'is-active' : ''}`} onClick={close}>
+    <div
+      className={`glass-sheet-overlay ${active ? 'is-active' : ''}`}
+      onClick={dismissible ? close : undefined}
+    >
       <div
         ref={panelRef}
         className="glass-sheet"
@@ -314,7 +331,14 @@ export function Sheet({
             </h2>
             {subtitle ? <div className="glass-sheet__subtitle">{subtitle}</div> : null}
           </div>
-          <button ref={closeRef} className="glass-sheet__close" type="button" onClick={close} aria-label="关闭">
+          <button
+            ref={closeRef}
+            className="glass-sheet__close"
+            type="button"
+            onClick={close}
+            aria-label="关闭"
+            disabled={!dismissible}
+          >
             <X size={16} aria-hidden="true" />
           </button>
         </div>
@@ -322,6 +346,47 @@ export function Sheet({
         {footer ? <div className="glass-sheet__actions">{footer}</div> : null}
       </div>
     </div>
+  );
+}
+
+/** 统一确认弹层：替代原生 confirm()，支持 danger 语气 */
+export function ConfirmSheet({
+  title,
+  description,
+  confirmText = '确定',
+  cancelText = '取消',
+  danger,
+  busy,
+  onConfirm,
+  onCancel
+}: {
+  title: string;
+  description?: ReactNode;
+  confirmText?: string;
+  cancelText?: string;
+  danger?: boolean;
+  busy?: boolean;
+  onConfirm: () => void;
+  onCancel: () => void;
+}) {
+  return (
+    <Sheet
+      title={title}
+      onClose={onCancel}
+      dismissible={!busy}
+      footer={
+        <div className="stack-sm">
+          <Btn variant={danger ? 'danger' : 'primary'} block disabled={busy} onClick={onConfirm}>
+            {busy ? '处理中…' : confirmText}
+          </Btn>
+          <Btn variant="secondary" block disabled={busy} onClick={onCancel}>
+            {cancelText}
+          </Btn>
+        </div>
+      }
+    >
+      {description ? <p className="muted-text" style={{ margin: 0 }}>{description}</p> : null}
+    </Sheet>
   );
 }
 
