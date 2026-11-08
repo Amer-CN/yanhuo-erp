@@ -1,8 +1,10 @@
-"""无障碍回归：标签关联、弹层焦点、Esc、键盘行、触控尺寸、减动效。
-用法（先 pnpm dev）：python scripts/a11y-check.py [base_url]
+"""无障碍回归（v2 场次记账）：标签关联、弹层焦点、Esc、键盘行、触控尺寸、减动效。
+
+用法：
+  pnpm dev   # 或 pnpm build && pnpm preview -- --port 4173
+  python scripts/a11y-check.py [base_url]
 """
 
-import os
 import sys
 import time
 
@@ -31,8 +33,8 @@ def main() -> int:
             timezone_id="Asia/Shanghai",
             reduced_motion="reduce",
         )
-        page = ctx.new_page()
         ctx.add_init_script("localStorage.setItem('yh-sync-disabled','1')")
+        page = ctx.new_page()
         for i in range(40):
             try:
                 page.goto(BASE, wait_until="networkidle", timeout=8000)
@@ -41,46 +43,54 @@ def main() -> int:
                 if i == 39:
                     raise
                 time.sleep(0.5)
-        page.wait_for_selector("text=大地红 1000 响", timeout=20000)
+        page.get_by_role("button", name="记一笔").first.wait_for(timeout=20000)
 
-        print("[1] 表单标签关联")
+        print("[1] 标签关联")
+        page.get_by_role("button", name="记一笔").last.click()
+        page.get_by_role("button", name="添加商品").first.click()
+        page.wait_for_selector(".glass-search input", timeout=5000)
         search = page.locator(".glass-search input")
-        check("搜索框有可访问名", bool(search.get_attribute("aria-label")), "aria-label 缺失")
-        page.get_by_role("button", name="进货").click()
-        page.wait_for_selector(".glass-input-group", timeout=5000)
+        check("选商品搜索框有可访问名", bool(search.get_attribute("aria-label")), "aria-label 缺失")
+
+        page.get_by_role("button", name="大地红 1000 响", exact=False).first.click()
+        page.get_by_role("button", name="完成（回单据）").click()
+        page.wait_for_selector(".record-line", timeout=5000)
         labels = page.evaluate(
-            """() => Array.from(document.querySelectorAll('.glass-input-group')).map(g => {
+            """() => Array.from(document.querySelectorAll('.record-page .glass-input-group')).map(g => {
                 const f = g.querySelector('input,select,textarea');
                 const l = g.querySelector('label');
                 return { label: l ? l.textContent.trim() : '', forId: l ? l.getAttribute('for') : null, id: f ? f.id : null };
             })"""
         )
         bad_labels = [x for x in labels if not x["id"] or x["forId"] != x["id"]]
-        check("进货字段 label for=控件 id", len(bad_labels) == 0, f"{len(bad_labels)} 个未关联: {bad_labels[:3]}")
+        check("单据字段 label for=控件 id", len(bad_labels) == 0, f"{len(bad_labels)} 个未关联: {bad_labels[:3]}")
 
         print("[2] 弹层焦点与 Esc")
-        page.get_by_role("button", name="开单").click()
-        page.locator(".prod-btn").first.click()
-        page.wait_for_selector(".checkout-bar", timeout=5000)
-        page.locator(".checkout-dock__count").click()
+        trigger = page.get_by_role("button", name="添加商品").first
+        trigger.click()
         page.wait_for_selector(".glass-sheet[role=dialog]", timeout=5000)
         dialog = page.locator(".glass-sheet[role=dialog]")
-        check("弹层有 aria-labelledby", bool(dialog.get_attribute("aria-labelledby")), dialog.get_attribute("aria-labelledby") or "")
+        check("弹层有 aria-labelledby", bool(dialog.get_attribute("aria-labelledby")), "缺失")
         check(
             "焦点在弹层内",
             page.evaluate("() => !!document.activeElement.closest('.glass-sheet')"),
             page.evaluate("() => document.activeElement.className"),
         )
         page.keyboard.press("Escape")
-        page.wait_for_timeout(500)
+        page.wait_for_timeout(650)
         check("Esc 关闭弹层", page.locator(".glass-sheet[role=dialog]").count() == 0)
         check(
-            "关闭后焦点归还",
-            page.evaluate("() => document.activeElement.className.includes('checkout-dock__count')"),
-            page.evaluate("() => document.activeElement.className"),
+            "关闭后焦点归还触发按钮",
+            page.evaluate("() => (document.activeElement.textContent || '').includes('添加商品')"),
+            page.evaluate("() => (document.activeElement.textContent || document.activeElement.className || '').slice(0, 30)"),
         )
 
         print("[3] 键盘操作列表行")
+        page.get_by_role("button", name="返回").click()
+        page.wait_for_timeout(400)
+        if page.get_by_text("这单还没保存", exact=False).count() > 0:
+            page.get_by_role("button", name="离开").click()
+            page.wait_for_timeout(500)
         page.get_by_role("button", name="更多").click()
         page.wait_for_selector(".list-item", timeout=5000)
         row = page.locator(".list-item").first
@@ -90,12 +100,12 @@ def main() -> int:
         check("更多列表行 Enter 可进入", page.locator(".back-btn").count() > 0, "未进入子页")
         page.locator(".back-btn").click()
         page.wait_for_timeout(400)
+        page.get_by_role("button", name="记账").click()
+        page.wait_for_timeout(300)
 
         print("[4] 触控目标")
-        page.get_by_role("button", name="开单").click()
-        page.wait_for_timeout(600)
         small = page.evaluate(
-            """() => Array.from(document.querySelectorAll('button, a, [role=button], input, select'))
+            """() => Array.from(document.querySelectorAll("button, a, [role=button], select, input:not([type=checkbox]):not([type=radio]):not([type=hidden])"))
                 .filter(e => {
                     const r = e.getBoundingClientRect();
                     const s = getComputedStyle(e);
@@ -103,13 +113,13 @@ def main() -> int:
                 })
                 .map(e => (e.getAttribute('aria-label') || e.textContent || e.tagName).trim().slice(0, 24) + ` ${Math.round(e.getBoundingClientRect().width)}x${Math.round(e.getBoundingClientRect().height)}`)"""
         )
-        check("开单页无小于 44 的可见控件", len(small) == 0, f"{len(small)} 个: {small[:5]}")
+        check("记账首页无小于 44 的可见控件", len(small) == 0, f"{len(small)} 个: {small[:5]}")
 
         print("[5] 减动效")
         motion = page.evaluate(
             """() => {
                 const bad = [];
-                for (const el of document.querySelectorAll('.prod-btn, .checkout-dock, .glass-tab-bar__item, .glass-btn')) {
+                for (const el of document.querySelectorAll('.prod-btn, .glass-btn, .glass-tab-bar__item, .record-actions, .sample-note')) {
                     const s = getComputedStyle(el);
                     if (parseFloat(s.transitionDuration) > 0.05 || parseFloat(s.animationDuration) > 0.05) {
                         bad.push(el.className.split(' ')[0] + ' t=' + s.transitionDuration + ' a=' + s.animationDuration);
