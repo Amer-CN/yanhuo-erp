@@ -27,7 +27,7 @@ import {
 } from './db/repo';
 import { SETTING_KEYS, type Session } from './db/types';
 import { seedIfEmpty } from './db/seed';
-import { createSnapshot } from './db/backup';
+import { createSnapshot, latestSnapshot, snapshotBeforeOpen } from './db/backup';
 import {
   emptySessionSummary,
   fifoAllocate,
@@ -236,6 +236,12 @@ export default function App() {
     let alive = true;
     (async () => {
       try {
+        // 必须在 Dexie 打开主库之前：升级/迁移前先留一份可导出的快照
+        try {
+          await snapshotBeforeOpen();
+        } catch {
+          // 快照失败不阻断启动；不写 console，避免打扰摊主
+        }
         await ensureDeviceId();
         await ensureBootstrapSettings({
           [SETTING_KEYS.deviceName]: defaultDeviceName(),
@@ -494,6 +500,26 @@ export default function App() {
     }
   };
 
+  const exportLatestBackup = async () => {
+    try {
+      const snap = await latestSnapshot();
+      if (!snap) {
+        showToast('还没有可导出的备份', 'warning');
+        return;
+      }
+      const blob = new Blob([JSON.stringify(snap.file)], { type: 'application/json' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `烟花账-迁移前备份-${snap.at.slice(0, 10)}.json`;
+      a.click();
+      window.setTimeout(() => URL.revokeObjectURL(url), 3000);
+      showToast('已导出最近一份备份');
+    } catch (e) {
+      showToast(`导出备份失败：${msgOf(e)}`, 'error');
+    }
+  };
+
   return (
     <div className={`glass-bg ${editor ? '' : 'glass-bg--has-tab-bar-floating'}`}>
       <div className="app-shell">
@@ -516,6 +542,9 @@ export default function App() {
               <p>历史数据还没归到场次：{migrateError}。账本可以继续记，迁移成功后再看报表。</p>
               <Btn block={false} size="sm" variant="secondary" onClick={retryMigrate}>
                 重试迁移
+              </Btn>
+              <Btn block={false} size="sm" variant="secondary" onClick={() => void exportLatestBackup()}>
+                导出最近备份
               </Btn>
             </div>
           ) : null}

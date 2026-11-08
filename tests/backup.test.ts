@@ -5,7 +5,8 @@ import {
   createSnapshot,
   listSnapshots,
   pruneSnapshots,
-  restoreSnapshot
+  restoreSnapshot,
+  snapshotBeforeOpen
 } from '../src/db/backup';
 import { db } from '../src/db/db';
 import type { BackupFile } from '../src/db/merge';
@@ -48,6 +49,36 @@ function emptyFile(): BackupFile {
     deviceId: 'dev-test',
     data: structuredClone(EMPTY_DATA)
   };
+}
+
+/** 手工造一个 v2 主库（没有 sessions 表），模拟老版本设备升级前的数据 */
+function createV2Database(): Promise<void> {
+  return new Promise((resolve, reject) => {
+    const req = indexedDB.open('yanhuo-erp', 2);
+    req.onupgradeneeded = () => {
+      const idb = req.result;
+      idb.createObjectStore('products', { keyPath: 'id' });
+      idb.createObjectStore('batches', { keyPath: 'id' });
+      idb.createObjectStore('orders', { keyPath: 'id' });
+      idb.createObjectStore('lines', { keyPath: 'id' });
+      idb.createObjectStore('adjustments', { keyPath: 'id' });
+      idb.createObjectStore('settings', { keyPath: 'key' });
+      idb.createObjectStore('outbox', { keyPath: 'id' });
+    };
+    req.onsuccess = () => {
+      const idb = req.result;
+      const tx = idb.transaction(['products', 'orders', 'settings'], 'readwrite');
+      tx.objectStore('products').put(product('p-v2', '旧货'));
+      tx.objectStore('orders').put(order('o-v2', 700));
+      tx.objectStore('settings').put({ key: 'deviceId', value: 'dev-v2' });
+      tx.oncomplete = () => {
+        idb.close();
+        resolve();
+      };
+      tx.onerror = () => reject(tx.error);
+    };
+    req.onerror = () => reject(req.error);
+  });
 }
 
 beforeEach(async () => {
@@ -133,5 +164,28 @@ describe('本地备份', () => {
       '2026-11-04',
       '2026-11-05'
     ]);
+  });
+
+  it('v2 数据（无 sessions）：首次打开前生成 pre-migrate 快照', async () => {
+    await db.close();
+    await db.delete();
+    await backupDb.snapshots.clear();
+    await createV2Database();
+
+    const before = await snapshotBeforeOpen();
+    expect(before.created).toBe(false);
+    expect(before.version).toBe(2);
+    expect(before.snapshotId).toBeTypeOf('number');
+
+    const pre = (await listSnapshots()).find((s) => s.reason === 'pre-migrate');
+    expect(pre).toBeTruthy();
+    expect(pre?.schemaVersion).toBe(2);
+    expect(pre?.file.data.orders).toHaveLength(1);
+    expect(pre?.file.data.orders[0].totalFen).toBe(700);
+    expect(pre?.file.data.products).toHaveLength(1);
+    expect(pre?.file.data.sessions).toEqual([]);
+
+    // 恢复成 Dexie v3，避免影响后续清理
+    await db.open();
   });
 });

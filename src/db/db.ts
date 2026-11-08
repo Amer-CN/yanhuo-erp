@@ -18,6 +18,9 @@ export interface OutboxRow {
   queuedAt: number;
 }
 
+/** 主库 schema 版本：唯一来源。升版本前先看 backup.snapshotBeforeOpen 的迁移快照 */
+export const SCHEMA_VERSION = 3;
+
 export class AppDB extends Dexie {
   products!: Table<Product, string>;
   batches!: Table<Batch, string>;
@@ -42,7 +45,7 @@ export class AppDB extends Dexie {
       outbox: 'id, queuedAt'
     });
     // v3：事后记账模型。sessions 只加表；orders 加 sessionId 索引（不重建记录）。
-    this.version(3).stores({
+    this.version(SCHEMA_VERSION).stores({
       sessions: 'id, status, startedAt, closedAt, deviceId',
       orders: 'id, createdAt, deviceId, payMethod, voided, sessionId'
     });
