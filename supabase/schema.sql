@@ -32,9 +32,4 @@ create policy "yh ledger access" on public.yh_records
     ledger = coalesce(current_setting('request.headers', true)::json ->> 'x-ledger-key', '')
   );
 
--- 如果上面的 request.headers 方案在你的 Supabase 版本里不通（表现为 401/403 或空结果），
--- 且这个项目只有你自己用，可以退回到「单人账本」策略：
--- drop policy if exists "yh ledger access" on public.yh_records;
--- create policy "yh ledger access" on public.yh_records
---   for all to anon using (true) with check (true);
--- 注意：退回后，任何拿到你 anon key 的人都能读写这张表，请勿把 key 发到公开地方。
+-- 禁止改为 using (true)：那会允许任何持有 anon key 的客户端读写全部账本。

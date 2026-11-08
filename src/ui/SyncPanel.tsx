@@ -181,7 +181,7 @@ export default function SyncPanel({ sync, onDone }: { sync: SyncApi; onDone: Don
       ) : (
         <div className="page-stack" style={{ marginTop: 10 }}>
           <p className="tiny-text" style={{ margin: 0 }}>
-            内置配置，打开即用；需要换账本再点「修改配置」。
+            内置配置，打开即用；需要换账本再点「修改配置」。内置账本为共享密钥，仅用于自用。
           </p>
           <div className="sync-lines">
             <div className="sync-line">

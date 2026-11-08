@@ -1,6 +1,5 @@
-// 内置同步配置：开箱即用，两台手机不用填任何东西。
-// 说明：publishable key 本来就是公开的前端 key；ledger key 只是把你们的账本
-// 和同一项目里的其他数据隔开。介意的话可在「设置与同步 → 云同步」里换成自己的同步码。
+// 注意：以下三项都会被打进公开前端包，等同于公开信息，不能当作秘密。
+// 账本隔离依赖 ledgerKey + RLS；轮换步骤见 docs/03-云同步设置.md。
 
 export const DEFAULT_SYNC = {
   url: 'https://lnmjmnzddncxvwkvdhoo.supabase.co',
