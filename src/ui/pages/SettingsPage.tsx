@@ -366,7 +366,7 @@ export default function SettingsPage({
             </div>
             {pending.productDiffs.length > 0 ? (
               <div>
-                <div className="tiny-text" style={{ fontWeight: 600 }}>
+                <div className="tiny-text" style={{ fontWeight: 'var(--yh-weight-semibold)' }}>
                   商品变化
                 </div>
                 <ul className="merge-diff">
@@ -378,7 +378,7 @@ export default function SettingsPage({
             ) : null}
             {pending.settingsDiffs.length > 0 ? (
               <div>
-                <div className="tiny-text" style={{ fontWeight: 600 }}>
+                <div className="tiny-text" style={{ fontWeight: 'var(--yh-weight-semibold)' }}>
                   设置变化（操作人按设备保留，不会覆盖）
                 </div>
                 <ul className="merge-diff">

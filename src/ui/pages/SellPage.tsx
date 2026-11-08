@@ -376,7 +376,7 @@ export default function SellPage({
                       </div>
                     </div>
                     <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                      <span style={{ fontWeight: 700, fontVariantNumeric: 'tabular-nums' }}>
+                      <span style={{ fontWeight: 'var(--yh-weight-semibold)', fontVariantNumeric: 'tabular-nums' }}>
                         ¥{fenToStr(amount)}
                       </span>
                       <button
@@ -604,7 +604,7 @@ export default function SellPage({
               </div>
               <div className="row-between">
                 <span className="tiny-text">改后</span>
-                <span style={{ fontWeight: 700 }}>¥{fenToStr(newLineTotal)}</span>
+                <span style={{ fontWeight: 'var(--yh-weight-semibold)' }}>¥{fenToStr(newLineTotal)}</span>
               </div>
               <div className="row-between">
                 <span className="tiny-text">让利</span>

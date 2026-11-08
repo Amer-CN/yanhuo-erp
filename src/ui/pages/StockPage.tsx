@@ -152,7 +152,7 @@ export default function StockPage({
           <div className="page-stack">
             <div className="row-between">
               <span className="muted-text">当前库存</span>
-              <span style={{ fontWeight: 700, fontVariantNumeric: 'tabular-nums' }}>
+              <span style={{ fontWeight: 'var(--yh-weight-semibold)', fontVariantNumeric: 'tabular-nums' }}>
                 {qtyToStr(inv.get(open.id) ?? 0, open.boxQty, open.unitBase)}
               </span>
             </div>
@@ -197,7 +197,7 @@ export default function StockPage({
                               </div>
                             ) : null}
                           </div>
-                          <div style={{ fontWeight: 700, fontVariantNumeric: 'tabular-nums' }}>
+                          <div style={{ fontWeight: 'var(--yh-weight-semibold)', fontVariantNumeric: 'tabular-nums' }}>
                             剩 {qtyToStr(remaining, open.boxQty, open.unitBase)}
                           </div>
                         </div>

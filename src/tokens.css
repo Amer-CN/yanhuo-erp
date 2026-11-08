@@ -1,0 +1,304 @@
+/* =====================================================================
+   烟花进销存 · 设计令牌 v1.0
+   ---------------------------------------------------------------------
+   三层结构，只允许上层引用下层：
+     Primitive  原始值（颜色色阶、字号、间距……）—— 业务样式禁止直接引用
+     Semantic   语义（ink / surface / border / accent / state）—— 组件引用这一层
+     Component  组件（导航、卡片、浮条、弹层尺寸）—— 只有组件实现可以引用
+   主题：:root 即暗色（默认），[data-theme='light'] 覆盖语义层。
+   断点不写成变量（CSS 变量不能进 @media），见 docs/04-设计系统.md。
+   ===================================================================== */
+
+:root {
+  /* ================================================================
+     1. PRIMITIVE · 颜色
+     品牌色为「烟花橙」；中性色分暗/亮两条墨阶，语义层按主题取用。
+     ================================================================ */
+  --yh-orange-50: #fff6e8;
+  --yh-orange-100: #ffe8c7;
+  --yh-orange-200: #ffd39b;
+  --yh-orange-300: #ffbb6b;
+  --yh-orange-400: #ffa233;
+  --yh-orange-500: #ff8a00;
+  --yh-orange-600: #e07200;
+  --yh-orange-700: #b85a00;
+  --yh-orange-800: #8a3f00;
+  --yh-orange-900: #5c2900;
+
+  --yh-green-300: #7ee2a8;
+  --yh-green-600: #0f7a3d;
+  --yh-red-300: #ff9b9b;
+  --yh-red-600: #b3261e;
+  --yh-yellow-300: #ffd27a;
+  --yh-yellow-700: #8a5a00;
+
+  --yh-ink-dark-1: #ffffff;
+  --yh-ink-dark-2: #d6e0e2;
+  --yh-ink-dark-3: #a8b6ba;
+  --yh-ink-dark-4: #7f8f94;
+  --yh-ink-light-1: #0f1f2a;
+  --yh-ink-light-2: #4a575c;
+  --yh-ink-light-3: #5f6d73;
+  --yh-ink-light-4: #7b878c;
+
+  /* 发光档：只用于暗色背景上的金额/状态文字（已按 AA 校验） */
+  --yh-dark-price: #ffb15c;
+  --yh-dark-ok: #7ee2a8;
+  --yh-dark-bad: #ff9b9b;
+  --yh-dark-warn: #ffd27a;
+  --yh-dark-accent-text: #ffc27a;
+
+  /* ================================================================
+     2. PRIMITIVE · 排版
+     系统栈，不加载网络字体：断网首屏不闪、中文无回退空洞。
+     金额一律 tabular-nums，保证列对齐与不跳动。
+     ================================================================ */
+  --yh-font-sans: -apple-system, BlinkMacSystemFont, 'SF Pro Display', 'PingFang SC',
+    'Hiragino Sans GB', 'Microsoft YaHei', system-ui, sans-serif;
+  --yh-font-mono: ui-monospace, 'SF Mono', 'Cascadia Mono', Consolas, monospace;
+
+  --yh-text-2xs: 11px; /* 角标、最小注记 */
+  --yh-text-xs: 12px; /* 辅助文字、表格次要列 */
+  --yh-text-sm: 13px; /* 说明文字、表单提示 */
+  --yh-text-md: 14px; /* 紧凑正文、表单标签 */
+  --yh-text-base: 15px; /* 正文、列表标题、商品名 */
+  --yh-text-lg: 18px; /* 小标题 */
+  --yh-text-xl: 20px; /* 副标题、金额中号 */
+  --yh-text-2xl: 24px; /* 页面主数字、弹层金额 */
+  --yh-text-3xl: 30px; /* 报表主数字 */
+  --yh-text-4xl: 40px; /* 收款结果 */
+
+  --yh-weight-regular: 400;
+  --yh-weight-medium: 500;
+  --yh-weight-semibold: 600;
+
+  --yh-leading-tight: 1.15;
+  --yh-leading-snug: 1.28;
+  --yh-leading-normal: 1.45;
+  --yh-leading-relaxed: 1.6;
+
+  --yh-tracking-tight: -0.02em;
+  --yh-tracking-normal: 0;
+  --yh-tracking-wide: 0.02em;
+
+  /* ================================================================
+     3. PRIMITIVE · 间距（4px 基准）
+     布局只用 1/2/3/4/6/8 档；2px 仅作光学微调，禁止用于布局。
+     ================================================================ */
+  --yh-space-0-5: 2px;
+  --yh-space-1: 4px;
+  --yh-space-2: 8px;
+  --yh-space-3: 12px;
+  --yh-space-4: 16px;
+  --yh-space-5: 20px;
+  --yh-space-6: 24px;
+  --yh-space-8: 32px;
+  --yh-space-10: 40px;
+  --yh-space-12: 48px;
+  --yh-space-16: 64px;
+
+  /* ================================================================
+     4. PRIMITIVE · 圆角
+     ================================================================ */
+  --yh-radius-xs: 8px;
+  --yh-radius-sm: 12px;
+  --yh-radius-md: 16px;
+  --yh-radius-lg: 18px;
+  --yh-radius-xl: 24px;
+  --yh-radius-pill: 999px;
+
+  /* ================================================================
+     5. PRIMITIVE · 动效
+     位移 ≤ 14px，时长 ≤ 300ms；减动效下全部归零。
+     ================================================================ */
+  --yh-dur-fast: 150ms;
+  --yh-dur-base: 220ms;
+  --yh-dur-sheet: 260ms;
+  --yh-dur-slow: 300ms;
+  --yh-ease-standard: cubic-bezier(0.2, 0.8, 0.2, 1);
+  --yh-ease-out: cubic-bezier(0.16, 1, 0.3, 1);
+  --yh-ease-in-out: cubic-bezier(0.4, 0, 0.2, 1);
+
+  /* ================================================================
+     6. PRIMITIVE · 层级
+     ================================================================ */
+  --yh-z-nav: 40;
+  --yh-z-dock: 900;
+  --yh-z-sheet: 1000;
+  --yh-z-toast: 1100;
+
+  /* ================================================================
+     7. COMPONENT · 尺寸（全产品统一，页面不得另写数字）
+     ================================================================ */
+  --yh-page-max: 560px;
+  --yh-page-pad: var(--yh-space-4);
+  --yh-page-gap: 14px; /* 3.5 档：玻璃边框 1.5px + 阴影在视觉上补足到 16px */
+  --yh-card-pad-y: 18px;
+  --yh-card-pad-x: var(--yh-space-4);
+  --yh-card-tight-pad: 14px;
+  --yh-gap-card: 10px; /* 2.5 档：同上，感知约 12px */
+  --yh-gap-inline: var(--yh-space-2);
+  --yh-gap-tight: 6px;
+
+  --yh-touch-min: 44px; /* WCAG 2.5.5 / Apple HIG 下限 */
+  --yh-btn-height: 56px;
+  --yh-btn-height-sm: 44px;
+  --yh-btn-height-lg: 64px;
+  --yh-control-height: 52px;
+  --yh-icon-btn: 44px;
+
+  --yh-nav-title-size: 22px; /* 顶栏专用，不进入字号阶梯 */
+  --yh-section-title-size: var(--yh-text-xl);
+  --yh-card-title-size: var(--yh-text-lg);
+  --yh-dock-bottom-gap: 74px;
+  --yh-sheet-max-height: 90dvh;
+  --yh-sheet-radius: var(--yh-radius-xl);
+  --yh-code-radius: var(--yh-radius-sm);
+
+  /* 业务组件尺寸（块级，不进全局间距阶梯） */
+  --yh-border-width: 1.5px; /* 玻璃描边统一 1.5px，占位感来自半透明而非加粗 */
+  --yh-product-card-min: 108px;
+  --yh-product-grid-gap: var(--yh-gap-card);
+  --yh-dock-max: 528px;
+  --yh-cart-radius: var(--yh-radius-lg);
+  --yh-tabbar-reserve: 150px; /* 内容底部为悬浮 Tab Bar + 结算条预留的空间 */
+}
+
+/* =====================================================================
+   语义层 · 暗色（默认）
+   ===================================================================== */
+:root,
+[data-theme='dark'] {
+  --yh-canvas: #070a10;
+  --yh-canvas-mid: #0e2530;
+
+  --yh-ink-1: var(--yh-ink-dark-1);
+  --yh-ink-2: var(--yh-ink-dark-2);
+  --yh-ink-3: var(--yh-ink-dark-3);
+  --yh-ink-4: var(--yh-ink-dark-4);
+
+  --yh-ink-price: var(--yh-dark-price); /* 11.03:1 on canvas */
+  --yh-ink-ok: var(--yh-dark-ok); /* 10.05:1 on canvas-mid */
+  --yh-ink-bad: var(--yh-dark-bad); /* 7.85:1 on canvas-mid */
+  --yh-ink-warn: var(--yh-dark-warn); /* 11.13:1 on canvas-mid */
+  --yh-ink-accent: var(--yh-dark-accent-text);
+
+  --yh-accent: var(--yh-orange-500);
+  --yh-accent-hover: var(--yh-orange-400);
+  --yh-accent-soft: rgba(255, 138, 0, 0.16);
+  --yh-on-accent: #2a1600; /* 7.33:1 on #ff8a00 */
+
+  --yh-surface-1: var(--gl-surface-1);
+  --yh-surface-2: var(--gl-surface-2);
+  --yh-surface-3: var(--gl-surface-3);
+  --yh-surface-4: var(--gl-surface-4);
+  --yh-surface-5: var(--gl-surface-5);
+
+  --yh-border-subtle: var(--gl-border-subtle);
+  --yh-border-medium: var(--gl-border-medium);
+  --yh-border-strong: var(--gl-border-strong);
+  --yh-border-accent: color-mix(in srgb, var(--yh-accent) 45%, transparent);
+
+  --yh-focus-ring: #ffc27a; /* ≥ 8:1 on canvas，满足 2.4.11 的 3:1 */
+  --yh-focus-width: 2px;
+  --yh-focus-offset: 3px;
+
+  --yh-shadow-1: 0 1px 2px rgba(0, 0, 0, 0.24);
+  --yh-shadow-2: 0 8px 32px rgba(0, 0, 0, 0.18);
+  --yh-shadow-3: 0 16px 40px rgba(0, 0, 0, 0.42);
+  --yh-shadow-dock: 0 12px 32px rgba(0, 0, 0, 0.4);
+
+  --yh-scrim: rgba(0, 0, 0, 0.5);
+
+  /* 品牌极光：夜间余烬，不随主题变成青绿 */
+  --yh-aurora-1: rgba(255, 138, 0, 0.16);
+  --yh-aurora-2: rgba(196, 72, 24, 0.14);
+  --yh-aurora-3: rgba(255, 196, 120, 0.1);
+
+  /* GlassKit 桥接：组件库内部一律走这些语义值 */
+  --gl-color-text-muted: var(--yh-ink-2);
+  --gl-placeholder: var(--yh-ink-3);
+  --gl-color-on-primary: var(--yh-on-accent);
+  --gl-focus-ring: var(--yh-focus-ring);
+  --gl-color-text-heading: var(--yh-ink-1);
+  --gl-tab-bar-color: #c3d0d2;
+  --gl-tab-bar-active-color: var(--yh-ink-accent);
+  --gl-bg-aurora-1: var(--yh-aurora-1);
+  --gl-bg-aurora-2: var(--yh-aurora-2);
+  --gl-bg-aurora-3: var(--yh-aurora-3);
+}
+
+/* =====================================================================
+   语义层 · 亮色
+   ===================================================================== */
+[data-theme='light'] {
+  --yh-canvas: #eef2f6;
+  --yh-canvas-mid: #f5f7fa;
+
+  --yh-ink-1: var(--yh-ink-light-1);
+  --yh-ink-2: var(--yh-ink-light-2); /* 6.65:1 on canvas */
+  --yh-ink-3: var(--yh-ink-light-3); /* 4.76:1 on canvas */
+  --yh-ink-4: var(--yh-ink-light-4);
+
+  --yh-ink-price: var(--yh-orange-800); /* 6.69:1 on canvas */
+  --yh-ink-ok: var(--yh-green-600); /* 4.82:1 */
+  --yh-ink-bad: var(--yh-red-600); /* 5.81:1 */
+  --yh-ink-warn: var(--yh-yellow-700); /* 5.27:1 */
+  --yh-ink-accent: var(--yh-orange-800);
+
+  --yh-accent: var(--yh-orange-500);
+  --yh-accent-hover: var(--yh-orange-600);
+  --yh-accent-soft: rgba(255, 138, 0, 0.12);
+  --yh-on-accent: #2a1600;
+
+  --yh-surface-1: var(--gl-surface-1);
+  --yh-surface-2: var(--gl-surface-2);
+  --yh-surface-3: var(--gl-surface-3);
+  --yh-surface-4: var(--gl-surface-4);
+  --yh-surface-5: var(--gl-surface-5);
+
+  --yh-border-subtle: var(--gl-border-subtle);
+  --yh-border-medium: var(--gl-border-medium);
+  --yh-border-strong: var(--gl-border-strong);
+  --yh-border-accent: color-mix(in srgb, var(--yh-accent) 55%, transparent);
+
+  --yh-focus-ring: var(--yh-orange-800);
+  --yh-focus-width: 2px;
+  --yh-focus-offset: 3px;
+
+  --yh-shadow-1: 0 1px 2px rgba(15, 31, 42, 0.06);
+  --yh-shadow-2: 0 8px 32px rgba(15, 31, 42, 0.08);
+  --yh-shadow-3: 0 16px 40px rgba(15, 31, 42, 0.14);
+  --yh-shadow-dock: 0 12px 32px rgba(15, 31, 42, 0.16);
+
+  --yh-scrim: rgba(15, 31, 42, 0.32);
+
+  --yh-aurora-1: rgba(255, 176, 84, 0.22);
+  --yh-aurora-2: rgba(255, 138, 60, 0.14);
+  --yh-aurora-3: rgba(255, 220, 170, 0.2);
+
+  --gl-color-text-muted: var(--yh-ink-2);
+  --gl-placeholder: var(--yh-ink-3);
+  --gl-color-on-primary: var(--yh-on-accent);
+  --gl-focus-ring: var(--yh-focus-ring);
+  --gl-color-text-heading: var(--yh-ink-1);
+  --gl-tab-bar-color: #5b6669;
+  --gl-tab-bar-active-color: var(--yh-orange-800);
+  --gl-bg-aurora-1: var(--yh-aurora-1);
+  --gl-bg-aurora-2: var(--yh-aurora-2);
+  --gl-bg-aurora-3: var(--yh-aurora-3);
+}
+
+/* =====================================================================
+   兼容别名 · v1.0
+   旧类名仍可工作；新代码请直接用语义名（price/ok/bad/warn）。
+   计划在 v1.1 删除。
+   ===================================================================== */
+:root,
+[data-theme='dark'],
+[data-theme='light'] {
+  --yh-price-ink: var(--yh-ink-price);
+  --yh-ok-ink: var(--yh-ink-ok);
+  --yh-bad-ink: var(--yh-ink-bad);
+  --yh-warn-ink: var(--yh-ink-warn);
+}

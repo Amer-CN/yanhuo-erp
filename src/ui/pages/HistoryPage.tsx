@@ -92,7 +92,7 @@ export default function HistoryPage({
                       <div className="glass-list__trailing">
                         <span
                           style={{
-                            fontWeight: 700,
+                            fontWeight: 'var(--yh-weight-semibold)',
                             fontVariantNumeric: 'tabular-nums',
                             textDecoration: o.voided ? 'line-through' : undefined
                           }}
@@ -161,7 +161,7 @@ export default function HistoryPage({
                         {l.discountFen > 0 ? ` · 让利 ¥${fenToStr(l.discountFen)}` : ''}
                       </div>
                     </div>
-                    <div style={{ fontWeight: 700, fontVariantNumeric: 'tabular-nums' }}>
+                    <div style={{ fontWeight: 'var(--yh-weight-semibold)', fontVariantNumeric: 'tabular-nums' }}>
                       ¥{fenToStr(l.amountFen)}
                     </div>
                   </div>
@@ -169,11 +169,11 @@ export default function HistoryPage({
               );
             })}
             <div className="row-between" style={{ padding: '4px 2px' }}>
-              <span style={{ fontWeight: 600 }}>合计</span>
+              <span style={{ fontWeight: 'var(--yh-weight-semibold)' }}>合计</span>
               <span
                 style={{
-                  fontWeight: 700,
-                  fontSize: 22,
+                  fontWeight: 'var(--yh-weight-semibold)',
+                  fontSize: 'var(--yh-text-2xl)',
                   color: 'var(--gl-color-primary)',
                   fontVariantNumeric: 'tabular-nums'
                 }}

@@ -399,11 +399,11 @@ function MorePage({
             <div className="tiny-text">今天 · {localDate()}</div>
             <div
               style={{
-                fontSize: 30,
-                fontWeight: 700,
+                fontSize: 'var(--yh-text-3xl)',
+                fontWeight: 'var(--yh-weight-semibold)',
                 color: 'var(--yh-price-ink)',
                 fontVariantNumeric: 'tabular-nums',
-                lineHeight: 1.15
+                lineHeight: 'var(--yh-leading-tight)'
               }}
             >
               ¥{fenToStr(todayRevenue)}
@@ -411,7 +411,7 @@ function MorePage({
           </div>
           <div style={{ textAlign: 'right' }}>
             <div className="tiny-text">单数</div>
-            <div style={{ fontSize: 24, fontWeight: 700 }}>{todayCount}</div>
+            <div style={{ fontSize: 'var(--yh-text-2xl)', fontWeight: 'var(--yh-weight-semibold)' }}>{todayCount}</div>
           </div>
         </div>
         <div className="tiny-text" style={{ marginTop: 8 }}>

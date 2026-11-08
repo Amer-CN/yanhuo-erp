@@ -35,8 +35,8 @@ React 18 + TypeScript + Vite；Dexie（IndexedDB）；GlassKit 1.40 + lucide-rea
 ## 目录
 
 - `src/db/`：types / db / repo / calc / merge / outbox / sync / syncDefaults
-- `src/ui/pages/`：7 个页面；`src/ui/kit.tsx` 组件；`src/styles.css` 应用层样式
-- `supabase/schema.sql`：云端建表；`docs/`：需求、使用说明、云同步
+- `src/ui/pages/`：7 个页面；`src/ui/kit.tsx` 组件；`src/tokens.css` 设计令牌；`src/styles.css` 应用层样式
+- `supabase/schema.sql`：云端建表；`docs/`：需求、使用说明、云同步、设计系统
 - `scripts/`：E2E 与诊断脚本
 
 ## 约定 / 红线

@@ -176,7 +176,7 @@ export default function ReportPage({
                         className="glass-table__num"
                         style={{
                           color: m.grossFen >= 0 ? 'var(--yh-ok-ink)' : 'var(--yh-bad-ink)',
-                          fontWeight: 600
+                          fontWeight: 'var(--yh-weight-semibold)'
                         }}
                       >
                         ¥{fenToStr(m.grossFen)}
@@ -198,7 +198,7 @@ export default function ReportPage({
         {warnings.length === 0 ? (
           <Empty icon={<TriangleAlert size={24} />} text="没有临期批次" />
         ) : (
-          <ul className="glass-list" style={{ borderRadius: 18 }}>
+          <ul className="glass-list" style={{ borderRadius: 'var(--yh-radius-lg)' }}>
             {warnings.map((w) => (
               <li key={w.batch.id} className="glass-list__item">
                 <span className="glass-list__leading">
