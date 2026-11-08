@@ -37,12 +37,17 @@ pnpm test         # 核心计算单元测试
 端到端测试（需要 Playwright + Chromium）：
 
 ```bash
+pip install -r scripts/requirements.txt
+python -m playwright install chromium
+
 python scripts/e2e-smoke.py     # 开单/进货/报表/库存全流程
 python scripts/e2e-offline.py   # 断网可用（先 build + preview）
 python scripts/e2e-merge.py     # 两设备导出导入合并（先 build + preview）
 python scripts/e2e-sync.py      # 两设备自动云同步 + 断网补发（默认本地假 Supabase，可连真实项目）
 python scripts/a11y-check.py    # 标签/焦点/Esc/键盘/44px/减动效
 ```
+
+CI 在 PR 上自动跑 `check-default-sync` + `e2e-smoke` + `e2e-sync` + `e2e-offline`，见 [`.github/workflows/e2e.yml`](.github/workflows/e2e.yml)。
 
 界面截图在 [`docs/screenshots/ui/`](docs/screenshots/ui/)（含深色 / 浅色两套）。
 
