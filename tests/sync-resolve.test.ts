@@ -64,10 +64,26 @@ describe('resolveRemote（表驱动）', () => {
       want: 'take-remote'
     },
     {
-      name: '两端都缺业务时间（旧数据）→ 保留本地，不刷冲突',
+      name: '两端 updatedAt 缺失且内容相同（仅 createdAt）→ 保留本地',
       kind: 'order',
       local: { ...localOrder, updatedAt: undefined },
-      remote: { ...remoteEdited, updatedAt: undefined },
+      remote: { ...localOrder, updatedAt: undefined },
+      remoteTime: 0,
+      want: 'keep-local'
+    },
+    {
+      name: 'record_updated_at 缺列：远端 data.updatedAt 更新 → 取远端',
+      kind: 'order',
+      local: makeOrder('o1', 1000, 's1', { updatedAt: T }),
+      remote: makeOrder('o1', 2000, 's1', { updatedAt: '2026-11-02T00:00:00.000Z' }),
+      remoteTime: 0,
+      want: 'take-remote'
+    },
+    {
+      name: 'record_updated_at 缺列：远端 data.updatedAt 更旧 → 保留本地',
+      kind: 'order',
+      local: makeOrder('o1', 1000, 's1', { updatedAt: T }),
+      remote: makeOrder('o1', 2000, 's1', { updatedAt: '2026-10-31T00:00:00.000Z' }),
       remoteTime: 0,
       want: 'keep-local'
     },

@@ -244,7 +244,7 @@ async function pushOutbox(cfg: SyncConfig, deviceId: string): Promise<number> {
   for (const row of rows) {
     if (row.kind === 'setting' && SKIP_SETTINGS.has(row.recordId)) continue;
     const local = row.op === 'delete' ? undefined : locals.get(`${row.kind}:${row.recordId}`);
-    payload.push({
+    const payloadRow: PushRow = {
       id: `${row.kind}:${row.recordId}`,
       record_id: row.recordId,
       ledger: cfg.ledgerKey,
@@ -252,10 +252,14 @@ async function pushOutbox(cfg: SyncConfig, deviceId: string): Promise<number> {
       data: local ?? {},
       // 推送时刻只做增量水位；业务时间单独放 record_updated_at
       updated_at: Date.now(),
-      record_updated_at: local ? businessTime(local) : 0,
       device_id: deviceId,
       deleted: row.op === 'delete' || !local
-    });
+    };
+    // 已确认远端缺列后，后续批次直接从 payload 里省掉，避免每次都先撞一次 400
+    if (!recordColumnMissing) {
+      payloadRow.record_updated_at = local ? businessTime(local) : 0;
+    }
+    payload.push(payloadRow);
   }
 
   if (payload.length > 0) {

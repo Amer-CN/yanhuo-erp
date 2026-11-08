@@ -54,7 +54,9 @@ export function resolveRemote(
   if (cur === undefined || cur === null) return 'take-remote';
 
   const localTime = businessTime(cur);
-  const remoteTime = Number(remoteRecordUpdatedAt) || 0;
+  // 远端还没加 record_updated_at 列时（迁移执行前），用记录自身的业务时间兜底，
+  // 否则 0 会恒小于本地时间，远端编辑永远不生效。
+  const remoteTime = Number(remoteRecordUpdatedAt) || businessTime(remote);
 
   if (remoteTime > localTime) return 'take-remote';
   if (remoteTime < localTime) return 'keep-local';
