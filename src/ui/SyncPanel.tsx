@@ -134,19 +134,37 @@ export default function SyncPanel({ sync, onDone }: { sync: SyncApi; onDone: Don
             />
           </Field>
           <Field label="同步码（两台手机必须一样）">
-            <div className="row" style={{ gap: 8 }}>
-              <input
-                className="glass-input grow"
-                type="password"
-                value={ledger}
-                onChange={(e) => setLedger(e.target.value)}
-                placeholder="点右边生成一个"
-              />
-              <Btn block={false} variant="tertiary" onClick={() => setLedger(makeLedgerKey())}>
-                生成
-              </Btn>
-            </div>
+            <input
+              className="glass-input"
+              value={ledger}
+              onChange={(e) => setLedger(e.target.value)}
+              placeholder="点下面生成一个"
+              autoCapitalize="off"
+              autoCorrect="off"
+            />
           </Field>
+          <div className="row" style={{ gap: 8 }}>
+            <Btn block={false} variant="tertiary" onClick={() => setLedger(makeLedgerKey())}>
+              生成
+            </Btn>
+            <Btn
+              block={false}
+              variant="tertiary"
+              onClick={async () => {
+                try {
+                  await navigator.clipboard.writeText(ledger);
+                  onDone('同步码已复制，去第二台手机粘贴');
+                } catch {
+                  onDone('复制失败，长按输入框手动复制', 'warning');
+                }
+              }}
+            >
+              <span className="icon-text">
+                <Copy size={16} aria-hidden="true" /> 复制
+              </span>
+            </Btn>
+            <span className="tiny-text">生成后复制给另一台手机</span>
+          </div>
           <div className="stack-sm">
             <Btn block disabled={busy} onClick={save}>
               保存并启用

@@ -21,15 +21,55 @@ MOCK = os.path.join(ROOT, "scripts", "mock-supabase.mjs")
 OUT = os.path.join(ROOT, "docs", "screenshots", "e2e")
 os.makedirs(OUT, exist_ok=True)
 
+# 不设 SYNC_URL 就用本地假 Supabase；设了就跑真实项目（跑完清理测试账本）
+REAL_URL = os.environ.get("SYNC_URL")
+REAL_KEY = os.environ.get("SYNC_KEY")
+REAL_LEDGER = os.environ.get("SYNC_LEDGER")
+USE_MOCK = not (REAL_URL and REAL_KEY and REAL_LEDGER)
+
 errors: list[str] = []
 
 
+def config():
+    if USE_MOCK:
+        return (f"http://127.0.0.1:{PORT}", "test-anon-key", "test-ledger-2026")
+    return (REAL_URL, REAL_KEY, REAL_LEDGER)
+
+
 def init_script():
+    url, key, ledger = config()
     return f"""
-      localStorage.setItem('yh-sync-url', 'http://127.0.0.1:{PORT}');
-      localStorage.setItem('yh-sync-anon', 'test-anon-key');
-      localStorage.setItem('yh-sync-ledger', 'test-ledger-2026');
+      localStorage.setItem('yh-sync-url', '{url}');
+      localStorage.setItem('yh-sync-anon', '{key}');
+      localStorage.setItem('yh-sync-ledger', '{ledger}');
     """
+
+
+def cleanup_cloud():
+    if USE_MOCK:
+        return
+    import json
+    import urllib.parse
+    import urllib.request
+
+    target = (
+        f"{REAL_URL}/rest/v1/yh_records?ledger=eq."
+        + urllib.parse.quote(REAL_LEDGER)
+    )
+    req = urllib.request.Request(
+        target,
+        method="DELETE",
+        headers={
+            "apikey": REAL_KEY,
+            "x-ledger-key": REAL_LEDGER,
+            "Prefer": "return=minimal",
+        },
+    )
+    try:
+        with urllib.request.urlopen(req, timeout=20) as r:
+            print("[cleanup] 云端测试账本已清理", r.status)
+    except Exception as e:  # noqa: BLE001
+        print("[cleanup] 清理失败：", e)
 
 
 def new_page(browser, tag):
@@ -92,17 +132,21 @@ def wait_revenue(page, want: str, timeout=30) -> bool:
 
 
 def main() -> int:
-    mock = subprocess.Popen(
-        ["node", MOCK, str(PORT)],
-        cwd=ROOT,
-        stdout=subprocess.PIPE,
-        stderr=subprocess.STDOUT,
-        text=True,
-    )
-    time.sleep(1.0)
-    if mock.poll() is not None:
-        print("mock server failed:", mock.stdout.read() if mock.stdout else "")
-        return 1
+    mock = None
+    if USE_MOCK:
+        mock = subprocess.Popen(
+            ["node", MOCK, str(PORT)],
+            cwd=ROOT,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.STDOUT,
+            text=True,
+        )
+        time.sleep(1.0)
+        if mock.poll() is not None:
+            print("mock server failed:", mock.stdout.read() if mock.stdout else "")
+            return 1
+    else:
+        print("[sync] 使用真实 Supabase：", REAL_URL)
 
     try:
         with sync_playwright() as p:
@@ -147,11 +191,13 @@ def main() -> int:
             ctx_b.close()
             browser.close()
     finally:
-        mock.terminate()
-        try:
-            mock.wait(timeout=5)
-        except subprocess.TimeoutExpired:
-            mock.kill()
+        cleanup_cloud()
+        if mock is not None:
+            mock.terminate()
+            try:
+                mock.wait(timeout=5)
+            except subprocess.TimeoutExpired:
+                mock.kill()
 
     if errors:
         print("\n!! 问题：")
