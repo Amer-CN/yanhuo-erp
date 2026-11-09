@@ -1,8 +1,8 @@
 name: E2E
 
+# push 到 main 时由 deploy.yml 的 e2e job 做门禁（build.needs: e2e），
+# 这里只跑 PR 与手动触发，避免同一次 push 重复跑两遍 E2E。
 on:
-  push:
-    branches: [main]
   pull_request:
   workflow_dispatch:
 
