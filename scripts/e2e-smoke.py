@@ -11,6 +11,8 @@ sys.stderr.reconfigure(encoding="utf-8", errors="replace")
 
 from playwright.sync_api import sync_playwright
 
+from e2e_util import wait_for_toast
+
 BASE = os.environ.get("SMOKE_BASE", "http://127.0.0.1:5173/")
 ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
 OUT = os.path.join(ROOT, "docs", "screenshots", "e2e")
@@ -88,13 +90,10 @@ def main() -> int:
         shot(page, "04-进货.png")
         page.get_by_role("button", name="保存这一条").click()
         # 上一条「已记 1 单」的撤销 toast 会先被读到；等目标文案出现再断言
-        toast = page.locator(".toast").filter(has_text="已进货").first
-        try:
-            toast.wait_for(timeout=5000)
-        except Exception:  # noqa: BLE001
+        ptoast = wait_for_toast(page, "已进货")
+        if ptoast is None:
             shot(page, "FAIL-进货toast.png")
             errors.append("进货后没有出现「已进货」提示")
-        ptoast = toast.inner_text() if toast.count() else "(no toast)"
         print("    toast:", ptoast)
 
         print("[4] 库存")

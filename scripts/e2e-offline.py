@@ -12,6 +12,8 @@ sys.stderr.reconfigure(encoding="utf-8", errors="replace")
 
 from playwright.sync_api import sync_playwright
 
+from e2e_util import wait_for_toast
+
 BASE = sys.argv[1] if len(sys.argv) > 1 else "http://127.0.0.1:4173/"
 ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
 OUT = os.path.join(ROOT, "docs", "screenshots", "e2e")
@@ -87,8 +89,10 @@ def main() -> int:
         page.get_by_role("button", name="大地红 1000 响").first.click()
         page.get_by_role("button", name="完成（回单据）").click()
         page.get_by_role("button", name="保存并记下一单").click()
-        page.wait_for_selector(".toast", timeout=5000)
-        print("    toast:", page.locator(".toast").inner_text())
+        toast = wait_for_toast(page, "已记")
+        print("    toast:", toast)
+        if toast is None:
+            errors.append("离线记一笔后没有出现「已记」提示")
         page.wait_for_timeout(400)
         page.get_by_role("button", name="返回").click()
         page.wait_for_timeout(400)

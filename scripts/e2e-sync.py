@@ -15,6 +15,8 @@ sys.stdout.reconfigure(encoding="utf-8", errors="replace", line_buffering=True)
 
 from playwright.sync_api import sync_playwright
 
+from e2e_util import wait_for_toast
+
 ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
 BASE = os.environ.get("SYNC_TEST_BASE", "http://127.0.0.1:5173/")
 PORT = 54321
@@ -109,7 +111,8 @@ def sell(page, product: str) -> None:
     page.get_by_role("button", name=product, exact=False).first.click()
     page.get_by_role("button", name="完成（回单据）").click()
     page.get_by_role("button", name="保存并记下一单").click()
-    page.wait_for_selector(".toast", timeout=8000)
+    if wait_for_toast(page, "已记", timeout=8000) is None:
+        raise AssertionError("保存后没有出现「已记」提示")
     page.wait_for_timeout(400)
     page.get_by_role("button", name="返回").click()
     page.wait_for_timeout(500)

@@ -1,6 +1,8 @@
 name: E2E
 
 on:
+  push:
+    branches: [main]
   pull_request:
   workflow_dispatch:
 
@@ -14,69 +16,4 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - uses: pnpm/action-setup@v4
-        with:
-          version: 12
-
-      - uses: actions/setup-node@v4
-        with:
-          node-version: 22
-          cache: pnpm
-
-      - name: Install JS dependencies
-        run: pnpm install --frozen-lockfile
-
-      - name: Install Python dependencies
-        run: |
-          python -m pip install --upgrade pip
-          python -m pip install -r scripts/requirements.txt
-          python -m playwright install --with-deps chromium
-
-      - name: Build
-        run: pnpm build
-
-      - name: Start dev server (5173)
-        run: |
-          nohup pnpm exec vite --host 127.0.0.1 --port 5173 > /tmp/dev.log 2>&1 &
-          for i in $(seq 1 60); do
-            if curl -sf http://127.0.0.1:5173/ > /dev/null; then exit 0; fi
-            sleep 1
-          done
-          echo 'dev server failed to start'; cat /tmp/dev.log; exit 1
-
-      - name: Start preview server (4173)
-        run: |
-          nohup pnpm exec vite preview --host 127.0.0.1 --port 4173 > /tmp/preview.log 2>&1 &
-          for i in $(seq 1 60); do
-            if curl -sf http://127.0.0.1:4173/ > /dev/null; then exit 0; fi
-            sleep 1
-          done
-          echo 'preview server failed to start'; cat /tmp/preview.log; exit 1
-
-      - name: check default sync (zero-config)
-        run: python scripts/check-default-sync.py
-
-      - name: e2e smoke
-        run: python scripts/e2e-smoke.py
-
-      - name: e2e sync (mock Supabase)
-        run: python scripts/e2e-sync.py
-
-      - name: e2e offline (preview + service worker)
-        run: python scripts/e2e-offline.py
-
-      - name: Upload screenshots
-        if: failure()
-        uses: actions/upload-artifact@v4
-        with:
-          name: e2e-screenshots
-          path: docs/screenshots/e2e/
-          if-no-files-found: ignore
-
-      - name: Server logs
-        if: failure()
-        run: |
-          echo '--- dev server ---'
-          cat /tmp/dev.log || true
-          echo '--- preview server ---'
-          cat /tmp/preview.log || true
+      - uses: ./.github/actions/e2e

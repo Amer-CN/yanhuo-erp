@@ -7,3 +7,4 @@ Thumbs.db
 docs/screenshots/e2e/
 .perf/
 coverage/
+__pycache__/
