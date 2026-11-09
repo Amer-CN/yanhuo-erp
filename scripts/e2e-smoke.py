@@ -87,11 +87,15 @@ def main() -> int:
         page.get_by_label("进价", exact=False).fill("12")
         shot(page, "04-进货.png")
         page.get_by_role("button", name="保存这一条").click()
-        page.wait_for_selector(".toast", timeout=5000)
-        ptoast = page.locator(".toast").inner_text()
+        # 上一条「已记 1 单」的撤销 toast 会先被读到；等目标文案出现再断言
+        toast = page.locator(".toast").filter(has_text="已进货").first
+        try:
+            toast.wait_for(timeout=5000)
+        except Exception:  # noqa: BLE001
+            shot(page, "FAIL-进货toast.png")
+            errors.append("进货后没有出现「已进货」提示")
+        ptoast = toast.inner_text() if toast.count() else "(no toast)"
         print("    toast:", ptoast)
-        if "已进货" not in ptoast:
-            errors.append(f"进货未成功，toast={ptoast}")
 
         print("[4] 库存")
         page.get_by_role("button", name="库存").click()
