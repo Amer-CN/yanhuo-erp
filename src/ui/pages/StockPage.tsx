@@ -4,7 +4,7 @@ import type { Batch, Product } from '../../db/types';
 import type { FifoResult } from '../../db/calc';
 import { batchStock } from '../../db/calc';
 import { createAdjustment } from '../../db/repo';
-import { fenToStr, localDate, qtyToStr } from '../../db/util';
+import { fenToStr, localDate, MS_PER_DAY, qtyToStr } from '../../db/util';
 import { Btn, Empty, Field, Sheet, Stat, rowProps, type Done } from '../kit';
 
 export default function StockPage({
@@ -170,7 +170,7 @@ export default function StockPage({
                       ? Math.round(
                           (new Date(`${batch.expiryDate}T00:00:00`).getTime() -
                             new Date(`${localDate()}T00:00:00`).getTime()) /
-                            86400000
+                            MS_PER_DAY
                         )
                       : null;
                     return (

@@ -172,8 +172,6 @@ export default function ReportPage({
     </th>
   );
 
-  const goRecord = () => onGoRecord();
-
   return (
     <div className="page-stack">
       <Card>
@@ -278,7 +276,7 @@ export default function ReportPage({
             icon={<PenLine size={24} />}
             text="还没有场次，记一笔就开始这一场"
             action={
-              <Btn block={false} size="sm" onClick={goRecord}>
+              <Btn block={false} size="sm" onClick={onGoRecord}>
                 记一笔
               </Btn>
             }
@@ -321,7 +319,7 @@ export default function ReportPage({
                   补记到这一场
                 </Btn>
               ) : (
-                <Btn block={false} size="sm" onClick={goRecord}>
+                <Btn block={false} size="sm" onClick={onGoRecord}>
                   记一笔
                 </Btn>
               )
@@ -402,7 +400,7 @@ export default function ReportPage({
                 </span>
               </Btn>
             ) : (
-              <Btn block={false} size="sm" onClick={goRecord}>
+              <Btn block={false} size="sm" onClick={onGoRecord}>
                 <span className="icon-text">
                   <PenLine size={16} aria-hidden="true" /> 去记一笔
                 </span>

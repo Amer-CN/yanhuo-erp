@@ -45,6 +45,9 @@ export function addDays(dateStr: string, days: number): string {
   return localDate(d);
 }
 
+/** 一天的毫秒数 */
+export const MS_PER_DAY = 24 * 60 * 60 * 1000;
+
 /** 分 → 显示字符串（不带 ¥） */
 export function fenToStr(fen: number): string {
   const sign = fen < 0 ? '-' : '';

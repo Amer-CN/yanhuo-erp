@@ -1,8 +1,8 @@
-// 核心计算：库存、FIFO 成本、日报、单品毛利、临期预警。
+// 核心计算：库存、FIFO 成本、场次汇总、单品毛利、临期预警。
 // 原则：库存和毛利都是「算出来的」，不落库；合并后重算永远一致。
 
 import type { Adjustment, Batch, SaleLine, SalesOrder, SessionSummary } from './types';
-import { addDays, localDate } from './util';
+import { addDays, localDate, MS_PER_DAY } from './util';
 
 /** 有效订单（排除整单作废） */
 export function activeOrderIds(orders: SalesOrder[]): Set<string> {
@@ -304,7 +304,7 @@ export function expiryWarnings(
     if (remaining <= 0) continue;
     if (b.expiryDate > limit) continue;
     const daysLeft = Math.round(
-      (new Date(`${b.expiryDate}T00:00:00`).getTime() - new Date(`${today}T00:00:00`).getTime()) / 86400000
+      (new Date(`${b.expiryDate}T00:00:00`).getTime() - new Date(`${today}T00:00:00`).getTime()) / MS_PER_DAY
     );
     out.push({ batch: b, productName: productName(b.productId), remaining, daysLeft });
   }
