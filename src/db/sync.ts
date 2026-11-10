@@ -663,11 +663,16 @@ export async function testSyncConfig(cfg: SyncConfig): Promise<void> {
   await rest(cfg, 'yh_records?select=id&limit=1');
 }
 
-/** 清空云端账本（危险操作，与本地清空一起用） */
+/**
+ * 清空云端账本（危险操作，与本地清空一起用）。
+ * v2 起服务端撤销了 anon 的 DELETE，这里改为软删除：把本账本所有行标记 deleted=true。
+ * 好处：误操作后可在控制台把 deleted 改回 false 恢复；且不再存在「一键物理抹除」的能力。
+ */
 export async function clearCloud(cfg: SyncConfig): Promise<void> {
   await rest(cfg, `yh_records?ledger=eq.${encodeURIComponent(cfg.ledgerKey)}`, {
-    method: 'DELETE',
-    headers: { Prefer: 'return=minimal' }
+    method: 'PATCH',
+    headers: { Prefer: 'return=minimal' },
+    body: JSON.stringify({ deleted: true, updated_at: Date.now() })
   });
 }
 

@@ -49,24 +49,34 @@ def init_script():
 
 
 def cleanup_cloud():
+    """清理真实测试账本。
+
+    v2 策略撤销了 anon 的 DELETE，这里只能做软删除（deleted=true）。
+    行会保留在表里；要物理清需要 service_role 在控制台操作。
+    """
     if USE_MOCK:
         return
+    import json
+    import time
     import urllib.parse
     import urllib.request
 
     target = f"{REAL_URL}/rest/v1/yh_records?ledger=eq." + urllib.parse.quote(REAL_LEDGER)
+    body = json.dumps({"deleted": True, "updated_at": int(time.time() * 1000)}).encode()
     req = urllib.request.Request(
         target,
-        method="DELETE",
+        data=body,
+        method="PATCH",
         headers={
             "apikey": REAL_KEY,
             "x-ledger-key": REAL_LEDGER,
             "Prefer": "return=minimal",
+            "Content-Type": "application/json",
         },
     )
     try:
         with urllib.request.urlopen(req, timeout=20) as r:
-            print("[cleanup] 云端测试账本已清理", r.status)
+            print("[cleanup] 云端测试账本已软删除", r.status)
     except Exception as e:  # noqa: BLE001
         print("[cleanup] 清理失败：", e)
 

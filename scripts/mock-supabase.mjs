@@ -12,7 +12,7 @@ function cors(res) {
     'Access-Control-Allow-Headers',
     'apikey, authorization, content-type, prefer, x-ledger-key'
   );
-  res.setHeader('Access-Control-Allow-Methods', 'GET, POST, DELETE, OPTIONS');
+  res.setHeader('Access-Control-Allow-Methods', 'GET, POST, PATCH, DELETE, OPTIONS');
   res.setHeader('Access-Control-Max-Age', '600');
 }
 
@@ -105,6 +105,24 @@ const server = http.createServer(async (req, res) => {
       rows.set(item.id, { ...item });
     }
     res.writeHead(201).end();
+    return;
+  }
+
+  // 软删除：与 v2 策略一致（anon 已无 DELETE 权限，清空账本走 PATCH deleted=true）
+  if (req.method === 'PATCH') {
+    const body = await readBody(req);
+    let parsed;
+    try {
+      parsed = JSON.parse(body);
+    } catch {
+      res.writeHead(400).end(JSON.stringify({ error: 'bad json' }));
+      return;
+    }
+    const patch = Array.isArray(parsed) ? parsed[0] ?? {} : parsed;
+    for (const [, row] of rows) {
+      if (row.ledger === ledger) Object.assign(row, patch);
+    }
+    res.writeHead(204).end();
     return;
   }
 

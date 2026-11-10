@@ -552,8 +552,19 @@ function DangerSection({
     }
     const cfg = pendingCfg;
     setPendingCfg(null);
-    if (cfg) await clearCloud(cfg);
+    let cloudError: string | null = null;
+    if (cfg) {
+      try {
+        await clearCloud(cfg);
+      } catch (e) {
+        // 云端失败不阻断本地清空；必须明确告知，否则下次同步会把旧数据拉回来
+        cloudError = e instanceof Error ? e.message : String(e);
+      }
+    }
     await runClearLocal();
+    if (cloudError) {
+      onDone(`本地已清空，但云端没清干净（${cloudError}）。联网后再清一次云端`, 'warning');
+    }
   };
 
   const cancelClearStep = () => {

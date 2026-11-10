@@ -25,7 +25,7 @@ async function call(label, method, path, body, l = ledger) {
     headers: {
       ...headers(l),
       ...(method === 'POST' ? { Prefer: 'resolution=merge-duplicates,return=representation' } : {}),
-      ...(method === 'DELETE' ? { Prefer: 'return=minimal' } : {})
+      ...(['DELETE', 'PATCH'].includes(method) ? { Prefer: 'return=minimal' } : {})
     },
     body: body ? JSON.stringify(body) : undefined
   });
@@ -79,8 +79,19 @@ const writeWrong = await call(
 );
 if ([200, 201].includes(writeWrong.status) && writeWrong.text.includes('wrong')) ok = false;
 
-await call('6 清理测试行', 'DELETE', `yh_records?id=eq.${encodeURIComponent(rowId)}`);
-await call('7 清理错误行', 'DELETE', `yh_records?id=eq.${encodeURIComponent(rowId + ':wrong')}`);
+// v2 起 anon 没有 DELETE 权限，清理改用软删除（标记 deleted=true）
+await call(
+  '6 软删除测试行',
+  'PATCH',
+  `yh_records?id=eq.${encodeURIComponent(rowId)}`,
+  { deleted: true, updated_at: Date.now() }
+);
+await call(
+  '7 软删除错误行',
+  'PATCH',
+  `yh_records?id=eq.${encodeURIComponent(rowId + ':wrong')}`,
+  { deleted: true, updated_at: Date.now() }
+);
 
 console.log(ok ? '\nOK：表可读写，且错误同步码被拒绝' : '\nFAIL：策略或表有问题，看上面状态码');
 process.exit(ok ? 0 : 1);
