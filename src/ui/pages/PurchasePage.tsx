@@ -5,6 +5,18 @@ import { createBatch, createProduct, deleteBatch } from '../../db/repo';
 import { DELETED_PRODUCT, fenToStr, localDate, qtyToStr, strToFen } from '../../db/util';
 import { Btn, Card, ConfirmSheet, Empty, Field, ProductFormModal, Sheet, rowProps, type Done } from '../kit';
 
+interface PurchaseForm {
+  productId: string;
+  qty: string;
+  unit: 'base' | 'box';
+  cost: string;
+  batchNo: string;
+  produceDate: string;
+  expiryDate: string;
+  supplier: string;
+  receivedAt: string;
+}
+
 export default function PurchasePage({
   products,
   batches,
@@ -20,15 +32,19 @@ export default function PurchasePage({
     () => products.filter((p) => !p.archived).sort((a, b) => a.name.localeCompare(b.name, 'zh')),
     [products]
   );
-  const [productId, setProductId] = useState('');
-  const [qty, setQty] = useState('1');
-  const [unit, setUnit] = useState<'base' | 'box'>('base');
-  const [cost, setCost] = useState('');
-  const [batchNo, setBatchNo] = useState('');
-  const [produceDate, setProduceDate] = useState('');
-  const [expiryDate, setExpiryDate] = useState('');
-  const [supplier, setSupplier] = useState('');
-  const [receivedAt, setReceivedAt] = useState(localDate());
+  const [form, setForm] = useState<PurchaseForm>({
+    productId: '',
+    qty: '1',
+    unit: 'base',
+    cost: '',
+    batchNo: '',
+    produceDate: '',
+    expiryDate: '',
+    supplier: '',
+    receivedAt: localDate()
+  });
+  const { productId, qty, unit, cost, batchNo, produceDate, expiryDate, supplier, receivedAt } = form;
+  const patchForm = (patch: Partial<PurchaseForm>) => setForm((f) => ({ ...f, ...patch }));
   const [newProduct, setNewProduct] = useState(false);
   const [todayOpen, setTodayOpen] = useState(false);
   const [delBatchId, setDelBatchId] = useState<string | null>(null);
@@ -56,11 +72,7 @@ export default function PurchasePage({
   const pname = (id: string) => products.find((p) => p.id === id)?.name ?? DELETED_PRODUCT;
 
   const resetForm = () => {
-    setQty('1');
-    setCost('');
-    setBatchNo('');
-    setProduceDate('');
-    setExpiryDate('');
+    patchForm({ qty: '1', cost: '', batchNo: '', produceDate: '', expiryDate: '' });
     setErrors({});
   };
 
@@ -107,8 +119,8 @@ export default function PurchasePage({
               className="glass-select"
               value={productId}
               onChange={(e) => {
-                setProductId(e.target.value);
-                setUnit('base');
+                patchForm({ productId: e.target.value });
+                patchForm({ unit: 'base' });
                 setErrors((p) => ({ ...p, product: undefined }));
               }}
             >
@@ -129,7 +141,7 @@ export default function PurchasePage({
                 type="button"
                 className="glass-segmented__item"
                 aria-pressed={unit === 'base'}
-                onClick={() => setUnit('base')}
+                onClick={() => patchForm({ unit: 'base' })}
               >
                 按{product.unitBase}
               </button>
@@ -137,7 +149,7 @@ export default function PurchasePage({
                 type="button"
                 className="glass-segmented__item"
                 aria-pressed={unit === 'box'}
-                onClick={() => setUnit('box')}
+                onClick={() => patchForm({ unit: 'box' })}
               >
                 按箱（1箱={product.boxQty}
                 {product.unitBase}）
@@ -152,7 +164,7 @@ export default function PurchasePage({
                 inputMode="decimal"
                 value={qty}
                 onChange={(e) => {
-                  setQty(e.target.value);
+                  patchForm({ qty: e.target.value });
                   setErrors((p) => ({ ...p, qty: undefined }));
                 }}
               />
@@ -163,7 +175,7 @@ export default function PurchasePage({
                 inputMode="decimal"
                 value={cost}
                 onChange={(e) => {
-                  setCost(e.target.value);
+                  patchForm({ cost: e.target.value });
                   setErrors((p) => ({ ...p, cost: undefined }));
                 }}
                 placeholder="120"
@@ -190,7 +202,7 @@ export default function PurchasePage({
                   <input
                     className="glass-input"
                     value={batchNo}
-                    onChange={(e) => setBatchNo(e.target.value)}
+                    onChange={(e) => patchForm({ batchNo: e.target.value })}
                   />
                 </Field>
                 <Field label="到货日期">
@@ -198,7 +210,7 @@ export default function PurchasePage({
                     className="glass-input"
                     type="date"
                     value={receivedAt}
-                    onChange={(e) => setReceivedAt(e.target.value)}
+                    onChange={(e) => patchForm({ receivedAt: e.target.value })}
                   />
                 </Field>
               </div>
@@ -209,7 +221,7 @@ export default function PurchasePage({
                     className="glass-input"
                     type="date"
                     value={produceDate}
-                    onChange={(e) => setProduceDate(e.target.value)}
+                    onChange={(e) => patchForm({ produceDate: e.target.value })}
                   />
                 </Field>
                 <Field label="有效期至">
@@ -217,7 +229,7 @@ export default function PurchasePage({
                     className="glass-input"
                     type="date"
                     value={expiryDate}
-                    onChange={(e) => setExpiryDate(e.target.value)}
+                    onChange={(e) => patchForm({ expiryDate: e.target.value })}
                   />
                 </Field>
               </div>
@@ -226,7 +238,7 @@ export default function PurchasePage({
                 <input
                   className="glass-input"
                   value={supplier}
-                  onChange={(e) => setSupplier(e.target.value)}
+                  onChange={(e) => patchForm({ supplier: e.target.value })}
                 />
               </Field>
             </div>
@@ -301,7 +313,7 @@ export default function PurchasePage({
           onClose={() => setNewProduct(false)}
           onSave={async (input) => {
             const p = await createProduct(input);
-            setProductId(p.id);
+            patchForm({ productId: p.id });
             setNewProduct(false);
             onDone('商品已建');
           }}

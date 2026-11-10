@@ -54,6 +54,32 @@ export function productAvgCostFen(batches: Batch[]): Map<string, number> {
   return avg;
 }
 
+/** 从某商品的批次队列按 FIFO 扣 need；返回扣到的成本、剩余需求与新队列下标 */
+function takeFromBatches(
+  arr: Batch[],
+  startIdx: number,
+  need: number,
+  batchRemaining: Map<string, number>
+): { cost: number; left: number; idx: number } {
+  let idx = startIdx;
+  let left = need;
+  let cost = 0;
+  while (left > 0 && idx < arr.length) {
+    const b = arr[idx];
+    const remain = batchRemaining.get(b.id) ?? 0;
+    if (remain <= 0) {
+      idx++;
+      continue;
+    }
+    const take = Math.min(remain, left);
+    cost += take * b.unitCostFen;
+    batchRemaining.set(b.id, remain - take);
+    left -= take;
+    if (remain - take === 0) idx++;
+  }
+  return { cost, left, idx };
+}
+
 /**
  * FIFO 成本重放：进货批次按到货时间先进先出，销售明细按时间顺序扣批。
  * 两台设备的数据合并后按时间重排，结果就是合并后的真实成本。
@@ -103,24 +129,15 @@ export function fifoAllocate(
   let uncoveredCostFen = 0;
 
   for (const line of sorted) {
-    let need = line.qtyBase;
-    let got = 0;
-    let idx = queueIdx.get(line.productId) ?? 0;
     const arr = byProduct.get(line.productId) ?? [];
-
-    while (need > 0 && idx < arr.length) {
-      const b = arr[idx];
-      const remain = batchRemaining.get(b.id) ?? 0;
-      if (remain <= 0) {
-        idx++;
-        continue;
-      }
-      const take = Math.min(remain, need);
-      got += take * b.unitCostFen;
-      batchRemaining.set(b.id, remain - take);
-      need -= take;
-      if (remain - take === 0) idx++;
-    }
+    const taken = takeFromBatches(
+      arr,
+      queueIdx.get(line.productId) ?? 0,
+      line.qtyBase,
+      batchRemaining
+    );
+    const need = taken.left;
+    let got = taken.cost;
 
     if (need > 0) {
       const unit = avgCost.get(line.productId) ?? 0;
@@ -129,7 +146,7 @@ export function fifoAllocate(
       uncoveredCostFen += need * unit;
     }
 
-    queueIdx.set(line.productId, idx);
+    queueIdx.set(line.productId, taken.idx);
     lineCost.set(line.id, got);
   }
 
