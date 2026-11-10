@@ -7,6 +7,7 @@ import type { AppData, Session } from './types';
 import { SETTING_KEYS } from './types';
 import { mergeSessionPair } from './sessionLogic';
 import { nowIso } from './util';
+import type { Table } from 'dexie';
 
 export interface BackupFile {
   app: 'yanhuo-erp';
@@ -75,6 +76,17 @@ export function parseBackup(text: string): BackupFile {
   };
 }
 
+/** 流水只增：按 id 取差集写入，返回实际新增条数 */
+async function addOnly<T extends { id: string }>(
+  table: Table<T, string>,
+  incoming: T[]
+): Promise<number> {
+  const existing = new Set((await table.toArray()).map((x) => x.id));
+  const fresh = incoming.filter((x) => !existing.has(x.id));
+  if (fresh.length > 0) await table.bulkPut(fresh);
+  return fresh.length;
+}
+
 /** 合并备份；同 id 的流水直接跳过，商品按 updatedAt 新者胜 */
 export async function importMerge(backup: BackupFile): Promise<MergeResult> {
   const data = backup.data;
@@ -114,33 +126,10 @@ export async function importMerge(backup: BackupFile): Promise<MergeResult> {
       if (toPutProducts.length) await db.products.bulkPut(toPutProducts);
 
       // 流水：只增
-      const batchIds = new Set((await db.batches.toArray()).map((x) => x.id));
-      const newBatches = data.batches.filter((b) => !batchIds.has(b.id));
-      if (newBatches.length) {
-        await db.batches.bulkPut(newBatches);
-        result.batchesAdded = newBatches.length;
-      }
-
-      const orderIds = new Set((await db.orders.toArray()).map((x) => x.id));
-      const newOrders = data.orders.filter((o) => !orderIds.has(o.id));
-      if (newOrders.length) {
-        await db.orders.bulkPut(newOrders);
-        result.ordersAdded = newOrders.length;
-      }
-
-      const lineIds = new Set((await db.lines.toArray()).map((x) => x.id));
-      const newLines = data.lines.filter((l) => !lineIds.has(l.id));
-      if (newLines.length) {
-        await db.lines.bulkPut(newLines);
-        result.linesAdded = newLines.length;
-      }
-
-      const adjIds = new Set((await db.adjustments.toArray()).map((x) => x.id));
-      const newAdj = data.adjustments.filter((a) => !adjIds.has(a.id));
-      if (newAdj.length) {
-        await db.adjustments.bulkPut(newAdj);
-        result.adjustmentsAdded = newAdj.length;
-      }
+      result.batchesAdded = await addOnly(db.batches, data.batches);
+      result.ordersAdded = await addOnly(db.orders, data.orders);
+      result.linesAdded = await addOnly(db.lines, data.lines);
+      result.adjustmentsAdded = await addOnly(db.adjustments, data.adjustments);
 
       // 场次：同 id 合并；closed 优先，其次 updatedAt 新者胜；补记计数取 max
       const incomingSessions = data.sessions ?? [];
