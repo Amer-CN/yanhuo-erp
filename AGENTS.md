@@ -35,9 +35,10 @@ React 18 + TypeScript + Vite；Dexie（IndexedDB）；GlassKit 1.40 + lucide-rea
 ## 目录
 
 - `src/db/`：types / db / repo / calc / merge / outbox / sync / syncDefaults
-- `src/ui/pages/`：7 个页面；`src/ui/kit.tsx` 组件；`src/tokens.css` 设计令牌；`src/styles.css` 应用层样式
+- `src/ui/pages/`：7 个页面；`src/ui/kit.tsx` 组件；`src/ui/useRecordDraft.ts` 开单草稿 hook；`src/tokens.css` 设计令牌；`src/styles.css` 应用层样式
 - `supabase/schema.sql`：云端建表；`docs/`：需求、使用说明、云同步、设计系统
 - `scripts/`：E2E 与诊断脚本
+- **`docs/代码异味基线-20261110.md`：重构基线（36 条 → 遗留 5 条，均 Minor）。动结构前先读**；文中 M1–M6 是重构批次编号，与下文产品里程碑 M6（真机试用）无关
 
 ## 约定 / 红线
 
@@ -46,7 +47,10 @@ React 18 + TypeScript + Vite；Dexie（IndexedDB）；GlassKit 1.40 + lucide-rea
 3. 不在 `E:\测试` 干活；不删 `E:\测试\.work\rea-full` 的 `reports/`、`*.jsonl`、`tools/`。
 4. 跨盘引用写绝对路径。
 5. 测试脚本默认 `localStorage['yh-sync-disabled']='1'`，别让测试数据写真实账本。
+6. 重构/改结构前先读 `docs/代码异味基线-20261110.md` 的「已消除」「已关闭」两节——**不得重复报告或重复重构**；改完必须回写基线。
 
 ## 当前状态
 
 已上线，并通过真实 Supabase 双设备同步 / 断网补发验证；下一步：真机摊位试用（M6）。
+
+代码结构已完成一轮重构（13 个 commit，`e291aee`..`f0092be`），仅剩 5 条 Minor 异味未处理，详见基线文档第十节。
