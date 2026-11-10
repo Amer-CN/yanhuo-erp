@@ -261,17 +261,15 @@ async function postPayload(cfg: SyncConfig, rows: PushRow[]): Promise<void> {
   });
 }
 
-async function pushOutbox(cfg: SyncConfig, deviceId: string): Promise<number> {
-  const rows = await db.outbox.orderBy('queuedAt').limit(OUTBOX_BATCH).toArray();
-  if (rows.length === 0) return 0;
+type OutboxRow = (typeof db.outbox) extends Table<infer T> ? T : never;
 
-  // 一次事务批量取本地记录（原来是逐条 get，最多 300 次串行往返）
-  const locals = await getLocalMany(
-    rows
-      .filter((row) => row.op !== 'delete')
-      .map((row) => ({ kind: row.kind, recordId: row.recordId }))
-  );
-
+/** 按发件箱行组装推送 payload；本地缺失/删除的统一标 deleted */
+function buildPushPayload(
+  rows: OutboxRow[],
+  locals: Map<string, unknown>,
+  cfg: SyncConfig,
+  deviceId: string
+): PushRow[] {
   const payload: PushRow[] = [];
 
   for (const row of rows) {
@@ -295,37 +293,55 @@ async function pushOutbox(cfg: SyncConfig, deviceId: string): Promise<number> {
     if (!schemaColumnMissing) payloadRow.schema_version = 2;
     payload.push(payloadRow);
   }
+  return payload;
+}
 
-  if (payload.length > 0) {
-    let rowsToSend = payload;
-    let attempts = 0;
-    while (attempts < MAX_ATTEMPTS) {
-      attempts++;
+/** 推送 payload：缺列时降级重试；重试次数与缺列标志位的语义保持不变 */
+async function postWithSchemaFallback(cfg: SyncConfig, payload: PushRow[]): Promise<void> {
+  if (payload.length === 0) return;
+  let rowsToSend = payload;
+  let attempts = 0;
+  while (attempts < MAX_ATTEMPTS) {
+    attempts++;
+    try {
+      await postPayload(cfg, rowsToSend);
+      break;
+    } catch (e) {
+      const missing = missingColumns(e);
+      if (!missing) throw e;
+
+      const before = `${recordColumnMissing}/${schemaColumnMissing}`;
+      if (missing === 'record' || missing === 'both') recordColumnMissing = true;
+      if (missing === 'schema' || missing === 'both') schemaColumnMissing = true;
+      if (`${recordColumnMissing}/${schemaColumnMissing}` === before) throw e;
+
       try {
-        await postPayload(cfg, rowsToSend);
-        break;
-      } catch (e) {
-        const missing = missingColumns(e);
-        if (!missing) throw e;
-
-        const before = `${recordColumnMissing}/${schemaColumnMissing}`;
-        if (missing === 'record' || missing === 'both') recordColumnMissing = true;
-        if (missing === 'schema' || missing === 'both') schemaColumnMissing = true;
-        if (`${recordColumnMissing}/${schemaColumnMissing}` === before) throw e;
-
-        try {
-          localStorage.setItem(
-            'yh-sync-warn',
-            '远端缺少 record_updated_at 或 schema_version 列，已降级推送'
-          );
-        } catch {
-          /* 隐私模式忽略 */
-        }
-        rowsToSend = stripMissingColumns(payload);
-        if (attempts >= MAX_ATTEMPTS) throw e;
+        localStorage.setItem(
+          'yh-sync-warn',
+          '远端缺少 record_updated_at 或 schema_version 列，已降级推送'
+        );
+      } catch {
+        /* 隐私模式忽略 */
       }
+      rowsToSend = stripMissingColumns(payload);
+      if (attempts >= MAX_ATTEMPTS) throw e;
     }
   }
+}
+
+async function pushOutbox(cfg: SyncConfig, deviceId: string): Promise<number> {
+  const rows = await db.outbox.orderBy('queuedAt').limit(OUTBOX_BATCH).toArray();
+  if (rows.length === 0) return 0;
+
+  // 一次事务批量取本地记录（原来是逐条 get，最多 300 次串行往返）
+  const locals = await getLocalMany(
+    rows
+      .filter((row) => row.op !== 'delete')
+      .map((row) => ({ kind: row.kind, recordId: row.recordId }))
+  );
+
+  const payload = buildPushPayload(rows, locals, cfg, deviceId);
+  await postWithSchemaFallback(cfg, payload);
   await db.outbox.bulkDelete(rows.map((r) => r.id));
   return payload.length;
 }
@@ -352,9 +368,141 @@ async function mergeUnknownKinds(ids: string[]): Promise<void> {
   await db.settings.put({ key: UNKNOWN_KINDS_KEY, value: JSON.stringify(merged) });
 }
 
+interface RemotePlan {
+  /** kind → id → 待写入的值 */
+  puts: Map<Kind, Map<string, unknown>>;
+  /** kind → 待删除的 id */
+  deletes: Map<Kind, Set<string>>;
+  conflicts: SyncConflictRow[];
+  unknownIds: string[];
+}
+
+/**
+ * 决策：把一页远端行算成「待写 / 待删 / 冲突」三张清单，纯内存，不落库。
+ * 决策顺序与逐条应用完全一致。
+ */
+function planRemoteChanges(knownRows: RemoteRow[], current: Map<string, unknown>): RemotePlan {
+  const plan: RemotePlan = {
+    puts: new Map(),
+    deletes: new Map(),
+    conflicts: [],
+    unknownIds: []
+  };
+  const { puts, deletes, conflicts: conflictRows } = plan;
+
+  const putRow = (kind: Kind, id: string, value: unknown) => {
+    let map = puts.get(kind);
+    if (!map) {
+      map = new Map();
+      puts.set(kind, map);
+    }
+    map.set(id, value);
+    deletes.get(kind)?.delete(id);
+    current.set(`${kind}:${id}`, value);
+  };
+
+  const deleteRow = (kind: Kind, id: string) => {
+    puts.get(kind)?.delete(id);
+    let set = deletes.get(kind);
+    if (!set) {
+      set = new Set();
+      deletes.set(kind, set);
+    }
+    set.add(id);
+    current.set(`${kind}:${id}`, undefined);
+  };
+
+  /** 删单一并删明细；此刻之后出现的明细行仍会重新写入（与逐条顺序一致） */
+  const dropLinesOfOrder = (orderId: string) => {
+    const queuedLines = puts.get('line');
+    if (queuedLines) {
+      for (const [id, line] of queuedLines) {
+        if ((line as SaleLine).orderId === orderId) queuedLines.delete(id);
+      }
+    }
+    for (const [key, value] of current) {
+      if (key.startsWith('line:') && value && (value as SaleLine).orderId === orderId) {
+        current.set(key, undefined);
+      }
+    }
+  };
+
+  for (const row of knownRows) {
+    if (row.deleted) {
+      if (row.kind === 'order') dropLinesOfOrder(row.record_id);
+      deleteRow(row.kind, row.record_id);
+      continue;
+    }
+
+    const cur = current.get(`${row.kind}:${row.record_id}`);
+    const decision = resolveRemote(
+      row.kind,
+      cur,
+      row.data,
+      Number(row.record_updated_at) || 0
+    );
+
+    if (decision === 'keep-local') continue;
+    if (decision === 'conflict') {
+      conflictRows.push({
+        at: new Date().toISOString(),
+        kind: row.kind,
+        recordId: row.record_id,
+        local: JSON.stringify(cur ?? null),
+        remote: JSON.stringify(row.data ?? null)
+      });
+      continue;
+    }
+
+    switch (row.kind) {
+      case 'session': {
+        const remote = row.data as Session;
+        const merged = cur
+          ? mergeSessionPair(cur as Session, { ...remote, id: row.record_id })
+          : { ...remote, id: row.record_id };
+        putRow('session', row.record_id, merged);
+        break;
+      }
+      case 'setting': {
+        if (SKIP_SETTINGS.has(row.record_id)) break;
+        const remote = row.data as Setting;
+        if (remote && typeof remote.key === 'string') {
+          putRow('setting', row.record_id, { key: row.record_id, value: remote.value });
+        }
+        break;
+      }
+      default:
+        // 未知 kind 已按 KNOWN_KINDS 过滤；这里处理 order/batch/line/adjustment/product
+        putRow(row.kind, row.record_id, {
+          ...(row.data as Record<string, unknown>),
+          id: row.record_id
+        });
+    }
+  }
+  return plan;
+}
+
+/** 按计划落库：先删（含 order 级联明细）再写；由调用方保证处在事务内 */
+async function applyPlannedChanges(plan: RemotePlan): Promise<void> {
+  const orderIds = [...(plan.deletes.get('order') ?? [])];
+  if (orderIds.length > 0) {
+    await db.orders.bulkDelete(orderIds);
+    await db.lines.where('orderId').anyOf(orderIds).delete();
+    plan.deletes.delete('order');
+  }
+  for (const [kind, set] of plan.deletes) {
+    if (set.size > 0) await TABLE_BY_KIND[kind].bulkDelete([...set]);
+  }
+  for (const [kind, map] of plan.puts) {
+    if (map.size > 0) await TABLE_BY_KIND[kind].bulkPut([...map.values()]);
+  }
+  if (plan.conflicts.length > 0) await db.conflicts.bulkAdd(plan.conflicts);
+  await mergeUnknownKinds(plan.unknownIds);
+}
+
 /**
  * 应用一页远端行：一次事务内按类型批量读、再批量写。
- * 决策顺序与逐条应用完全一致，只是把小事务合并成每页一次。
+ * 决策（planRemoteChanges）与落库（applyPlannedChanges）分开，事务边界不变。
  */
 async function applyRemoteBatch(rows: RemoteRow[]): Promise<void> {
   if (rows.length === 0) return;
@@ -375,129 +523,22 @@ async function applyRemoteBatch(rows: RemoteRow[]): Promise<void> {
   if (knownRows.length === 0 && unknownIds.length === 0) return;
 
   await db.transaction('rw', [...RECORD_TABLES, db.conflicts], async () => {
-    const conflictRows: SyncConflictRow[] = [];
+    // 批量读当前状态，后续判断都在内存里完成
+    const current = new Map<string, unknown>();
     const idsByKind = new Map<Kind, string[]>();
     for (const row of knownRows) {
       const ids = idsByKind.get(row.kind) ?? [];
       ids.push(row.record_id);
       idsByKind.set(row.kind, ids);
     }
-
-    // 批量读当前状态，后续判断都在内存里完成
-    const current = new Map<string, unknown>();
     for (const [kind, ids] of idsByKind) {
       const locals = await TABLE_BY_KIND[kind].bulkGet(ids);
       ids.forEach((id, i) => current.set(`${kind}:${id}`, locals[i]));
     }
 
-    const puts = new Map<Kind, Map<string, unknown>>();
-    const deletes = new Map<Kind, Set<string>>();
-
-    const putRow = (kind: Kind, id: string, value: unknown) => {
-      let map = puts.get(kind);
-      if (!map) {
-        map = new Map();
-        puts.set(kind, map);
-      }
-      map.set(id, value);
-      deletes.get(kind)?.delete(id);
-      current.set(`${kind}:${id}`, value);
-    };
-
-    const deleteRow = (kind: Kind, id: string) => {
-      puts.get(kind)?.delete(id);
-      let set = deletes.get(kind);
-      if (!set) {
-        set = new Set();
-        deletes.set(kind, set);
-      }
-      set.add(id);
-      current.set(`${kind}:${id}`, undefined);
-    };
-
-    /** 删单一并删明细；此刻之后出现的明细行仍会重新写入（与逐条顺序一致） */
-    const dropLinesOfOrder = (orderId: string) => {
-      const queuedLines = puts.get('line');
-      if (queuedLines) {
-        for (const [id, line] of queuedLines) {
-          if ((line as SaleLine).orderId === orderId) queuedLines.delete(id);
-        }
-      }
-      for (const [key, value] of current) {
-        if (key.startsWith('line:') && value && (value as SaleLine).orderId === orderId) {
-          current.set(key, undefined);
-        }
-      }
-    };
-
-    for (const row of knownRows) {
-      if (row.deleted) {
-        if (row.kind === 'order') dropLinesOfOrder(row.record_id);
-        deleteRow(row.kind, row.record_id);
-        continue;
-      }
-
-      const cur = current.get(`${row.kind}:${row.record_id}`);
-      const decision = resolveRemote(
-        row.kind,
-        cur,
-        row.data,
-        Number(row.record_updated_at) || 0
-      );
-
-      if (decision === 'keep-local') continue;
-      if (decision === 'conflict') {
-        conflictRows.push({
-          at: new Date().toISOString(),
-          kind: row.kind,
-          recordId: row.record_id,
-          local: JSON.stringify(cur ?? null),
-          remote: JSON.stringify(row.data ?? null)
-        });
-        continue;
-      }
-
-      switch (row.kind) {
-        case 'session': {
-          const remote = row.data as Session;
-          const merged = cur
-            ? mergeSessionPair(cur as Session, { ...remote, id: row.record_id })
-            : { ...remote, id: row.record_id };
-          putRow('session', row.record_id, merged);
-          break;
-        }
-        case 'setting': {
-          if (SKIP_SETTINGS.has(row.record_id)) break;
-          const remote = row.data as Setting;
-          if (remote && typeof remote.key === 'string') {
-            putRow('setting', row.record_id, { key: row.record_id, value: remote.value });
-          }
-          break;
-        }
-        default:
-          // 未知 kind 已按 KNOWN_KINDS 过滤；这里处理 order/batch/line/adjustment/product
-          putRow(row.kind, row.record_id, {
-            ...(row.data as Record<string, unknown>),
-            id: row.record_id
-          });
-      }
-    }
-
-    // 先删（含 order 级联明细）再写，最终状态与逐条执行一致
-    const orderIds = [...(deletes.get('order') ?? [])];
-    if (orderIds.length > 0) {
-      await db.orders.bulkDelete(orderIds);
-      await db.lines.where('orderId').anyOf(orderIds).delete();
-      deletes.delete('order');
-    }
-    for (const [kind, set] of deletes) {
-      if (set.size > 0) await TABLE_BY_KIND[kind].bulkDelete([...set]);
-    }
-    for (const [kind, map] of puts) {
-      if (map.size > 0) await TABLE_BY_KIND[kind].bulkPut([...map.values()]);
-    }
-    if (conflictRows.length > 0) await db.conflicts.bulkAdd(conflictRows);
-    await mergeUnknownKinds(unknownIds);
+    const plan = planRemoteChanges(knownRows, current);
+    plan.unknownIds = unknownIds;
+    await applyPlannedChanges(plan);
   });
 }
 
