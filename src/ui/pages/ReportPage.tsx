@@ -16,7 +16,7 @@ import {
   sessionReport,
   type ProductMargin
 } from '../../db/calc';
-import { fenToStr, isoToLocalDate, isoToTime, qtyToStr } from '../../db/util';
+import { DELETED_PRODUCT, fenToStr, isoToLocalDate, isoToTime, qtyToStr } from '../../db/util';
 import { Btn, Card, Empty, Sheet, Stat, type Done } from '../kit';
 
 type SortKey = 'gross' | 'revenue' | 'qty';
@@ -110,7 +110,7 @@ export default function ReportPage({
   const margins = useMemo(
     () =>
       selected
-        ? productMarginsBySession(selected.id, orders, lines, fifo, (id) => productByName.get(id)?.name ?? '(已删)')
+        ? productMarginsBySession(selected.id, orders, lines, fifo, (id) => productByName.get(id)?.name ?? DELETED_PRODUCT)
         : [],
     [selected, orders, lines, fifo, productByName]
   );
@@ -127,7 +127,7 @@ export default function ReportPage({
   }, [margins, sort]);
 
   const warnings = useMemo(
-    () => expiryWarnings(batches, fifo, (id) => productByName.get(id)?.name ?? '(已删)', warnDays),
+    () => expiryWarnings(batches, fifo, (id) => productByName.get(id)?.name ?? DELETED_PRODUCT, warnDays),
     // eslint-disable-next-line react-hooks/exhaustive-deps
     [batches, fifo, warnDays, products]
   );

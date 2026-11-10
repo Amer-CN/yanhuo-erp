@@ -2,7 +2,7 @@ import { useMemo, useState } from 'react';
 import { Plus, Trash2, PackagePlus } from 'lucide-react';
 import type { Batch, Product } from '../../db/types';
 import { createBatch, createProduct, deleteBatch } from '../../db/repo';
-import { fenToStr, localDate, qtyToStr, strToFen } from '../../db/util';
+import { DELETED_PRODUCT, fenToStr, localDate, qtyToStr, strToFen } from '../../db/util';
 import { Btn, Card, Empty, Field, ProductFormModal, Sheet, rowProps, type Done } from '../kit';
 
 export default function PurchasePage({
@@ -52,7 +52,7 @@ export default function PurchasePage({
     [batches, today]
   );
 
-  const pname = (id: string) => products.find((p) => p.id === id)?.name ?? '(已删)';
+  const pname = (id: string) => products.find((p) => p.id === id)?.name ?? DELETED_PRODUCT;
 
   const resetForm = () => {
     setQty('1');

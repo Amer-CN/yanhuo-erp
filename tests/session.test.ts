@@ -121,6 +121,32 @@ describe('场次汇总', () => {
     expect(m[0].discountFen).toBe(1000);
   });
 
+  it('fifo 未覆盖的明细标记 costIncomplete 并排在最后', () => {
+    const localBatches = [batch('b1', 100, 100, '2026-01-01')];
+    const o1 = order('o1', '2026-01-01T10:00:00', 3000, 's9', 'cash');
+    const o2 = order('o2', '2026-01-01T11:00:00', 9000, 's9', 'cash');
+    const localLines: SaleLine[] = [
+      // p1：有批次可扣
+      line('l1', 'o1', 10, 300, 3000),
+      // p2：fifo 重放时还不存在这一单，明细没有成本记录
+      { ...line('l2', 'o2', 5, 1800, 9000), productId: 'p2' }
+    ];
+    // 只用 o1 重放，模拟「新增单后快照未重算」的陈旧 fifo
+    const fifo = fifoAllocate(localBatches, [o1], localLines);
+    expect(fifo.lineCost.has('l1')).toBe(true);
+    expect(fifo.lineCost.has('l2')).toBe(false);
+
+    const m = productMarginsBySession('s9', [o1, o2], localLines, fifo, (id) => id);
+    expect(m).toHaveLength(2);
+    const byId = new Map(m.map((x) => [x.productId, x]));
+    expect(byId.get('p1')?.costIncomplete).toBe(false);
+    expect(byId.get('p2')?.costIncomplete).toBe(true);
+    expect(byId.get('p2')?.costFen).toBe(0);
+    // p2 毛利更高（成本缺失），但 costIncomplete 让它排最后
+    expect(byId.get('p2')!.grossFen).toBeGreaterThan(byId.get('p1')!.grossFen);
+    expect(m.map((x) => x.productId)).toEqual(['p1', 'p2']);
+  });
+
   it('空场次全为 0', () => {
     const fifo = fifoAllocate(batches, orders, lines);
     const rep = sessionReport('nope', orders, lines, fifo);

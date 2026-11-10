@@ -85,3 +85,6 @@ export function qtyToStr(qtyBase: number, boxQty: number, unitBase: string): str
 export function randomDeviceName(): string {
   return Math.random() < 0.5 ? '手机' : '平板';
 }
+
+/** 商品已被删除时的统一展示名 */
+export const DELETED_PRODUCT = '(已删)';

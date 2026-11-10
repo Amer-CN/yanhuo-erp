@@ -245,6 +245,8 @@ export function productMarginsBySession(
       costIncomplete: false
     };
     const lineCost = fifo.lineCost.get(l.id);
+    // 该明细没有任何批次可扣（漏录进货/超卖），成本是缺失的，不只是 0
+    if (lineCost === undefined) cur.costIncomplete = true;
     cur.qtyBase += l.qtyBase;
     cur.revenueFen += l.amountFen;
     cur.costFen += lineCost ?? 0;

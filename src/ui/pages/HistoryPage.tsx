@@ -3,7 +3,7 @@ import { Receipt, RotateCcw, Ban } from 'lucide-react';
 import type { Product, SaleLine, SalesOrder } from '../../db/types';
 import { PAY_LABEL } from '../../db/types';
 import { restoreOrder, voidOrder } from '../../db/repo';
-import { fenToStr, isoToLocalDate, isoToTime, qtyToStr } from '../../db/util';
+import { DELETED_PRODUCT, fenToStr, isoToLocalDate, isoToTime, qtyToStr } from '../../db/util';
 import { Btn, Empty, Sheet, rowProps, type Done } from '../kit';
 
 export default function HistoryPage({
@@ -154,7 +154,7 @@ export default function HistoryPage({
                 <div key={l.id} className="mini-card">
                   <div className="row-between">
                     <div className="grow">
-                      <div className="cart-line__name">{p?.name ?? '(已删)'}</div>
+                      <div className="cart-line__name">{p?.name ?? DELETED_PRODUCT}</div>
                       <div className="cart-line__meta">
                         {qtyToStr(l.qtyBase, p?.boxQty ?? 0, p?.unitBase ?? '个')} × ¥
                         {fenToStr(l.unitPriceFen)}

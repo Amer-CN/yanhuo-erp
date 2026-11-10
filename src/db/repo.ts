@@ -188,6 +188,9 @@ export class RecordError extends Error {
   }
 }
 
+/** 找不到场次时的统一提示（'这单找不到…' 是另一种文案，不要合并） */
+const SESSION_GONE_MSG = '这场找不到了，刷新看看';
+
 /** 本机正在进行中的场次（异常情况下有多条时取最晚开始的一场） */
 export async function getOpenSession(deviceId: string): Promise<Session | undefined> {
   const rows = await db.sessions.where('status').equals('open').toArray();
@@ -309,12 +312,38 @@ function buildLines(orderId: string, input: RecordLineInput[], updatedAt: string
   });
 }
 
+interface BuildOrderArgs {
+  orderId: string;
+  deviceId: string;
+  operator: string;
+  createdAt: string;
+  payMethod: PayMethod;
+  sessionId: string;
+  note?: string;
+  lines: SaleLine[];
+}
+
+/** 由调用方已生成的 id/时间 + 明细组装订单（totalFen 按明细重算，id 不在内部生成） */
+function buildOrder(args: BuildOrderArgs): SalesOrder {
+  return {
+    id: args.orderId,
+    deviceId: args.deviceId,
+    operator: args.operator,
+    createdAt: args.createdAt,
+    payMethod: args.payMethod,
+    totalFen: args.lines.reduce((s, l) => s + l.amountFen, 0),
+    sessionId: args.sessionId,
+    note: args.note?.trim() || undefined,
+    updatedAt: args.createdAt
+  };
+}
+
 /** 保存一单：事务内写 order + lines；自动挂到本机 open 场次 */
 export async function saveRecord(input: RecordInput): Promise<SalesOrder> {
   const session = input.sessionId
     ? await getSession(input.sessionId)
     : await ensureOpenSession(input.deviceId, input.operator);
-  if (!session) throw new RecordError('SESSION_NOT_FOUND', '这场找不到了，刷新看看');
+  if (!session) throw new RecordError('SESSION_NOT_FOUND', SESSION_GONE_MSG);
   if (session.status !== 'open') {
     throw new RecordError('SESSION_CLOSED', '这一场已结账，用补记');
   }
@@ -322,18 +351,16 @@ export async function saveRecord(input: RecordInput): Promise<SalesOrder> {
   const orderId = uuid();
   const at = nowIso();
   const lines = buildLines(orderId, input.lines, at);
-  const totalFen = lines.reduce((s, l) => s + l.amountFen, 0);
-  const order: SalesOrder = {
-    id: orderId,
+  const order = buildOrder({
+    orderId,
     deviceId: input.deviceId,
     operator: input.operator,
     createdAt: at,
     payMethod: input.payMethod,
-    totalFen,
     sessionId: session.id,
-    note: input.note?.trim() || undefined,
-    updatedAt: at
-  };
+    note: input.note,
+    lines
+  });
 
   await db.transaction('rw', db.orders, db.lines, async () => {
     await db.orders.put(order);
@@ -435,7 +462,7 @@ export async function undoPatchedRecord(id: string): Promise<void> {
 /** 收摊结账：算快照 → 标记 closed；不删任何单 */
 export async function closeSession(sessionId: string, operator: string): Promise<Session> {
   const session = await db.sessions.get(sessionId);
-  if (!session) throw new RecordError('SESSION_NOT_FOUND', '这场找不到了，刷新看看');
+  if (!session) throw new RecordError('SESSION_NOT_FOUND', SESSION_GONE_MSG);
   if (session.status === 'closed') {
     throw new RecordError('ALREADY_CLOSED', '这一场已经结过账了');
   }
@@ -459,7 +486,7 @@ export async function closeSession(sessionId: string, operator: string): Promise
 /** 撤销结账：仅下一场尚未开始时允许 */
 export async function reopenSession(sessionId: string): Promise<Session> {
   const session = await db.sessions.get(sessionId);
-  if (!session) throw new RecordError('SESSION_NOT_FOUND', '这场找不到了，刷新看看');
+  if (!session) throw new RecordError('SESSION_NOT_FOUND', SESSION_GONE_MSG);
   if (session.status !== 'closed') {
     throw new RecordError('NOT_CLOSED', '这一场还没结账');
   }
@@ -479,7 +506,7 @@ export async function reopenSession(sessionId: string): Promise<Session> {
 /** 补记到已结账场次：写单 + patchedCount +1 + 重算快照 */
 export async function addPatchedRecord(input: RecordInput & { sessionId: string }): Promise<SalesOrder> {
   const session = await db.sessions.get(input.sessionId);
-  if (!session) throw new RecordError('SESSION_NOT_FOUND', '这场找不到了，刷新看看');
+  if (!session) throw new RecordError('SESSION_NOT_FOUND', SESSION_GONE_MSG);
   if (session.status !== 'closed') {
     throw new RecordError('NOT_CLOSED', '这一场还在进行中，直接记一笔就行');
   }
@@ -487,18 +514,16 @@ export async function addPatchedRecord(input: RecordInput & { sessionId: string 
   const orderId = uuid();
   const createdAt = nowIso();
   const lines = buildLines(orderId, input.lines, createdAt);
-  const totalFen = lines.reduce((s, l) => s + l.amountFen, 0);
-  const order: SalesOrder = {
-    id: orderId,
+  const order = buildOrder({
+    orderId,
     deviceId: input.deviceId,
     operator: input.operator,
     createdAt,
     payMethod: input.payMethod,
-    totalFen,
     sessionId: session.id,
-    note: input.note?.trim() || undefined,
-    updatedAt: createdAt
-  };
+    note: input.note,
+    lines
+  });
 
   const ledger = await loadLedger();
   const nextOrders = [...ledger.orders, order];
