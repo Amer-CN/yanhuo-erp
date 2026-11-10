@@ -163,6 +163,16 @@ export async function createBatch(input: BatchInput, deviceId: string): Promise<
 }
 
 export async function deleteBatch(id: string): Promise<void> {
+  const batch = await db.batches.get(id);
+  // 已经卖出过的批次不能删：历史明细还在，删掉后 FIFO 重放找不到这批成本，
+  // 会退回兜底均价，已结账场次的毛利被不可逆改写。
+  if (batch) {
+    const { orders, lines, batches } = await loadLedger();
+    const remaining = fifoAllocate(batches, orders, lines).batchRemaining.get(id) ?? 0;
+    if (remaining < batch.qtyBase) {
+      throw new RecordError('BATCH_IN_USE', '这批货已经卖出去了，不能删；只能改数量');
+    }
+  }
   await db.batches.delete(id);
   await enqueue('batch', id, 'delete');
 }
@@ -178,7 +188,8 @@ export type RecordErrorCode =
   | 'SESSION_NOT_FOUND'
   | 'ALREADY_CLOSED'
   | 'NOT_CLOSED'
-  | 'NEXT_SESSION_STARTED';
+  | 'NEXT_SESSION_STARTED'
+  | 'BATCH_IN_USE';
 
 export class RecordError extends Error {
   code: RecordErrorCode;

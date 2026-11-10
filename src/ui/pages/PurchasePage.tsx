@@ -1,7 +1,7 @@
 import { useMemo, useState } from 'react';
 import { Plus, Trash2, PackagePlus } from 'lucide-react';
 import type { Batch, Product } from '../../db/types';
-import { createBatch, createProduct, deleteBatch } from '../../db/repo';
+import { createBatch, createProduct, deleteBatch, RecordError } from '../../db/repo';
 import { DELETED_PRODUCT, fenToStr, localDate, qtyToStr, strToFen } from '../../db/util';
 import { Btn, Card, ConfirmSheet, Empty, Field, ProductFormModal, Sheet, rowProps, type Done } from '../kit';
 
@@ -48,6 +48,8 @@ export default function PurchasePage({
   const [newProduct, setNewProduct] = useState(false);
   const [todayOpen, setTodayOpen] = useState(false);
   const [delBatchId, setDelBatchId] = useState<string | null>(null);
+  // 删除失败的就地提示：已卖出的批次不能删（不能只用 toast，否则用户看不到原因）
+  const [delError, setDelError] = useState<string | null>(null);
   const [errors, setErrors] = useState<{ product?: string; qty?: string; cost?: string }>({});
 
   const product = active.find((p) => p.id === productId);
@@ -265,6 +267,12 @@ export default function PurchasePage({
         </li>
       </ul>
 
+      {delError ? (
+        <p className="glass-hint glass-hint--error" role="alert" style={{ margin: '8px 2px 0' }}>
+          {delError}
+        </p>
+      ) : null}
+
       {todayOpen ? (
         <Sheet title="今天录入的进货" onClose={() => setTodayOpen(false)}>
           {todayBatches.length === 0 ? (
@@ -329,8 +337,14 @@ export default function PurchasePage({
             const id = delBatchId;
             setDelBatchId(null);
             if (!id) return;
-            await deleteBatch(id);
-            onDone('已删除', 'warning');
+            try {
+              await deleteBatch(id);
+              setDelError(null);
+              onDone('已删除', 'warning');
+            } catch (e) {
+              // 已卖出的批次会被 repo 拦下，就地提示原因，不弹 alert
+              setDelError(e instanceof RecordError ? e.message : '删除失败，稍后重试');
+            }
           }}
           onCancel={() => setDelBatchId(null)}
         />

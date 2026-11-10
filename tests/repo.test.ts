@@ -322,6 +322,26 @@ describe('商品 / 进货 / 设置 / 调整', () => {
     expect(await db.outbox.get(`batch:${b.id}`)).toMatchObject({ op: 'delete' });
   });
 
+  it('已卖出的批次不能删（BATCH_IN_USE）；没卖过的照常删除', async () => {
+    await db.products.put(makeProduct('p1'));
+    const sold = await createBatch({ productId: 'p1', qtyBase: 10, unitCostFen: 100 }, DEVICE);
+    await saveRecord(input([line(900, { productId: 'p1', qtyBase: 3 })]));
+
+    // 卖掉 3 个 → FIFO 剩余 7 < 10，删了会让历史成本退回兜底均价
+    await expect(deleteBatch(sold.id)).rejects.toMatchObject({
+      code: 'BATCH_IN_USE',
+      message: '这批货已经卖出去了，不能删；只能改数量'
+    });
+    expect(await db.batches.get(sold.id)).toBeTruthy();
+    expect(await db.outbox.get(`batch:${sold.id}`)).toMatchObject({ op: 'upsert' });
+
+    // 没被动过的批次仍可删
+    const untouched = await createBatch({ productId: 'p1', qtyBase: 10, unitCostFen: 100 }, DEVICE);
+    await deleteBatch(untouched.id);
+    expect(await db.batches.get(untouched.id)).toBeUndefined();
+    expect(await db.outbox.get(`batch:${untouched.id}`)).toMatchObject({ op: 'delete' });
+  });
+
   it('设置读写、设备 ID 稳定、启动默认设置只补缺失项', async () => {
     await setSetting('k', 'v');
     expect(await getSetting('k')).toBe('v');
