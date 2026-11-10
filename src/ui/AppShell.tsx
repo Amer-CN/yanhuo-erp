@@ -1,9 +1,12 @@
 import {
+  createContext,
   lazy,
   Suspense,
+  useContext,
   useEffect,
   useRef,
   useState,
+  type ComponentType,
   type Dispatch,
   type ReactNode,
   type SetStateAction
@@ -270,7 +273,8 @@ const preloadSecondaryPages = () => {
   void import('./RecordEditor');
 };
 
-export interface AppMainProps {
+/** 只读派生数据：放在 Context 里，页面按需消费，不再逐层传 props */
+export interface AppDataValue {
   data: AppData;
   inv: Map<string, number>;
   fifo: FifoResult;
@@ -283,43 +287,74 @@ export interface AppMainProps {
   openSummary: SessionSummary;
   sessionOrders: SalesOrder[];
   warnDays: number;
-  sub: SubPage;
-  tab: Tab;
-  editor: EditorState | null;
   editorInitial?: RecordDraft;
+  showToast: Done;
+}
+
+/** 写操作：单独存放，只读数据变化不会牵连这些消费者重渲染 */
+export interface AppActionsValue {
   setEditor: Dispatch<SetStateAction<EditorState | null>>;
   setSub: Dispatch<SetStateAction<SubPage>>;
   setTab: Dispatch<SetStateAction<Tab>>;
   onSaved: (order: SalesOrder, andNext: boolean, undo?: () => Promise<void>) => void;
-  showToast: Done;
   onOpenCloseSession: () => void;
+  /** 报表页的带参回调（需要 sessionId） */
+  onPatchSession: (session: Session) => void;
+  /** 报表页的「去记一笔」 */
+  onGoRecord: () => void;
+}
+
+const AppDataContext = createContext<AppDataValue | null>(null);
+const AppActionsContext = createContext<AppActionsValue | null>(null);
+
+export function useAppData(): AppDataValue {
+  const v = useContext(AppDataContext);
+  if (!v) throw new Error('useAppData 必须在 AppDataProvider 内使用');
+  return v;
+}
+
+export function useAppActions(): AppActionsValue {
+  const v = useContext(AppActionsContext);
+  if (!v) throw new Error('useAppActions 必须在 AppActionsProvider 内使用');
+  return v;
+}
+
+/** value / actions 由调用方 useMemo，避免每次渲染都换新对象 */
+export function AppDataProvider({
+  value,
+  actions,
+  children
+}: {
+  value: AppDataValue;
+  actions: AppActionsValue;
+  children: ReactNode;
+}) {
+  return (
+    <AppActionsContext.Provider value={actions}>
+      <AppDataContext.Provider value={value}>{children}</AppDataContext.Provider>
+    </AppActionsContext.Provider>
+  );
+}
+
+export interface AppMainProps {
+  tab: Tab;
+  sub: SubPage;
+  editor: EditorState | null;
 }
 
 /** 主内容区：按 tab / sub / editor 原样路由到各页面 */
-export function AppMain({
-  data,
-  inv,
-  fifo,
-  avgCost,
-  operators,
-  deviceId,
-  settings,
-  sync,
-  openSession,
-  openSummary,
-  sessionOrders,
-  warnDays,
-  sub,
-  tab,
-  editor,
-  editorInitial,
-  setEditor,
-  setSub,
-  setTab,
-  onSaved,
-  showToast,
-  onOpenCloseSession
-}: AppMainProps) {
+export function AppMain({ tab, sub, editor }: AppMainProps) {
+  const {
+    data,
+    inv,
+    avgCost,
+    operators,
+    deviceId,
+    openSummary,
+    editorInitial,
+    showToast
+  } = useAppData();
+  const { setEditor, setSub, setTab, onSaved } = useAppActions();
   // 首屏渲染完成后再空闲预取其余页面，切 tab / 开单时不等待下载。
   useEffect(() => {
     const canIdle = typeof window.requestIdleCallback === 'function';
@@ -331,6 +366,9 @@ export function AppMain({
       else window.clearTimeout(handle);
     };
   }, []);
+
+  const TabPage = TAB_PAGES[tab];
+  const SubPageView = sub ? SUB_PAGES[sub] : null;
 
   return (
     <Suspense fallback={<PageLoading />}>
@@ -372,98 +410,140 @@ export function AppMain({
         />
       ) : (
         <>
-          {tab === 'record' && !sub ? (
-            <RecordPage
-              session={openSession}
-              summary={openSummary}
-              orders={sessionOrders}
-              lines={data.lines}
-              products={data.products}
-              online={sync.online}
-              onNewRecord={() => setEditor({ mode: 'new' })}
-              onOpenOrder={(id) => setEditor({ mode: 'edit', orderId: id })}
-              onCloseSession={onOpenCloseSession}
-              onOpenHistory={() => {
-                setTab('more');
-                setSub('history');
-              }}
-              onGoStock={() => setTab('stock')}
-            />
-          ) : null}
+          {SubPageView ? <SubPageView /> : <TabPage />}
 
-          {tab === 'purchase' && !sub ? (
-            <PurchasePage
-              products={data.products}
-              batches={data.batches}
-              deviceId={deviceId}
-              onDone={showToast}
-            />
-          ) : null}
-
-          {tab === 'stock' && !sub ? (
-            <StockPage
-              products={data.products}
-              batches={data.batches}
-              inv={inv}
-              fifo={fifo}
-              deviceId={deviceId}
-              onDone={showToast}
-            />
-          ) : null}
-
-          {tab === 'report' && !sub ? (
-            <ReportPage
-              products={data.products}
-              batches={data.batches}
-              orders={data.orders}
-              lines={data.lines}
-              sessions={data.sessions}
-              deviceId={deviceId}
-              fifo={fifo}
-              warnDays={warnDays}
-              onDone={showToast}
-              onPatchSession={(s) => setEditor({ mode: 'patch', sessionId: s.id })}
-              onGoRecord={() => {
-                setTab('record');
-                setEditor({ mode: 'new' });
-              }}
-            />
-          ) : null}
-
-          {tab === 'more' && !sub ? (
-            <MorePage
-              products={data.products.length}
-              orders={data.orders.length}
-              session={openSession}
-              summary={openSummary}
-              deviceName={settings[SETTING_KEYS.deviceName] ?? ''}
-              sync={sync}
-              onOpen={setSub}
-              onCloseSession={onOpenCloseSession}
-            />
-          ) : null}
-
-          {sub === 'products' ? (
-            <ProductsPage products={data.products} inv={inv} onDone={showToast} />
-          ) : null}
-
-          {sub === 'history' ? (
-            <HistoryPage
-              products={data.products}
-              orders={data.orders}
-              lines={data.lines}
-              onDone={showToast}
-            />
-          ) : null}
-
-          {sub === 'settings' ? (
-            <SettingsPage settings={settings} deviceId={deviceId} sync={sync} onDone={showToast} />
-          ) : null}
+          
         </>
       )}
     </Suspense>
   );
 }
+
+/* ------------------------------------------------------------------ 路由表 */
+
+/** 各 tab 的适配层：只负责把 Context 里的派生值交给页面，页面 props 保持不变 */
+function RecordTabPage() {
+  const { data, openSession, openSummary, sessionOrders, sync } = useAppData();
+  const { setEditor, setTab, setSub, onOpenCloseSession } = useAppActions();
+  return (
+    <RecordPage
+      session={openSession}
+      summary={openSummary}
+      orders={sessionOrders}
+      lines={data.lines}
+      products={data.products}
+      online={sync.online}
+      onNewRecord={() => setEditor({ mode: 'new' })}
+      onOpenOrder={(id) => setEditor({ mode: 'edit', orderId: id })}
+      onCloseSession={onOpenCloseSession}
+      onOpenHistory={() => {
+        setTab('more');
+        setSub('history');
+      }}
+      onGoStock={() => setTab('stock')}
+    />
+  );
+}
+
+function PurchaseTabPage() {
+  const { data, deviceId, showToast } = useAppData();
+  return (
+    <PurchasePage
+      products={data.products}
+      batches={data.batches}
+      deviceId={deviceId}
+      onDone={showToast}
+    />
+  );
+}
+
+function StockTabPage() {
+  const { data, inv, fifo, deviceId, showToast } = useAppData();
+  return (
+    <StockPage
+      products={data.products}
+      batches={data.batches}
+      inv={inv}
+      fifo={fifo}
+      deviceId={deviceId}
+      onDone={showToast}
+    />
+  );
+}
+
+function ReportTabPage() {
+  const { data, deviceId, fifo, warnDays, showToast } = useAppData();
+  const { onPatchSession, onGoRecord } = useAppActions();
+  return (
+    <ReportPage
+      products={data.products}
+      batches={data.batches}
+      orders={data.orders}
+      lines={data.lines}
+      sessions={data.sessions}
+      deviceId={deviceId}
+      fifo={fifo}
+      warnDays={warnDays}
+      onDone={showToast}
+      onPatchSession={onPatchSession}
+      onGoRecord={onGoRecord}
+    />
+  );
+}
+
+function MoreTabPage() {
+  const { data, openSession, openSummary, settings, sync } = useAppData();
+  const { setSub, onOpenCloseSession } = useAppActions();
+  return (
+    <MorePage
+      products={data.products.length}
+      orders={data.orders.length}
+      session={openSession}
+      summary={openSummary}
+      deviceName={settings[SETTING_KEYS.deviceName] ?? ''}
+      sync={sync}
+      onOpen={setSub}
+      onCloseSession={onOpenCloseSession}
+    />
+  );
+}
+
+function ProductsSubPage() {
+  const { data, inv, showToast } = useAppData();
+  return <ProductsPage products={data.products} inv={inv} onDone={showToast} />;
+}
+
+function HistorySubPage() {
+  const { data, showToast } = useAppData();
+  return (
+    <HistoryPage
+      products={data.products}
+      orders={data.orders}
+      lines={data.lines}
+      onDone={showToast}
+    />
+  );
+}
+
+function SettingsSubPage() {
+  const { settings, deviceId, sync, showToast } = useAppData();
+  return <SettingsPage settings={settings} deviceId={deviceId} sync={sync} onDone={showToast} />;
+}
+
+/** tab / sub 各一张映射表，AppMain 只做一次查表 */
+const TAB_PAGES: Record<Tab, ComponentType> = {
+  record: RecordTabPage,
+  purchase: PurchaseTabPage,
+  stock: StockTabPage,
+  report: ReportTabPage,
+  more: MoreTabPage
+};
+
+const SUB_PAGES: Record<Exclude<SubPage, null>, ComponentType> = {
+  products: ProductsSubPage,
+  history: HistorySubPage,
+  settings: SettingsSubPage
+};
 
 /* ------------------------------------------------------------------ 壳层 */
 

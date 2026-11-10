@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react';
+import { useCallback, useMemo, useState } from 'react';
 import { useLiveQuery } from 'dexie-react-hooks';
 import {
   emptySessionSummary,
@@ -13,10 +13,13 @@ import { fenToStr } from './db/util';
 import { useSync } from './ui/useSync';
 import { draftFromOrder, type RecordDraft } from './ui/recordDraft';
 import {
+  AppDataProvider,
   AppMain,
   AppShell,
   useTheme,
   useToast,
+  type AppActionsValue,
+  type AppDataValue,
   type EditorState,
   type SubPage,
   type Tab
@@ -42,10 +45,10 @@ export default function App() {
   }, [data]);
 
   const deviceId = settings[SETTING_KEYS.deviceId] ?? '';
-  const operators = [
-    settings[SETTING_KEYS.operatorA] ?? '我',
-    settings[SETTING_KEYS.operatorB] ?? '老婆'
-  ];
+  const operators = useMemo(
+    () => [settings[SETTING_KEYS.operatorA] ?? '我', settings[SETTING_KEYS.operatorB] ?? '老婆'],
+    [settings]
+  );
   const warnDays = Number(settings[SETTING_KEYS.expiryWarnDays] ?? '30') || 30;
   const hasSample = (data?.products ?? []).some((p) => p.sample);
   const sampleNoticeDismissed = settings[SETTING_KEYS.sampleNoticeDismissed] === '1';
@@ -99,7 +102,7 @@ export default function App() {
     );
   }, [editingOrder, data]);
 
-  const handleRecordSaved = (
+  const handleRecordSaved = useCallback((
     order: { totalFen: number },
     andNext: boolean,
     undo?: () => Promise<void>
@@ -126,7 +129,7 @@ export default function App() {
         : undefined
     );
     if (!andNext) setEditor(null);
-  };
+  }, [toastCtl.showToast]);
 
   const closeFlow = useCloseSessionFlow({
     data,
@@ -136,6 +139,64 @@ export default function App() {
     openSession,
     showToast: toastCtl.showToast
   });
+
+  /** 只读派生值：依赖都是上面的稳定结果，避免每次渲染换新对象 */
+  const appData = useMemo<AppDataValue | null>(
+    () =>
+      data
+        ? {
+            data,
+            inv,
+            fifo,
+            avgCost,
+            operators,
+            deviceId,
+            settings,
+            sync,
+            openSession,
+            openSummary,
+            sessionOrders,
+            warnDays,
+            editorInitial,
+            showToast: toastCtl.showToast
+          }
+        : null,
+    [
+      data,
+      inv,
+      fifo,
+      avgCost,
+      operators,
+      deviceId,
+      settings,
+      sync,
+      openSession,
+      openSummary,
+      sessionOrders,
+      warnDays,
+      editorInitial,
+      toastCtl.showToast
+    ]
+  );
+
+  /** 写操作单独一个 value：数据变化不会让它们的消费者重渲染 */
+  const appActions = useMemo<AppActionsValue>(
+    () => ({
+      setEditor,
+      setSub,
+      setTab,
+      onSaved: handleRecordSaved,
+      onOpenCloseSession: () => {
+        if (openSession) closeFlow.setCloseOpen(openSession);
+      },
+      onPatchSession: (s) => setEditor({ mode: 'patch', sessionId: s.id }),
+      onGoRecord: () => {
+        setTab('record');
+        setEditor({ mode: 'new' });
+      }
+    }),
+    [handleRecordSaved, openSession, closeFlow.setCloseOpen, setEditor, setSub, setTab]
+  );
 
   return (
     <>
@@ -161,33 +222,10 @@ export default function App() {
         toastApi={toastCtl}
         toastHidden={Boolean(closeFlow.closeOpen || closeFlow.closeDone)}
       >
-        {data ? (
-          <AppMain
-            data={data}
-            inv={inv}
-            fifo={fifo}
-            avgCost={avgCost}
-            operators={operators}
-            deviceId={deviceId}
-            settings={settings}
-            sync={sync}
-            openSession={openSession}
-            openSummary={openSummary}
-            sessionOrders={sessionOrders}
-            warnDays={warnDays}
-            sub={sub}
-            tab={tab}
-            editor={editor}
-            editorInitial={editorInitial}
-            setEditor={setEditor}
-            setSub={setSub}
-            setTab={setTab}
-            onSaved={handleRecordSaved}
-            showToast={toastCtl.showToast}
-            onOpenCloseSession={() => {
-              if (openSession) closeFlow.setCloseOpen(openSession);
-            }}
-          />
+        {data && appData ? (
+          <AppDataProvider value={appData} actions={appActions}>
+            <AppMain tab={tab} sub={sub} editor={editor} />
+          </AppDataProvider>
         ) : null}
       </AppShell>
 
