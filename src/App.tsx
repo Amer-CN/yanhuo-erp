@@ -140,7 +140,14 @@ export default function App() {
     showToast: toastCtl.showToast
   });
 
-  /** 只读派生值：依赖都是上面的稳定结果，避免每次渲染换新对象 */
+  /**
+   * 只读派生值：依赖链必须保持稳定，否则整个 Context 每渲染都会换新对象：
+   *   toastCtl.showToast → useToast 里 useCallback（依赖 armToast，armToast 又是 useCallback([])）
+   *   sync               → useSync 末尾 useMemo（configured/online/syncing/pending/last/error/syncNow 全在依赖里）
+   *   operators          → 本文件 useMemo([settings])
+   *   handleRecordSaved  → useCallback([toastCtl.showToast])
+   * 往 value 里加字段时，务必同步加进下面的依赖数组。
+   */
   const appData = useMemo<AppDataValue | null>(
     () =>
       data

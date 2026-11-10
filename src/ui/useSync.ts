@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   getSyncConfig,
   lastSyncAt,
@@ -118,5 +118,8 @@ export function useSync(): SyncApi {
     };
   }, [refresh, syncNow]);
 
-  return { configured, online, syncing, pending, lastSyncAt: last, error, syncNow };
+  return useMemo(
+    () => ({ configured, online, syncing, pending, lastSyncAt: last, error, syncNow }),
+    [configured, online, syncing, pending, last, error, syncNow]
+  );
 }

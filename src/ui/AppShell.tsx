@@ -2,6 +2,7 @@ import {
   createContext,
   lazy,
   Suspense,
+  useCallback,
   useContext,
   useEffect,
   useRef,
@@ -195,12 +196,12 @@ export function useToast(): ToastApi {
   const toastEnd = useRef(0);
   const toastRemaining = useRef(0);
 
-  const armToast = (ms: number) => {
+  const armToast = useCallback((ms: number) => {
     if (timer.current) window.clearTimeout(timer.current);
     toastRemaining.current = ms;
     toastEnd.current = Date.now() + ms;
     timer.current = window.setTimeout(() => setToast(null), ms);
-  };
+  }, []);
 
   const pauseToast = () => {
     if (timer.current) window.clearTimeout(timer.current);
@@ -216,11 +217,14 @@ export function useToast(): ToastApi {
     armToast(toastRemaining.current);
   };
 
-  const showToast: Done = (msg, tone = 'success', action) => {
-    setToast({ msg, tone, action });
-    const duration = action ? 6000 : tone === 'error' ? 5200 : tone === 'warning' ? 4000 : 2600;
-    armToast(duration);
-  };
+  const showToast = useCallback<Done>(
+    (msg, tone = 'success', action) => {
+      setToast({ msg, tone, action });
+      const duration = action ? 6000 : tone === 'error' ? 5200 : tone === 'warning' ? 4000 : 2600;
+      armToast(duration);
+    },
+    [armToast]
+  );
 
   return {
     toast,
