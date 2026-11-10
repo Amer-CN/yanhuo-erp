@@ -303,7 +303,10 @@ export default function PurchasePage({
                         variant="danger"
                         size="sm"
                         aria-label={`删除 ${pname(b.productId)} 这条进货`}
-                        onClick={() => setDelBatchId(b.id)}
+                        onClick={() => {
+                          setDelError(null);
+                          setDelBatchId(b.id);
+                        }}
                       >
                         <Trash2 size={16} aria-hidden="true" />
                       </Btn>

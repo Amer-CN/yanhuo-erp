@@ -107,6 +107,18 @@ describe('pull 游标推进', () => {
       nextCursor([{ id: 'order:old', updated_at: 100 }], { ts: 9000, id: 'order:x' })
     ).toEqual({ ts: 9000, id: 'order:x' });
   });
+
+  it('同一毫秒内 id 比游标更小（服务端乱序）也不采纳，避免游标倒退重复拉同一页', () => {
+    expect(
+      nextCursor([{ id: 'order:a', updated_at: 5000 }], { ts: 5000, id: 'order:c' })
+    ).toEqual({ ts: 5000, id: 'order:c' });
+  });
+
+  it('同一毫秒内 id 等于游标：原样返回，不前移也不倒退', () => {
+    expect(
+      nextCursor([{ id: 'order:c', updated_at: 5000 }], { ts: 5000, id: 'order:c' })
+    ).toEqual({ ts: 5000, id: 'order:c' });
+  });
 });
 
 describe('pull 端到端（假 Supabase）', () => {

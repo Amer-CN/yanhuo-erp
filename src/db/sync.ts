@@ -617,8 +617,11 @@ export function nextCursor(
   if (rows.length === 0) return fallback;
   const tail = rows[rows.length - 1];
   const ts = Number(tail.updated_at) || 0;
+  const id = tail.id ?? '';
+  // 时间回退，或同一毫秒内 id 比游标更小（服务端乱序）：都不采纳，否则会重复拉同一页
   if (ts < fallback.ts) return fallback;
-  return { ts, id: tail.id ?? '' };
+  if (ts === fallback.ts && id < fallback.id) return fallback;
+  return { ts, id };
 }
 
 async function pull(cfg: SyncConfig): Promise<number> {
