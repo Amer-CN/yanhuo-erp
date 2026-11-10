@@ -226,6 +226,32 @@ export async function getLastSession(deviceId: string): Promise<Session | undefi
   return rows.sort((a, b) => (a.startedAt < b.startedAt ? 1 : -1))[0];
 }
 
+interface LedgerTables {
+  orders: SalesOrder[];
+  lines: SaleLine[];
+  batches: Batch[];
+}
+
+/** 一次读出重算快照所需的三张全表（与各调用点改动前的读取集合一致） */
+async function loadLedger(): Promise<LedgerTables> {
+  const [orders, lines, batches] = await Promise.all([
+    db.orders.toArray(),
+    db.lines.toArray(),
+    db.batches.toArray()
+  ]);
+  return { orders, lines, batches };
+}
+
+/** 用给定集合重算某场次快照：FIFO 在内部完成，不对外暴露 FifoResult */
+function summarize(
+  sessionId: string,
+  orders: SalesOrder[],
+  lines: SaleLine[],
+  batches: Batch[]
+): SessionSummary {
+  return sessionReport(sessionId, orders, lines, fifoAllocate(batches, orders, lines));
+}
+
 /* ------------------------------------------------------------------ 单据 */
 
 export interface RecordLineInput {
@@ -384,19 +410,10 @@ export async function undoPatchedRecord(id: string): Promise<void> {
     return;
   }
   const lines = await db.lines.where('orderId').equals(id).toArray();
-  const [orders, allLines, batches] = await Promise.all([
-    db.orders.toArray(),
-    db.lines.toArray(),
-    db.batches.toArray()
-  ]);
-  const nextOrders = orders.filter((o) => o.id !== id);
-  const nextLines = allLines.filter((l) => l.orderId !== id);
-  const summary = sessionReport(
-    session.id,
-    nextOrders,
-    nextLines,
-    fifoAllocate(batches, nextOrders, nextLines)
-  );
+  const ledger = await loadLedger();
+  const nextOrders = ledger.orders.filter((o) => o.id !== id);
+  const nextLines = ledger.lines.filter((l) => l.orderId !== id);
+  const summary = summarize(session.id, nextOrders, nextLines, ledger.batches);
   const nextSession: Session = {
     ...session,
     patchedCount: Math.max(0, session.patchedCount - 1),
@@ -423,13 +440,8 @@ export async function closeSession(sessionId: string, operator: string): Promise
     throw new RecordError('ALREADY_CLOSED', '这一场已经结过账了');
   }
 
-  const [orders, lines, batches] = await Promise.all([
-    db.orders.toArray(),
-    db.lines.toArray(),
-    db.batches.toArray()
-  ]);
-  const fifo = fifoAllocate(batches, orders, lines);
-  const summary = sessionReport(sessionId, orders, lines, fifo);
+  const { orders, lines, batches } = await loadLedger();
+  const summary = summarize(sessionId, orders, lines, batches);
 
   const next: Session = {
     ...session,
@@ -488,19 +500,10 @@ export async function addPatchedRecord(input: RecordInput & { sessionId: string 
     updatedAt: createdAt
   };
 
-  const [orders, allLines, batches] = await Promise.all([
-    db.orders.toArray(),
-    db.lines.toArray(),
-    db.batches.toArray()
-  ]);
-  const nextOrders = [...orders, order];
-  const nextLines = [...allLines, ...lines];
-  const summary = sessionReport(
-    session.id,
-    nextOrders,
-    nextLines,
-    fifoAllocate(batches, nextOrders, nextLines)
-  );
+  const ledger = await loadLedger();
+  const nextOrders = [...ledger.orders, order];
+  const nextLines = [...ledger.lines, ...lines];
+  const summary = summarize(session.id, nextOrders, nextLines, ledger.batches);
   const nextSession: Session = {
     ...session,
     patchedCount: session.patchedCount + 1,
@@ -525,12 +528,8 @@ export async function addPatchedRecord(input: RecordInput & { sessionId: string 
 export async function refreshSessionSummary(sessionId: string): Promise<SessionSummary | undefined> {
   const session = await db.sessions.get(sessionId);
   if (!session) return undefined;
-  const [orders, lines, batches] = await Promise.all([
-    db.orders.toArray(),
-    db.lines.toArray(),
-    db.batches.toArray()
-  ]);
-  const summary = sessionReport(sessionId, orders, lines, fifoAllocate(batches, orders, lines));
+  const { orders, lines, batches } = await loadLedger();
+  const summary = summarize(sessionId, orders, lines, batches);
   await db.sessions.put({ ...session, summary, updatedAt: nowIso() });
   await enqueue('session', sessionId);
   return summary;
@@ -554,11 +553,7 @@ export async function migrateSessions(): Promise<number> {
 
   const groups = groupOrdersBySession(pending);
 
-  const [allOrders, allLines, batches] = await Promise.all([
-    db.orders.toArray(),
-    db.lines.toArray(),
-    db.batches.toArray()
-  ]);
+  const { orders: allOrders, lines: allLines, batches } = await loadLedger();
   const sessionOfOrder = new Map<string, string>();
   const sessions: Session[] = [];
 
@@ -586,6 +581,7 @@ export async function migrateSessions(): Promise<number> {
     const sid = sessionOfOrder.get(o.id);
     return sid ? { ...o, sessionId: sid } : o;
   });
+  // 例外：迁移在启动路径上，只重放一次 FIFO 供逐场复用；改用 summarize 会变成 N 次全量重放。
   const fifo = fifoAllocate(batches, migratedOrders, allLines);
   for (const s of sessions) s.summary = sessionReport(s.id, migratedOrders, allLines, fifo);
 

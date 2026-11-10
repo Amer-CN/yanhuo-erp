@@ -1,13 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import type { Adjustment, Batch, SaleLine, SalesOrder } from '../src/db/types';
-import {
-  dayReport,
-  expiryWarnings,
-  fifoAllocate,
-  inventoryMap,
-  productMargins,
-  rangeReport
-} from '../src/db/calc';
+import { expiryWarnings, fifoAllocate, inventoryMap } from '../src/db/calc';
 import { fenToStr, qtyToStr, strToFen } from '../src/db/util';
 
 function batch(id: string, qty: number, cost: number, date: string): Batch {
@@ -142,35 +135,6 @@ describe('报表', () => {
     line('l2', 'o2', 40, 50, 50),
     line('l3', 'o3', 10, 100, 100)
   ];
-
-  it('日报按本地日期汇总', () => {
-    const fifo = fifoAllocate(batches, orders, lines);
-    const rep = dayReport('2026-01-02', orders, lines, fifo);
-    expect(rep.orderCount).toBe(2);
-    expect(rep.revenueFen).toBe(45000 + 2000);
-    expect(rep.cashFen).toBe(45000);
-    expect(rep.wechatFen).toBe(2000);
-    expect(rep.alipayFen).toBe(0);
-    // 成本：l1 = 100×100+50×200 = 20000；l2 = 40×200（b1 已空）= 8000
-    expect(rep.costFen).toBe(20000 + 8000);
-    expect(rep.grossFen).toBe(47000 - 28000);
-    expect(rep.discountFen).toBe(50 * 150);
-  });
-
-  it('日期范围汇总含两端', () => {
-    const fifo = fifoAllocate(batches, orders, lines);
-    const rep = rangeReport('2026-01-02', '2026-01-03', orders, lines, fifo);
-    expect(rep.orderCount).toBe(3);
-    expect(rep.revenueFen).toBe(48000);
-  });
-
-  it('单品毛利 = 销售额 − 成本', () => {
-    const fifo = fifoAllocate(batches, orders, lines);
-    const m = productMargins('2026-01-01', '2026-12-31', orders, lines, fifo, () => '测试鞭炮');
-    expect(m).toHaveLength(1);
-    expect(m[0].revenueFen).toBe(45000 + 2000 + 1000);
-    expect(m[0].grossFen).toBe(m[0].revenueFen - m[0].costFen);
-  });
 
   it('临期预警只看有剩余的批次', () => {
     const withExpiry = [

@@ -17,10 +17,6 @@ export interface BackupFile {
   data: AppData;
 }
 
-export function backupVersion(): 2 {
-  return 2;
-}
-
 export async function exportBackup(deviceId: string): Promise<BackupFile> {
   const [products, batches, orders, lines, adjustments, sessions, settings] = await Promise.all([
     db.products.toArray(),

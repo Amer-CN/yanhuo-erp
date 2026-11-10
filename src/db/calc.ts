@@ -2,7 +2,7 @@
 // 原则：库存和毛利都是「算出来的」，不落库；合并后重算永远一致。
 
 import type { Adjustment, Batch, SaleLine, SalesOrder, SessionSummary } from './types';
-import { addDays, isoToLocalDate, localDate } from './util';
+import { addDays, localDate } from './util';
 
 /** 有效订单（排除整单作废） */
 export function activeOrderIds(orders: SalesOrder[]): Set<string> {
@@ -136,113 +136,6 @@ export function fifoAllocate(
   return { lineCost, batchRemaining, uncoveredQty, uncoveredCostFen };
 }
 
-export interface DayReport {
-  date: string;
-  orderCount: number;
-  lineCount: number;
-  revenueFen: number;
-  cashFen: number;
-  wechatFen: number;
-  alipayFen: number;
-  costFen: number;
-  grossFen: number;
-  discountFen: number;
-}
-
-function sumByDateReport(
-  date: string,
-  orders: SalesOrder[],
-  lines: SaleLine[],
-  fifo: FifoResult
-): DayReport {
-  const dayOrders = orders.filter((o) => !o.voided && isoToLocalDate(o.createdAt) === date);
-  const orderIds = new Set(dayOrders.map((o) => o.id));
-  const dayLines = lines.filter((l) => orderIds.has(l.orderId));
-
-  let cash = 0,
-    wechat = 0,
-    alipay = 0,
-    revenue = 0,
-    cost = 0,
-    discount = 0;
-  for (const o of dayOrders) {
-    if (o.payMethod === 'cash') cash += o.totalFen;
-    else if (o.payMethod === 'wechat') wechat += o.totalFen;
-    else alipay += o.totalFen;
-    revenue += o.totalFen;
-  }
-  for (const l of dayLines) {
-    cost += fifo.lineCost.get(l.id) ?? 0;
-    discount += l.discountFen;
-  }
-  return {
-    date,
-    orderCount: dayOrders.length,
-    lineCount: dayLines.length,
-    revenueFen: revenue,
-    cashFen: cash,
-    wechatFen: wechat,
-    alipayFen: alipay,
-    costFen: cost,
-    grossFen: revenue - cost,
-    discountFen: discount
-  };
-}
-
-export function dayReport(
-  date: string,
-  orders: SalesOrder[],
-  lines: SaleLine[],
-  fifo: FifoResult
-): DayReport {
-  return sumByDateReport(date, orders, lines, fifo);
-}
-
-/** 日期范围 [from, to]，含两端 */
-export function rangeReport(
-  from: string,
-  to: string,
-  orders: SalesOrder[],
-  lines: SaleLine[],
-  fifo: FifoResult
-): DayReport {
-  const inRange = orders.filter((o) => {
-    if (o.voided) return false;
-    const d = isoToLocalDate(o.createdAt);
-    return d >= from && d <= to;
-  });
-  const orderIds = new Set(inRange.map((o) => o.id));
-  const sel = lines.filter((l) => orderIds.has(l.orderId));
-  let cash = 0,
-    wechat = 0,
-    alipay = 0,
-    revenue = 0,
-    cost = 0,
-    discount = 0;
-  for (const o of inRange) {
-    if (o.payMethod === 'cash') cash += o.totalFen;
-    else if (o.payMethod === 'wechat') wechat += o.totalFen;
-    else alipay += o.totalFen;
-    revenue += o.totalFen;
-  }
-  for (const l of sel) {
-    cost += fifo.lineCost.get(l.id) ?? 0;
-    discount += l.discountFen;
-  }
-  return {
-    date: `${from}~${to}`,
-    orderCount: inRange.length,
-    lineCount: sel.length,
-    revenueFen: revenue,
-    cashFen: cash,
-    wechatFen: wechat,
-    alipayFen: alipay,
-    costFen: cost,
-    grossFen: revenue - cost,
-    discountFen: discount
-  };
-}
-
 export interface ProductMargin {
   productId: string;
   name: string;
@@ -257,40 +150,24 @@ export interface ProductMargin {
   costIncomplete?: boolean;
 }
 
-/** 单品毛利（日期范围内） */
-export function productMargins(
-  from: string,
-  to: string,
-  orders: SalesOrder[],
-  lines: SaleLine[],
-  fifo: FifoResult,
-  productName: (id: string) => string
-): ProductMargin[] {
-  const inRange = new Set(
-    orders
-      .filter((o) => !o.voided && isoToLocalDate(o.createdAt) >= from && isoToLocalDate(o.createdAt) <= to)
-      .map((o) => o.id)
-  );
-  const m = new Map<string, ProductMargin>();
-  for (const l of lines) {
-    if (!inRange.has(l.orderId)) continue;
-    const cur = m.get(l.productId) ?? {
-      productId: l.productId,
-      name: productName(l.productId),
-      qtyBase: 0,
-      revenueFen: 0,
-      costFen: 0,
-      grossFen: 0,
-      discountFen: 0
-    };
-    cur.qtyBase += l.qtyBase;
-    cur.revenueFen += l.amountFen;
-    cur.costFen += fifo.lineCost.get(l.id) ?? 0;
-    cur.discountFen += l.discountFen;
-    m.set(l.productId, cur);
+/** 收款汇总：cash 记现金，wechat 记微信，其余一律记支付宝（沿用既有语义） */
+function sumPayments(orders: SalesOrder[]): {
+  cashFen: number;
+  wechatFen: number;
+  alipayFen: number;
+  revenueFen: number;
+} {
+  let cashFen = 0;
+  let wechatFen = 0;
+  let alipayFen = 0;
+  let revenueFen = 0;
+  for (const o of orders) {
+    if (o.payMethod === 'cash') cashFen += o.totalFen;
+    else if (o.payMethod === 'wechat') wechatFen += o.totalFen;
+    else alipayFen += o.totalFen;
+    revenueFen += o.totalFen;
   }
-  for (const v of m.values()) v.grossFen = v.revenueFen - v.costFen;
-  return [...m.values()].sort((a, b) => b.grossFen - a.grossFen);
+  return { cashFen, wechatFen, alipayFen, revenueFen };
 }
 
 /**
@@ -307,16 +184,8 @@ export function sessionReport(
   const orderIds = new Set(sel.map((o) => o.id));
   const selLines = lines.filter((l) => orderIds.has(l.orderId));
 
-  let cash = 0;
-  let wechat = 0;
-  let alipay = 0;
-  let revenue = 0;
-  for (const o of sel) {
-    if (o.payMethod === 'cash') cash += o.totalFen;
-    else if (o.payMethod === 'wechat') wechat += o.totalFen;
-    else alipay += o.totalFen;
-    revenue += o.totalFen;
-  }
+  const { cashFen: cash, wechatFen: wechat, alipayFen: alipay, revenueFen: revenue } =
+    sumPayments(sel);
 
   let cost = 0;
   let discount = 0;

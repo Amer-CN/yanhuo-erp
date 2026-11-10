@@ -129,10 +129,6 @@ export function Stat({ k, v, tone }: { k: string; v: ReactNode; tone?: 'brand' |
   );
 }
 
-export function Money({ fen, className = '' }: { fen: number; className?: string }) {
-  return <span className={`amount ${className}`.trim()}>¥{fenToStr(fen)}</span>;
-}
-
 export function Empty({
   icon,
   text,
