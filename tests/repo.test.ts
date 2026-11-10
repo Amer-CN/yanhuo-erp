@@ -274,6 +274,9 @@ describe('商品 / 进货 / 设置 / 调整', () => {
     expect(p.priceList).toBe(26);
     expect(p.sample).toBeUndefined();
 
+    // nowIso() 精度到毫秒：同一毫秒内连续写入会得到相同的 updatedAt，
+    // 这里等一下再更新，避免用例偶发失败（曾导致 CI 随机红）
+    await new Promise((r) => setTimeout(r, 2));
     await updateProduct(p.id, { name: ' 新名字 ', priceList: 3000 });
     const updated = await db.products.get(p.id);
     expect(updated?.name).toBe('新名字');
