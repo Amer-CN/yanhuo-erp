@@ -15,7 +15,7 @@ import type {
   SessionSummary,
   Setting
 } from './types';
-import { SETTING_KEYS } from './types';
+import { SETTING_KEYS, SESSIONS_MIGRATED_VALUE } from './types';
 import { fifoAllocate, sessionReport } from './calc';
 import { groupOrdersBySession } from './sessionLogic';
 import { localDate, nowIso, uuid } from './util';
@@ -58,7 +58,8 @@ export async function ensureBootstrapSettings(defaults: Record<string, string>):
   const keys = Object.keys(defaults);
   const rows = await db.settings.toArray();
   const present = new Map(rows.map((r) => [r.key, r.value]));
-  const missing = keys.filter((k) => !present.get(k));
+  // 只看 key 是否存在：clearAllData 会把值置空，空串仍是「已初始化」
+  const missing = keys.filter((k) => !present.has(k));
   if (missing.length === 0) return;
   await db.settings.bulkPut(missing.map((k) => ({ key: k, value: defaults[k] })));
   await enqueueMany(missing.map((k) => ({ kind: 'setting' as const, recordId: k })));
@@ -572,7 +573,9 @@ export async function migrateSessions(): Promise<number> {
     .filter((o) => !o.sessionId)
     .sort((a, b) => (a.createdAt < b.createdAt ? -1 : a.createdAt > b.createdAt ? 1 : 0));
   if (pending.length === 0) {
-    if (done !== '1') await setSetting(SETTING_KEYS.sessionsMigrated, '1');
+    if (done !== SESSIONS_MIGRATED_VALUE) {
+      await setSetting(SETTING_KEYS.sessionsMigrated, SESSIONS_MIGRATED_VALUE);
+    }
     return 0;
   }
 
@@ -613,7 +616,7 @@ export async function migrateSessions(): Promise<number> {
   await db.transaction('rw', db.sessions, db.orders, db.settings, async () => {
     await db.sessions.bulkPut(sessions);
     await db.orders.bulkPut(migratedOrders.filter((o) => sessionOfOrder.has(o.id)));
-    await db.settings.put({ key: SETTING_KEYS.sessionsMigrated, value: '1' });
+    await db.settings.put({ key: SETTING_KEYS.sessionsMigrated, value: SESSIONS_MIGRATED_VALUE });
   });
 
   await enqueueMany([
@@ -679,9 +682,10 @@ export async function loadAll(): Promise<AppData> {
 }
 
 export async function clearAllData(): Promise<void> {
+  // 冲突留痕随本次「清空」一起删，避免清完还显示历史冲突数
   await db.transaction(
     'rw',
-    [db.products, db.batches, db.orders, db.lines, db.adjustments, db.sessions],
+    [db.products, db.batches, db.orders, db.lines, db.adjustments, db.sessions, db.conflicts],
     async () => {
       await Promise.all([
         db.products.clear(),
@@ -689,10 +693,12 @@ export async function clearAllData(): Promise<void> {
         db.orders.clear(),
         db.lines.clear(),
         db.adjustments.clear(),
-        db.sessions.clear()
+        db.sessions.clear(),
+        db.conflicts.clear()
       ]);
     }
   );
+  // 这两次 setSetting 会登记发件箱，因此 outbox 必须最后清
   await setSetting(SETTING_KEYS.seeded, '');
   await setSetting(SETTING_KEYS.sessionsMigrated, '');
   await db.outbox.clear();

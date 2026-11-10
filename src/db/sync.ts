@@ -7,7 +7,7 @@ import { enqueueAllLocal, pendingCount, syncWanted } from './outbox';
 import { DEFAULT_SYNC } from './syncDefaults';
 import { mergeSessionPair } from './sessionLogic';
 import { businessTime, resolveRemote } from './syncResolve';
-import type { SyncConflictRow } from './db';
+import type { OutboxRow, SyncConflictRow } from './db';
 import type { Table } from 'dexie';
 import type { SaleLine, Session, Setting } from './types';
 
@@ -36,8 +36,11 @@ const LS = {
   disabled: 'yh-sync-disabled'
 };
 
-/** 设备身份类设置不参与云同步 */
-const SKIP_SETTINGS = new Set<string>(['deviceId', 'deviceName']);
+/** 本机诊断键：记录见过的未知 kind，不参与云同步 */
+const UNKNOWN_KINDS_KEY = 'sync-unknown-kinds';
+
+/** 设备身份与设备级诊断不参与云同步 */
+const SKIP_SETTINGS = new Set<string>(['deviceId', 'deviceName', UNKNOWN_KINDS_KEY]);
 
 /** 一次推送的发件箱批量上限 */
 const OUTBOX_BATCH = 300;
@@ -49,6 +52,8 @@ const MAX_PAGES = 20;
 const PAGE_SIZE = 500;
 /** 错误响应文本的截断长度 */
 const ERROR_SNIPPET_LEN = 300;
+/** 单次 HTTP 请求的超时（毫秒）：弱网下避免连接挂住、把 busy 锁死在「同步中」 */
+const REQUEST_TIMEOUT_MS = 15_000;
 /** 未知 kind 最多保留的 id 数（只表示条数，不表方向） */
 const UNKNOWN_KIND_KEEP = 20;
 
@@ -132,24 +137,40 @@ async function rest<T = unknown>(
   path: string,
   init?: RequestInit
 ): Promise<T> {
-  const res = await fetch(`${cfg.url}/rest/v1/${path}`, {
-    ...init,
-    headers: {
-      apikey: cfg.anonKey,
-      // 旧版 anon key 是 JWT（eyJ...），新 publishable key 不是 JWT，
-      // 后者只放在 apikey 头里，避免被 PostgREST 当成坏 token。
-      ...(cfg.anonKey.startsWith('eyJ') ? { Authorization: `Bearer ${cfg.anonKey}` } : {}),
-      'Content-Type': 'application/json',
-      'x-ledger-key': cfg.ledgerKey,
-      ...(init?.headers ?? {})
+  const controller = new AbortController();
+  const timer: ReturnType<typeof setTimeout> = setTimeout(
+    () => controller.abort(),
+    REQUEST_TIMEOUT_MS
+  );
+  try {
+    const res = await fetch(`${cfg.url}/rest/v1/${path}`, {
+      ...init,
+      signal: controller.signal,
+      headers: {
+        apikey: cfg.anonKey,
+        // 旧版 anon key 是 JWT（eyJ...），新 publishable key 不是 JWT，
+        // 后者只放在 apikey 头里，避免被 PostgREST 当成坏 token。
+        ...(cfg.anonKey.startsWith('eyJ') ? { Authorization: `Bearer ${cfg.anonKey}` } : {}),
+        'Content-Type': 'application/json',
+        'x-ledger-key': cfg.ledgerKey,
+        ...(init?.headers ?? {})
+      }
+    });
+    if (!res.ok) {
+      const text = (await res.text()).slice(0, ERROR_SNIPPET_LEN);
+      throw new Error(`Supabase ${res.status}: ${text}`);
     }
-  });
-  if (!res.ok) {
-    const text = (await res.text()).slice(0, ERROR_SNIPPET_LEN);
-    throw new Error(`Supabase ${res.status}: ${text}`);
+    const text = await res.text();
+    return (text ? JSON.parse(text) : null) as T;
+  } catch (e) {
+    // 超时统一转成可读文案：调用方（useSync）会按退避重试，不会静默挂住
+    if (e instanceof Error && e.name === 'AbortError') {
+      throw new Error('云端无响应（超时），稍后自动重试');
+    }
+    throw e;
+  } finally {
+    clearTimeout(timer);
   }
-  const text = await res.text();
-  return (text ? JSON.parse(text) : null) as T;
 }
 
 /* ------------------------------------------------------------------ 记录映射 */
@@ -261,8 +282,6 @@ async function postPayload(cfg: SyncConfig, rows: PushRow[]): Promise<void> {
   });
 }
 
-type OutboxRow = (typeof db.outbox) extends Table<infer T> ? T : never;
-
 /** 按发件箱行组装推送 payload；本地缺失/删除的统一标 deleted */
 function buildPushPayload(
   rows: OutboxRow[],
@@ -350,8 +369,6 @@ async function pushOutbox(cfg: SyncConfig, deviceId: string): Promise<number> {
  * 记录本机遇到的未知 kind（新版本客户端写入的记录），最多保留 20 条 id。
  * 不写入业务表、不删除远端行；水位仍按 updated_at 推进。
  */
-const UNKNOWN_KINDS_KEY = 'sync-unknown-kinds';
-
 async function mergeUnknownKinds(ids: string[]): Promise<void> {
   if (ids.length === 0) return;
   const prev = (await db.settings.get(UNKNOWN_KINDS_KEY))?.value;

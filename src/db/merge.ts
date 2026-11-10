@@ -3,7 +3,7 @@
 //       商品和设置是可变数据，按 updatedAt / 导入优先。
 
 import { db } from './db';
-import type { AppData, Session } from './types';
+import type { AppData, Product, Session } from './types';
 import { SETTING_KEYS } from './types';
 import { mergeSessionPair } from './sessionLogic';
 import { nowIso } from './util';
@@ -109,7 +109,7 @@ export async function importMerge(backup: BackupFile): Promise<MergeResult> {
     async () => {
       // 商品：id 不存在则新增；存在则比 updatedAt
       const existingProducts = await db.products.bulkGet(data.products.map((p) => p.id));
-      const toPutProducts = [];
+      const toPutProducts: Product[] = [];
       for (let i = 0; i < data.products.length; i++) {
         const inc = data.products[i];
         const cur = existingProducts[i];

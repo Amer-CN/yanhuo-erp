@@ -166,6 +166,9 @@ export const SETTING_KEYS = {
   sessionsMigrated: 'sessionsMigrated'
 } as const;
 
+/** 迁移完成标记的唯一取值：repo 写入、backup 判断都引用它，避免字面量漂移 */
+export const SESSIONS_MIGRATED_VALUE = '1';
+
 export interface AppData {
   products: Product[];
   batches: Batch[];

@@ -7,6 +7,7 @@ import { exportBackup, replaceAll, type BackupFile } from './merge';
 import { ensureDeviceId } from './repo';
 import {
   SETTING_KEYS,
+  SESSIONS_MIGRATED_VALUE,
   type Adjustment,
   type AppData,
   type Batch,
@@ -137,7 +138,7 @@ function readStore<T>(idb: IDBDatabase, name: string): Promise<T[]> {
 /** 迁移逻辑与 repo.migrateSessions 的前置条件保持一致 */
 function needsSessionMigration(data: AppData): boolean {
   const migrated = data.settings.some(
-    (s) => s.key === SETTING_KEYS.sessionsMigrated && s.value === 'yes'
+    (s) => s.key === SETTING_KEYS.sessionsMigrated && s.value === SESSIONS_MIGRATED_VALUE
   );
   if (migrated) return false;
   return data.orders.some((o) => !o.sessionId);
