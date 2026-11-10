@@ -168,6 +168,32 @@ describe('voidOrder / restoreOrder', () => {
     expect((await load()).inventory).toBe(8);
     expect((await load()).summary.revenueFen).toBe(2000);
   });
+
+  it('已结账场次作废/恢复会重算快照；open 场次不写快照', async () => {
+    await db.products.put(makeProduct('p1'));
+    await db.batches.put(makeBatch('b1', 'p1', 10, 100));
+    const order = await saveRecord(input([line(2000, { qtyBase: 2 })]));
+    const sessionId = order.sessionId as string;
+
+    // open 场次：报表实时算，不落快照
+    await voidOrder(order.id);
+    expect((await db.sessions.get(sessionId))?.summary).toBeUndefined();
+    await restoreOrder(order.id);
+    expect((await db.sessions.get(sessionId))?.summary).toBeUndefined();
+
+    const closed = await closeSession(sessionId, '我');
+    expect(closed.summary).toMatchObject({ orderCount: 1, revenueFen: 2000 });
+
+    await voidOrder(order.id);
+    const voided = await db.sessions.get(sessionId);
+    expect(voided?.summary?.revenueFen).toBe(0);
+    expect(voided?.summary?.orderCount).toBe(0);
+
+    await restoreOrder(order.id);
+    const restored = await db.sessions.get(sessionId);
+    expect(restored?.summary?.revenueFen).toBe(2000);
+    expect(restored?.summary?.orderCount).toBe(1);
+  });
 });
 
 describe('closeSession', () => {

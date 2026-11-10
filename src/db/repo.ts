@@ -561,6 +561,17 @@ export async function refreshSessionSummary(sessionId: string): Promise<SessionS
   return summary;
 }
 
+/**
+ * 作废 / 恢复订单后重算快照：只对已结账场次生效。
+ * open 场次的报表本来就按 sessionReport 实时算，写快照只会给它凭空造一份 summary。
+ */
+async function refreshClosedSessionSummary(sessionId?: string): Promise<void> {
+  if (!sessionId) return;
+  const session = await db.sessions.get(sessionId);
+  if (session?.status !== 'closed') return;
+  await refreshSessionSummary(sessionId);
+}
+
 /* ------------------------------------------------------------------ 迁移 */
 
 /**
@@ -633,6 +644,7 @@ export async function voidOrder(id: string): Promise<void> {
   if (!o) return;
   await db.orders.put({ ...o, voided: true, updatedAt: nowIso() });
   await enqueue('order', id);
+  await refreshClosedSessionSummary(o.sessionId);
 }
 
 export async function restoreOrder(id: string): Promise<void> {
@@ -642,6 +654,7 @@ export async function restoreOrder(id: string): Promise<void> {
   delete next.voided;
   await db.orders.put(next);
   await enqueue('order', id);
+  await refreshClosedSessionSummary(o.sessionId);
 }
 
 /* ------------------------------------------------------------------ 调整 */
