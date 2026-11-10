@@ -39,6 +39,19 @@ const LS = {
 /** 设备身份类设置不参与云同步 */
 const SKIP_SETTINGS = new Set<string>(['deviceId', 'deviceName']);
 
+/** 一次推送的发件箱批量上限 */
+const OUTBOX_BATCH = 300;
+/** 单次同步的重试次数 */
+const MAX_ATTEMPTS = 4;
+/** 拉取分页的最大页数 */
+const MAX_PAGES = 20;
+/** 拉取分页的页大小 */
+const PAGE_SIZE = 500;
+/** 错误响应文本的截断长度 */
+const ERROR_SNIPPET_LEN = 300;
+/** 未知 kind 最多保留的 id 数（只表示条数，不表方向） */
+const UNKNOWN_KIND_KEEP = 20;
+
 export function getSyncConfig(): SyncConfig | null {
   try {
     if (localStorage.getItem(LS.disabled) === '1') return null;
@@ -132,7 +145,7 @@ async function rest<T = unknown>(
     }
   });
   if (!res.ok) {
-    const text = (await res.text()).slice(0, 300);
+    const text = (await res.text()).slice(0, ERROR_SNIPPET_LEN);
     throw new Error(`Supabase ${res.status}: ${text}`);
   }
   const text = await res.text();
@@ -249,7 +262,7 @@ async function postPayload(cfg: SyncConfig, rows: PushRow[]): Promise<void> {
 }
 
 async function pushOutbox(cfg: SyncConfig, deviceId: string): Promise<number> {
-  const rows = await db.outbox.orderBy('queuedAt').limit(300).toArray();
+  const rows = await db.outbox.orderBy('queuedAt').limit(OUTBOX_BATCH).toArray();
   if (rows.length === 0) return 0;
 
   // 一次事务批量取本地记录（原来是逐条 get，最多 300 次串行往返）
@@ -286,7 +299,7 @@ async function pushOutbox(cfg: SyncConfig, deviceId: string): Promise<number> {
   if (payload.length > 0) {
     let rowsToSend = payload;
     let attempts = 0;
-    while (attempts < 4) {
+    while (attempts < MAX_ATTEMPTS) {
       attempts++;
       try {
         await postPayload(cfg, rowsToSend);
@@ -309,7 +322,7 @@ async function pushOutbox(cfg: SyncConfig, deviceId: string): Promise<number> {
           /* 隐私模式忽略 */
         }
         rowsToSend = stripMissingColumns(payload);
-        if (attempts >= 4) throw e;
+        if (attempts >= MAX_ATTEMPTS) throw e;
       }
     }
   }
@@ -335,7 +348,7 @@ async function mergeUnknownKinds(ids: string[]): Promise<void> {
       /* 坏值按空数组处理 */
     }
   }
-  const merged = [...new Set([...arr, ...ids])].slice(-20);
+  const merged = [...new Set([...arr, ...ids])].slice(-UNKNOWN_KIND_KEEP);
   await db.settings.put({ key: UNKNOWN_KINDS_KEY, value: JSON.stringify(merged) });
 }
 
@@ -492,12 +505,12 @@ async function pull(cfg: SyncConfig): Promise<number> {
   let since = lastPullAt();
   let pulled = 0;
 
-  for (let page = 0; page < 20; page++) {
+  for (let page = 0; page < MAX_PAGES; page++) {
     const params = new URLSearchParams({
       ledger: `eq.${cfg.ledgerKey}`,
       updated_at: `gt.${since}`,
       order: 'updated_at.asc',
-      limit: '500',
+      limit: String(PAGE_SIZE),
       select: '*'
     });
     const rows = await rest<RemoteRow[]>(cfg, `yh_records?${params.toString()}`);
@@ -508,7 +521,7 @@ async function pull(cfg: SyncConfig): Promise<number> {
       pulled++;
     }
     setLastPull(since);
-    if (rows.length < 500) break;
+    if (rows.length < PAGE_SIZE) break;
   }
   return pulled;
 }

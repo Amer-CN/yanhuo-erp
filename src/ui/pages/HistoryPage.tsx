@@ -4,7 +4,7 @@ import type { Product, SaleLine, SalesOrder } from '../../db/types';
 import { PAY_LABEL } from '../../db/types';
 import { restoreOrder, voidOrder } from '../../db/repo';
 import { DELETED_PRODUCT, fenToStr, isoToLocalDate, isoToTime, qtyToStr } from '../../db/util';
-import { Btn, Empty, Sheet, rowProps, type Done } from '../kit';
+import { Btn, ConfirmSheet, Empty, Sheet, rowProps, type Done } from '../kit';
 
 export default function HistoryPage({
   products,
@@ -18,6 +18,7 @@ export default function HistoryPage({
   onDone: Done;
 }) {
   const [openId, setOpenId] = useState<string | null>(null);
+  const [voidConfirm, setVoidConfirm] = useState(false);
 
   const productById = useMemo(() => {
     const m = new Map<string, Product>();
@@ -133,12 +134,7 @@ export default function HistoryPage({
               <Btn
                 block
                 variant="danger"
-                onClick={async () => {
-                  if (!confirm('整单作废？作废后不计入报表（库存会加回来）。')) return;
-                  await voidOrder(open.id);
-                  onDone('已作废');
-                  setOpenId(null);
-                }}
+                onClick={() => setVoidConfirm(true)}
               >
                 <span className="icon-text">
                   <Ban size={18} aria-hidden="true" /> 整单作废
@@ -183,6 +179,23 @@ export default function HistoryPage({
             </div>
           </div>
         </Sheet>
+      ) : null}
+
+      {voidConfirm ? (
+        <ConfirmSheet
+          title="整单作废？"
+          description="作废后不计入报表（库存会加回来）。"
+          confirmText="整单作废"
+          danger
+          onConfirm={async () => {
+            setVoidConfirm(false);
+            if (!open) return;
+            await voidOrder(open.id);
+            onDone('已作废');
+            setOpenId(null);
+          }}
+          onCancel={() => setVoidConfirm(false)}
+        />
       ) : null}
     </div>
   );

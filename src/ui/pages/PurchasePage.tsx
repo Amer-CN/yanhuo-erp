@@ -3,7 +3,7 @@ import { Plus, Trash2, PackagePlus } from 'lucide-react';
 import type { Batch, Product } from '../../db/types';
 import { createBatch, createProduct, deleteBatch } from '../../db/repo';
 import { DELETED_PRODUCT, fenToStr, localDate, qtyToStr, strToFen } from '../../db/util';
-import { Btn, Card, Empty, Field, ProductFormModal, Sheet, rowProps, type Done } from '../kit';
+import { Btn, Card, ConfirmSheet, Empty, Field, ProductFormModal, Sheet, rowProps, type Done } from '../kit';
 
 export default function PurchasePage({
   products,
@@ -31,6 +31,7 @@ export default function PurchasePage({
   const [receivedAt, setReceivedAt] = useState(localDate());
   const [newProduct, setNewProduct] = useState(false);
   const [todayOpen, setTodayOpen] = useState(false);
+  const [delBatchId, setDelBatchId] = useState<string | null>(null);
   const [errors, setErrors] = useState<{ product?: string; qty?: string; cost?: string }>({});
 
   const product = active.find((p) => p.id === productId);
@@ -282,11 +283,7 @@ export default function PurchasePage({
                         variant="danger"
                         size="sm"
                         aria-label={`删除 ${pname(b.productId)} 这条进货`}
-                        onClick={async () => {
-                          if (!confirm('删除这条进货记录？')) return;
-                          await deleteBatch(b.id);
-                          onDone('已删除', 'warning');
-                        }}
+                        onClick={() => setDelBatchId(b.id)}
                       >
                         <Trash2 size={16} aria-hidden="true" />
                       </Btn>
@@ -308,6 +305,22 @@ export default function PurchasePage({
             setNewProduct(false);
             onDone('商品已建');
           }}
+        />
+      ) : null}
+
+      {delBatchId ? (
+        <ConfirmSheet
+          title="删除这条进货记录？"
+          confirmText="删除"
+          danger
+          onConfirm={async () => {
+            const id = delBatchId;
+            setDelBatchId(null);
+            if (!id) return;
+            await deleteBatch(id);
+            onDone('已删除', 'warning');
+          }}
+          onCancel={() => setDelBatchId(null)}
         />
       ) : null}
     </div>

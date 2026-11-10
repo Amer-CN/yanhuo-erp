@@ -10,7 +10,7 @@ import {
   type SyncConfig
 } from '../db/sync';
 import type { SyncApi } from './useSync';
-import { Btn, Card, Field, Sheet, type Done } from './kit';
+import { Btn, Card, ConfirmSheet, Field, Sheet, type Done } from './kit';
 import { localDate } from '../db/util';
 
 const SQL = `create table if not exists public.yh_records (
@@ -45,6 +45,7 @@ export default function SyncPanel({ sync, onDone }: { sync: SyncApi; onDone: Don
   const [key, setKey] = useState(() => getSyncConfig()?.anonKey ?? '');
   const [ledger, setLedger] = useState(() => getSyncConfig()?.ledgerKey ?? '');
   const [help, setHelp] = useState(false);
+  const [disableConfirm, setDisableConfirm] = useState(false);
   const [busy, setBusy] = useState(false);
 
   const statusText = !sync.configured
@@ -90,7 +91,6 @@ export default function SyncPanel({ sync, onDone }: { sync: SyncApi; onDone: Don
   };
 
   const disable = () => {
-    if (!confirm('关闭云同步？本机数据保留，但两台手机不再自动同步。')) return;
     clearSyncConfig();
     window.dispatchEvent(new Event('yh-sync-config'));
     setEditing(true);
@@ -216,7 +216,7 @@ export default function SyncPanel({ sync, onDone }: { sync: SyncApi; onDone: Don
                 <Settings2 size={18} aria-hidden="true" /> 修改配置
               </span>
             </Btn>
-            <Btn block variant="danger" onClick={disable}>
+            <Btn block variant="danger" onClick={() => setDisableConfirm(true)}>
               <span className="icon-text">
                 <Trash2 size={18} aria-hidden="true" /> 关闭云同步
               </span>
@@ -278,6 +278,20 @@ export default function SyncPanel({ sync, onDone }: { sync: SyncApi; onDone: Don
             </Btn>
           </div>
         </Sheet>
+      ) : null}
+
+      {disableConfirm ? (
+        <ConfirmSheet
+          title="关闭云同步？"
+          description="本机数据保留，但两台手机不再自动同步。"
+          confirmText="关闭云同步"
+          danger
+          onConfirm={() => {
+            setDisableConfirm(false);
+            disable();
+          }}
+          onCancel={() => setDisableConfirm(false)}
+        />
       ) : null}
     </Card>
   );

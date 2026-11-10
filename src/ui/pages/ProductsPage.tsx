@@ -3,7 +3,7 @@ import { Search, Plus, Package, ChevronRight, Power, Trash2 } from 'lucide-react
 import type { Product } from '../../db/types';
 import { createProduct, deleteProduct, updateProduct, type ProductInput } from '../../db/repo';
 import { fenToStr, qtyToStr } from '../../db/util';
-import { Btn, Empty, ProductFormModal, rowProps, type Done } from '../kit';
+import { Btn, ConfirmSheet, Empty, ProductFormModal, rowProps, type Done } from '../kit';
 
 export default function ProductsPage({
   products,
@@ -16,6 +16,7 @@ export default function ProductsPage({
 }) {
   const [q, setQ] = useState('');
   const [editing, setEditing] = useState<Product | 'new' | null>(null);
+  const [delConfirm, setDelConfirm] = useState(false);
 
   const list = useMemo(() => {
     const kw = q.trim().toLowerCase();
@@ -139,13 +140,7 @@ export default function ProductsPage({
                   block={false}
                   variant="danger"
                   size="sm"
-                  onClick={async () => {
-                    if (!confirm(`删除「${editing.name}」？有进货/销售记录的商品不会被删，只会停用。`))
-                      return;
-                    await deleteProduct(editing.id);
-                    onDone('已处理');
-                    setEditing(null);
-                  }}
+                  onClick={() => setDelConfirm(true)}
                 >
                   <span className="icon-text">
                     <Trash2 size={16} aria-hidden="true" /> 删除
@@ -154,6 +149,22 @@ export default function ProductsPage({
               </div>
             ) : undefined
           }
+        />
+      ) : null}
+
+      {delConfirm && editing && editing !== 'new' ? (
+        <ConfirmSheet
+          title={`删除「${editing.name}」？`}
+          description="有进货/销售记录的商品不会被删，只会停用。"
+          confirmText="删除"
+          danger
+          onConfirm={async () => {
+            setDelConfirm(false);
+            await deleteProduct(editing.id);
+            onDone('已处理');
+            setEditing(null);
+          }}
+          onCancel={() => setDelConfirm(false)}
         />
       ) : null}
     </div>

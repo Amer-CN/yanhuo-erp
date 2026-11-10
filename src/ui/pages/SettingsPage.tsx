@@ -18,7 +18,7 @@ import {
   type SnapshotReason,
   type SnapshotRow
 } from '../../db/backup';
-import { SETTING_KEYS } from '../../db/types';
+import { SETTING_KEYS, type Product, type Setting } from '../../db/types';
 import { afterMerge, clearCloud, getSyncConfig } from '../../db/sync';
 import SyncPanel from '../SyncPanel';
 import type { SyncApi } from '../useSync';
@@ -37,6 +37,43 @@ interface PendingMerge {
   };
   productDiffs: string[];
   settingsDiffs: string[];
+}
+
+/** 商品的可见变化（新增 / 调价 / 改名），顺序与备份里的商品顺序一致 */
+function diffProducts(current: Product[], incoming: Product[]): string[] {
+  const diffs: string[] = [];
+  const curById = new Map(current.map((p) => [p.id, p]));
+  for (const inc of incoming) {
+    const cur = curById.get(inc.id);
+    if (!cur) {
+      diffs.push(`新增：${inc.name}（¥${fenToStr(inc.priceList)}）`);
+      continue;
+    }
+    if (cur.priceList !== inc.priceList) {
+      diffs.push(`${inc.name}：¥${fenToStr(cur.priceList)} → ¥${fenToStr(inc.priceList)}`);
+    } else if (cur.name !== inc.name) {
+      diffs.push(`改名：${cur.name} → ${inc.name}`);
+    }
+  }
+  return diffs;
+}
+
+const SETTING_LABELS: Record<string, string> = {
+  [SETTING_KEYS.operatorA]: '操作人 A',
+  [SETTING_KEYS.operatorB]: '操作人 B',
+  [SETTING_KEYS.expiryWarnDays]: '临期预警天数'
+};
+
+/** 关键设置的变化（只比较操作人与临期天数） */
+function diffSettings(current: Setting[], incoming: Setting[]): string[] {
+  const diffs: string[] = [];
+  for (const s of incoming) {
+    const label = SETTING_LABELS[s.key];
+    if (!label) continue;
+    const cur = current.find((x) => x.key === s.key)?.value ?? '';
+    if (cur && cur !== s.value) diffs.push(`${label}：${cur} → ${s.value}`);
+  }
+  return diffs;
 }
 
 const SNAPSHOT_REASON: Record<SnapshotReason, string> = {
@@ -78,6 +115,9 @@ export default function SettingsPage({
   const [snapshots, setSnapshots] = useState<SnapshotRow[]>([]);
   const [restoreTarget, setRestoreTarget] = useState<SnapshotRow | null>(null);
   const [snapshotBusy, setSnapshotBusy] = useState(false);
+  const [undoConfirm, setUndoConfirm] = useState(false);
+  const [clearStep, setClearStep] = useState<0 | 1 | 2 | 3>(0);
+  const [pendingCfg, setPendingCfg] = useState<ReturnType<typeof getSyncConfig>>(null);
   const conflictCount = useLiveQuery(() => db.conflicts.count(), [], 0) ?? 0;
 
   useEffect(() => {
@@ -146,24 +186,29 @@ export default function SettingsPage({
     setTimeout(() => URL.revokeObjectURL(url), 3000);
   };
 
+  /** 优先用系统分享（手机可发微信），否则退回下载；两处导出共用 */
+  const shareOrDownload = async (file: File, backup: BackupFile, title = '烟花账备份') => {
+    const nav = navigator as Navigator & {
+      canShare?: (data?: { files?: File[] }) => boolean;
+      share?: (data: { files?: File[]; title?: string }) => Promise<void>;
+    };
+    if (nav.canShare?.({ files: [file] }) && nav.share) {
+      try {
+        await nav.share({ files: [file], title });
+      } catch {
+        download(backup);
+      }
+    } else {
+      download(backup);
+    }
+  };
+
   const doExport = async (silent = false): Promise<BackupFile | null> => {
     try {
       const backup = await exportBackup(deviceId);
       const name = `烟花账-备份-${new Date().toISOString().slice(0, 10)}.json`;
       const file = new File([JSON.stringify(backup)], name, { type: 'application/json' });
-      const nav = navigator as Navigator & {
-        canShare?: (data?: { files?: File[] }) => boolean;
-        share?: (data: { files?: File[]; title?: string }) => Promise<void>;
-      };
-      if (nav.canShare?.({ files: [file] }) && nav.share) {
-        try {
-          await nav.share({ files: [file], title: '烟花账备份' });
-        } catch {
-          download(backup);
-        }
-      } else {
-        download(backup);
-      }
+      await shareOrDownload(file, backup);
       await setSetting(SETTING_KEYS.lastExportAt, new Date().toISOString());
       if (!silent) onDone('备份已导出，记得发微信存一份');
       return backup;
@@ -178,34 +223,8 @@ export default function SettingsPage({
       const text = await file.text();
       const backup = parseBackup(text);
       const current = await loadAll();
-
-      const productDiffs: string[] = [];
-      const curById = new Map(current.products.map((p) => [p.id, p]));
-      for (const inc of backup.data.products) {
-        const cur = curById.get(inc.id);
-        if (!cur) {
-          productDiffs.push(`新增：${inc.name}（¥${fenToStr(inc.priceList)}）`);
-          continue;
-        }
-        if (cur.priceList !== inc.priceList) {
-          productDiffs.push(`${inc.name}：¥${fenToStr(cur.priceList)} → ¥${fenToStr(inc.priceList)}`);
-        } else if (cur.name !== inc.name) {
-          productDiffs.push(`改名：${cur.name} → ${inc.name}`);
-        }
-      }
-
-      const settingsDiffs: string[] = [];
-      const keyName: Record<string, string> = {
-        [SETTING_KEYS.operatorA]: '操作人 A',
-        [SETTING_KEYS.operatorB]: '操作人 B',
-        [SETTING_KEYS.expiryWarnDays]: '临期预警天数'
-      };
-      for (const s of backup.data.settings) {
-        const label = keyName[s.key];
-        if (!label) continue;
-        const cur = current.settings.find((x) => x.key === s.key)?.value ?? '';
-        if (cur && cur !== s.value) settingsDiffs.push(`${label}：${cur} → ${s.value}`);
-      }
+      const productDiffs = diffProducts(current.products, backup.data.products);
+      const settingsDiffs = diffSettings(current.settings, backup.data.settings);
 
       setPending({
         backup,
@@ -236,19 +255,7 @@ export default function SettingsPage({
         snapshot = JSON.stringify(pre);
         const preName = `烟花账-合并前备份-${new Date().toISOString().slice(0, 10)}.json`;
         const file = new File([snapshot], preName, { type: 'application/json' });
-        const nav = navigator as Navigator & {
-          canShare?: (data?: { files?: File[] }) => boolean;
-          share?: (data: { files?: File[]; title?: string }) => Promise<void>;
-        };
-        if (nav.canShare?.({ files: [file] }) && nav.share) {
-          try {
-            await nav.share({ files: [file], title: '合并前本机备份' });
-          } catch {
-            download(JSON.parse(snapshot) as BackupFile);
-          }
-        } else {
-          download(JSON.parse(snapshot) as BackupFile);
-        }
+        await shareOrDownload(file, pre, '合并前本机备份');
       }
       const r = await importMerge(pending.backup);
       await afterMerge();
@@ -266,7 +273,6 @@ export default function SettingsPage({
 
   const undoMerge = async () => {
     if (!preMerge) return;
-    if (!confirm('撤销这次合并？会把账本恢复到合并前的状态。')) return;
     try {
       await replaceAll(JSON.parse(preMerge) as BackupFile);
       const cfg = getSyncConfig();
@@ -281,6 +287,44 @@ export default function SettingsPage({
     } catch (e) {
       onDone('撤销失败：' + (e instanceof Error ? e.message : String(e)), 'error');
     }
+  };
+
+  /** 危险操作三段式：1 确认清本机 → 2 再确认 → 3（有云端配置时）是否清云端 */
+  const runClearLocal = async () => {
+    setClearStep(0);
+    await clearAllData();
+    onDone('已清空', 'warning');
+  };
+
+  const confirmClearStep = async () => {
+    if (clearStep === 1) {
+      setClearStep(2);
+      return;
+    }
+    if (clearStep === 2) {
+      const cfg = getSyncConfig();
+      if (cfg) {
+        setPendingCfg(cfg);
+        setClearStep(3);
+        return;
+      }
+      await runClearLocal();
+      return;
+    }
+    const cfg = pendingCfg;
+    setPendingCfg(null);
+    if (cfg) await clearCloud(cfg);
+    await runClearLocal();
+  };
+
+  const cancelClearStep = () => {
+    // 第三段取消 = 只跳过清云端，仍清本机（与原生 confirm 的分支一致）
+    if (clearStep === 3) {
+      setPendingCfg(null);
+      void runClearLocal();
+      return;
+    }
+    setClearStep(0);
   };
 
   const restoreStats = restoreTarget ? snapshotStats(restoreTarget) : null;
@@ -458,16 +502,7 @@ export default function SettingsPage({
           <Btn
             block
             variant="danger"
-            onClick={async () => {
-              if (!confirm('清空所有商品、进货、销售数据？导出备份后再操作。')) return;
-              if (!confirm('再确认一次：清空后无法恢复（除了导入之前导出的备份）。')) return;
-              const cfg = getSyncConfig();
-              if (cfg && confirm('同时清空云端账本？两台手机都会被清空。')) {
-                await clearCloud(cfg);
-              }
-              await clearAllData();
-              onDone('已清空', 'warning');
-            }}
+            onClick={() => setClearStep(1)}
           >
             <span className="icon-text">
               <Trash2 size={18} aria-hidden="true" /> 清空全部数据
@@ -554,7 +589,7 @@ export default function SettingsPage({
                 完成
               </Btn>
               {preMerge ? (
-                <Btn block={false} variant="tertiary" style={{ flex: 1 }} onClick={undoMerge}>
+                <Btn block={false} variant="tertiary" style={{ flex: 1 }} onClick={() => setUndoConfirm(true)}>
                   <span className="icon-text">
                     <RotateCcw size={16} aria-hidden="true" /> 撤销合并
                   </span>
@@ -622,6 +657,43 @@ export default function SettingsPage({
           busy={snapshotBusy}
           onConfirm={() => void doRestore()}
           onCancel={() => setRestoreTarget(null)}
+        />
+      ) : null}
+
+      {undoConfirm ? (
+        <ConfirmSheet
+          title="撤销这次合并？"
+          description="会把账本恢复到合并前的状态。"
+          confirmText="撤销合并"
+          danger
+          onConfirm={() => {
+            setUndoConfirm(false);
+            void undoMerge();
+          }}
+          onCancel={() => setUndoConfirm(false)}
+        />
+      ) : null}
+
+      {clearStep > 0 ? (
+        <ConfirmSheet
+          title={
+            clearStep === 1
+              ? '清空所有商品、进货、销售数据？'
+              : clearStep === 2
+                ? '再确认一次：'
+                : '同时清空云端账本？'
+          }
+          description={
+            clearStep === 1
+              ? '导出备份后再操作。'
+              : clearStep === 2
+                ? '清空后无法恢复（除了导入之前导出的备份）。'
+                : '两台手机都会被清空。'
+          }
+          confirmText={clearStep === 1 ? '继续' : clearStep === 2 ? '清空本机' : '一并清空云端'}
+          danger
+          onConfirm={() => void confirmClearStep()}
+          onCancel={cancelClearStep}
         />
       ) : null}
     </div>
