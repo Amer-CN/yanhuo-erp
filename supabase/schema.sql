@@ -19,6 +19,11 @@ create table if not exists public.yh_records (
 create index if not exists yh_records_ledger_updated
   on public.yh_records (ledger, updated_at);
 
+-- 复合游标（updated_at, id）：拉取翻页按这两列排序与比较，同毫秒记录不会漏。
+-- 老库升级：单独执行下面这条即可（可重复执行）。
+create index if not exists yh_records_ledger_updated_id
+  on public.yh_records (ledger, updated_at, id);
+
 create index if not exists yh_records_ledger_record_updated
   on public.yh_records (ledger, record_updated_at);
 

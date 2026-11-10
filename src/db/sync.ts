@@ -31,6 +31,8 @@ const LS = {
   anonKey: 'yh-sync-anon',
   ledger: 'yh-sync-ledger',
   lastPull: 'yh-sync-last-pull',
+  /** 复合游标的第二列：与 lastPull 一起定位「拉到哪里了」 */
+  lastPullId: 'yh-sync-last-pull-id',
   lastSync: 'yh-sync-last-sync',
   error: 'yh-sync-error',
   disabled: 'yh-sync-disabled'
@@ -102,6 +104,7 @@ export function clearSyncConfig(): void {
   localStorage.removeItem(LS.anonKey);
   localStorage.removeItem(LS.ledger);
   localStorage.removeItem(LS.lastPull);
+  localStorage.removeItem(LS.lastPullId);
   localStorage.removeItem(LS.lastSync);
   localStorage.removeItem(LS.error);
   localStorage.setItem(LS.disabled, '1');
@@ -117,8 +120,14 @@ function lastPullAt(): number {
   return Number(localStorage.getItem(LS.lastPull) ?? 0) || 0;
 }
 
-function setLastPull(v: number): void {
-  localStorage.setItem(LS.lastPull, String(v));
+function lastPullId(): string {
+  return localStorage.getItem(LS.lastPullId) ?? '';
+}
+
+/** 持久化复合游标：时间水位沿用旧键，id 存新键（老版本只读旧键，不受影响） */
+function setLastPullCursor(cursor: PullCursor): void {
+  localStorage.setItem(LS.lastPull, String(cursor.ts));
+  localStorage.setItem(LS.lastPullId, cursor.id);
 }
 
 export function lastSyncAt(): number | null {
@@ -559,26 +568,72 @@ async function applyRemoteBatch(rows: RemoteRow[]): Promise<void> {
   });
 }
 
+/** 拉取游标：(updated_at, id) 复合水位，避免同毫秒记录在翻页时被永久跳过 */
+export interface PullCursor {
+  ts: number;
+  id: string;
+}
+
+/**
+ * 显式列（对应检视 I-001）：只取应用用得到的字段，
+ * 不再把 ledger / device_id / schema_version 拉回本地。
+ */
+const PULL_COLUMNS = 'id,record_id,kind,data,updated_at,record_updated_at,deleted';
+
+/**
+ * 构造拉取参数（纯函数，便于单测）。游标语义：
+ * - `ts = 0`：首次全量，不加游标条件；
+ * - `ts > 0 且 id = ''`：从旧版本升级上来的水位，用 `gte` 重放该毫秒的记录（重复应用幂等）；
+ * - 否则：`(updated_at, id)` 严格大于游标。
+ */
+export function buildPullParams(
+  cursor: PullCursor,
+  ledgerKey: string,
+  limit: number = PAGE_SIZE
+): URLSearchParams {
+  const params = new URLSearchParams({
+    ledger: `eq.${ledgerKey}`,
+    order: 'updated_at.asc,id.asc',
+    limit: String(limit),
+    select: PULL_COLUMNS
+  });
+  if (cursor.ts <= 0) return params;
+  if (!cursor.id) {
+    params.set('updated_at', `gte.${cursor.ts}`);
+    return params;
+  }
+  params.set(
+    'or',
+    `(updated_at.gt.${cursor.ts},and(updated_at.eq.${cursor.ts},id.gt.${cursor.id}))`
+  );
+  return params;
+}
+
+/** 本页最后一条就是新游标；空页保持原游标，服务端乱序导致的回退不采纳 */
+export function nextCursor(
+  rows: { updated_at: number; id: string }[],
+  fallback: PullCursor
+): PullCursor {
+  if (rows.length === 0) return fallback;
+  const tail = rows[rows.length - 1];
+  const ts = Number(tail.updated_at) || 0;
+  if (ts < fallback.ts) return fallback;
+  return { ts, id: tail.id ?? '' };
+}
+
 async function pull(cfg: SyncConfig): Promise<number> {
-  let since = lastPullAt();
+  let cursor: PullCursor = { ts: lastPullAt(), id: lastPullId() };
   let pulled = 0;
 
   for (let page = 0; page < MAX_PAGES; page++) {
-    const params = new URLSearchParams({
-      ledger: `eq.${cfg.ledgerKey}`,
-      updated_at: `gt.${since}`,
-      order: 'updated_at.asc',
-      limit: String(PAGE_SIZE),
-      select: '*'
-    });
+    const params = buildPullParams(cursor, cfg.ledgerKey);
     const rows = await rest<RemoteRow[]>(cfg, `yh_records?${params.toString()}`);
     if (!Array.isArray(rows) || rows.length === 0) break;
     await applyRemoteBatch(rows);
-    for (const row of rows) {
-      since = Math.max(since, Number(row.updated_at) || 0);
-      pulled++;
-    }
-    setLastPull(since);
+    pulled += rows.length;
+    // 先落库再推进游标：中途失败时下次仍会重放同一页，不会留下空洞
+    cursor = nextCursor(rows, cursor);
+    setLastPullCursor(cursor);
     if (rows.length < PAGE_SIZE) break;
   }
   return pulled;

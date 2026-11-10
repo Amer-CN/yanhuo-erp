@@ -25,6 +25,42 @@ function readBody(req) {
   });
 }
 
+/**
+ * 游标条件：新客户端用复合游标
+ * `or=(updated_at.gt.TS,and(updated_at.eq.TS,id.gt.ID))`，
+ * 老客户端仍用单列 `updated_at=gt.TS|gte.TS`（模拟灰度混跑）。
+ */
+function cursorFilter(url) {
+  const or = url.searchParams.get('or');
+  if (or) {
+    const m = /^\(updated_at\.gt\.(\d+),and\(updated_at\.eq\.(\d+),id\.gt\.(.*)\)\)$/.exec(or);
+    if (m) {
+      const gtTs = Number(m[1]);
+      const eqTs = Number(m[2]);
+      const gtId = m[3];
+      return (r) =>
+        Number(r.updated_at) > gtTs ||
+        (Number(r.updated_at) === eqTs && String(r.id) > gtId);
+    }
+  }
+  const raw = url.searchParams.get('updated_at');
+  if (!raw) return () => true;
+  const m = /^(gt|gte)\.(\d+)$/.exec(raw);
+  if (!m) return () => true;
+  const ts = Number(m[2]);
+  return m[1] === 'gt'
+    ? (r) => Number(r.updated_at) > ts
+    : (r) => Number(r.updated_at) >= ts;
+}
+
+function compareRows(a, b) {
+  const byTs = Number(a.updated_at) - Number(b.updated_at);
+  if (byTs !== 0) return byTs;
+  const ka = String(a.id);
+  const kb = String(b.id);
+  return ka < kb ? -1 : ka > kb ? 1 : 0;
+}
+
 const server = http.createServer(async (req, res) => {
   cors(res);
   if (req.method === 'OPTIONS') {
@@ -41,11 +77,11 @@ const server = http.createServer(async (req, res) => {
   const ledger = req.headers['x-ledger-key'] ?? '';
 
   if (req.method === 'GET') {
-    const since = Number((url.searchParams.get('updated_at') ?? 'gt.0').replace('gt.', '')) || 0;
     const limit = Number(url.searchParams.get('limit') ?? '1000') || 1000;
+    const after = cursorFilter(url);
     const list = [...rows.values()]
-      .filter((r) => r.ledger === ledger && Number(r.updated_at) > since)
-      .sort((a, b) => Number(a.updated_at) - Number(b.updated_at))
+      .filter((r) => r.ledger === ledger && after(r))
+      .sort(compareRows)
       .slice(0, limit);
     res.writeHead(200, { 'Content-Type': 'application/json' }).end(JSON.stringify(list));
     return;
