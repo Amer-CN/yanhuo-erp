@@ -147,6 +147,7 @@ export interface ProductMargin {
   giftQty?: number;
   giftCostFen?: number;
   /** 该商品在本场有销量没有批次可扣（成本是估算的） */
+  // 目前仅覆盖 fifo 与订单不同步的防御场景；「无批次可扣」的检测未实现。
   costIncomplete?: boolean;
 }
 
@@ -245,7 +246,8 @@ export function productMarginsBySession(
       costIncomplete: false
     };
     const lineCost = fifo.lineCost.get(l.id);
-    // 该明细没有任何批次可扣（漏录进货/超卖），成本是缺失的，不只是 0
+    // 防御：fifo 与 orders 不同步时（陈旧 FifoResult）该明细没有成本记录。
+    // 注意「漏录进货」不走这里——那种情况 fifo 用兜底均价记 0，不是 undefined。
     if (lineCost === undefined) cur.costIncomplete = true;
     cur.qtyBase += l.qtyBase;
     cur.revenueFen += l.amountFen;

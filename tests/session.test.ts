@@ -121,7 +121,7 @@ describe('场次汇总', () => {
     expect(m[0].discountFen).toBe(1000);
   });
 
-  it('fifo 未覆盖的明细标记 costIncomplete 并排在最后', () => {
+  it('陈旧 fifo 下明细标记 costIncomplete 并排在最后', () => {
     const localBatches = [batch('b1', 100, 100, '2026-01-01')];
     const o1 = order('o1', '2026-01-01T10:00:00', 3000, 's9', 'cash');
     const o2 = order('o2', '2026-01-01T11:00:00', 9000, 's9', 'cash');
@@ -132,6 +132,7 @@ describe('场次汇总', () => {
       { ...line('l2', 'o2', 5, 1800, 9000), productId: 'p2' }
     ];
     // 只用 o1 重放，模拟「新增单后快照未重算」的陈旧 fifo
+    // 此输入为防御场景，生产调用链 fifo 与 orders 同源
     const fifo = fifoAllocate(localBatches, [o1], localLines);
     expect(fifo.lineCost.has('l1')).toBe(true);
     expect(fifo.lineCost.has('l2')).toBe(false);
