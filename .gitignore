@@ -8,3 +8,6 @@ docs/screenshots/e2e/
 .perf/
 coverage/
 __pycache__/
+.codearts/
+.opencode/
+docs/selfcheck-shots/

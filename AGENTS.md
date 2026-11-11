@@ -14,7 +14,7 @@
 pnpm install
 pnpm dev      # http://localhost:5173
 pnpm build    # tsc --noEmit && vite build
-pnpm test     # 11 个测试文件 / 86 个用例
+pnpm test     # 12 个测试文件 / 134 个用例（134 通过 / 0 失败 / 0 skip）
 ```
 
 端到端（需要 Playwright + Chromium）：
@@ -24,7 +24,7 @@ python scripts/e2e-smoke.py       # 开单/进货/报表/库存
 python scripts/e2e-sync.py        # 双设备自动云同步 + 断网补发（默认假 Supabase）
 python scripts/e2e-merge.py       # 手动导出/导入合并（先 build + preview）
 python scripts/e2e-offline.py     # 断网可用（先 build + preview）
-python scripts/a11y-check.py      # 无障碍回归
+python scripts/a11y-check.py      # 无障碍回归（已接入 CI：观察期，不阻塞部署）
 python scripts/check-default-sync.py  # 零配置会发同步请求（拦截不写库）
 ```
 
