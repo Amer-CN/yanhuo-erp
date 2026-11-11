@@ -12,7 +12,8 @@ permissions:
 jobs:
   e2e:
     runs-on: ubuntu-latest
-    timeout-minutes: 20
+    # 与 deploy.yml 一致：为 Playwright 安装的 apt 重试留出预算。
+    timeout-minutes: 45
     steps:
       - uses: actions/checkout@v4
 

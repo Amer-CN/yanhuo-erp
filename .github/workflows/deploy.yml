@@ -18,7 +18,9 @@ jobs:
   # 先跑 E2E：坏版本不得上线（TD-18）
   e2e:
     runs-on: ubuntu-latest
-    timeout-minutes: 20
+    # Playwright 安装带 3 次重试（见 .github/actions/e2e/action.yml），单次 apt/DNS
+    # 失败就可能耗掉约 10 分钟，20 分钟预算会把重试截断成 cancelled，故放宽到 45 分钟。
+    timeout-minutes: 45
     steps:
       - uses: actions/checkout@v4
 
