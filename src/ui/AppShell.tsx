@@ -410,7 +410,13 @@ export function useToast(): ToastApi {
        */
       const now = Date.now();
       const current = toastRef.current;
-      const currentUndoAlive = Boolean(current?.action) && toastEnd.current > now;
+      /*
+       * 只保护「撤销」类提示：示例商品的「知道了」同样带 action，但它只是确认按钮，
+       * 不该把随后弹出的「已记 1 单」这类普通提示吞掉——吞掉会让摊主以为没记上，
+       * e2e-smoke.py 也正是按「已记 1 单」断言保存成功。
+       */
+      const currentIsUndo = Boolean(current?.action && current.action.label.includes('撤销'));
+      const currentUndoAlive = currentIsUndo && toastEnd.current > now;
       /*
        * 错误提示是例外：宁可让撤销入口少活几秒，也不能把「没记上 / 没存上」吞掉
        * （吞掉就等于让用户以为已经记成功了）。同步类错误另有顶栏状态灯兜底。

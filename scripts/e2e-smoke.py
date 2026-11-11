@@ -76,12 +76,22 @@ def main() -> int:
         page.get_by_role("button", name="保存并记下一单").click()
         expect_text(page, "已记 1 单")
         page.wait_for_timeout(400)
+        # 「保存并记下一单」会顺带重开选商品弹层（连续开单设计，RecordEditor.tsx
+        # 里 setPickOpen(true)），弹层遮罩会挡住「返回」，先关掉它再返回。
+        finish = page.get_by_role("button", name="完成（回单据）")
+        if finish.is_visible():
+            finish.click()
+            page.wait_for_timeout(300)
         page.get_by_role("button", name="返回").click()
         page.wait_for_timeout(400)
         expect_text(page, "¥26.50")
         shot(page, "03-已记一单.png")
 
         print("[3] 进货")
+        # 上一条「已记 1 单」的撤销提示受 M-16 保护 6 秒，期间普通回执会被丢弃；
+        # 先把鼠标移开（避免 hover 暂停计时）并等它退场，再进货。
+        page.mouse.move(4, 4)
+        page.wait_for_selector(".toast", state="detached", timeout=12000)
         page.get_by_role("button", name="进货").click()
         page.wait_for_selector("select", timeout=5000)
         page.locator("select").first.select_option(index=1)
