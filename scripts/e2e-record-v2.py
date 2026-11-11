@@ -38,6 +38,14 @@ def add_product(page, name: str) -> None:
     page.wait_for_timeout(150)
 
 
+def close_picker_if_open(page) -> None:
+    """保存后自动重开的「选商品」弹层会挡住页面按钮，存在且可见才关掉。"""
+    finish = page.get_by_role("button", name="完成（回单据）")
+    if finish.count() > 0 and finish.first.is_visible():
+        finish.first.click()
+        page.wait_for_timeout(300)
+
+
 def main() -> int:
     with sync_playwright() as p:
         browser = p.chromium.launch()
@@ -66,7 +74,8 @@ def main() -> int:
         expect_text(page, "已记 1 单")
         page.wait_for_timeout(400)
 
-        # 第二单：赠品，保存后继续
+        # 第二单：赠品，保存后继续。上一单保存后弹层已自动重开，先关掉再点「添加商品」
+        close_picker_if_open(page)
         page.get_by_role("button", name="添加商品").first.click()
         add_product(page, "摔炮")
         page.get_by_role("button", name="完成（回单据）").click()
@@ -76,6 +85,8 @@ def main() -> int:
         page.get_by_role("button", name="保存并记下一单").click()
         expect_text(page, "已记 1 单")
         page.wait_for_timeout(400)
+        # 连续开单自动重开的弹层会挡住开单页的「返回」，先关掉
+        close_picker_if_open(page)
         page.get_by_role("button", name="返回").click()
         page.wait_for_timeout(400)
 

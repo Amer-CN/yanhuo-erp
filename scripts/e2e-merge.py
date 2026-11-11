@@ -117,10 +117,33 @@ def sell_product(page, name: str, expect_total: str) -> str:
     if expect_total not in toast:
         errors.append(f"{name} 记账金额不对：{toast}（应含 {expect_total}）")
 
-    # 6. 「返回」首页，等营业额刷新（替代固定 sleep：等文案比等时间稳）
+    # 6. 关掉「保存并记下一单」自动重开的选商品弹层（连续开单设计，RecordEditor.tsx
+    # 里 setPickOpen(true)），弹层遮罩会挡住开单页的「返回」。弹层是 setTimeout(30)
+    # 后才重开的，先给一帧让状态落定，再「存在且可见才点」，UI 再变也不会误报超时
+    page.wait_for_timeout(400)
+    finish = page.get_by_role("button", name="完成（回单据）")
+    if finish.count() > 0 and finish.first.is_visible():
+        finish.first.click()
+        page.wait_for_timeout(300)
+
+    # 7. 「返回」首页，等营业额刷新（替代固定 sleep：等文案比等时间稳）
     page.get_by_role("button", name="返回").click()
     expect(page.get_by_text(f"¥{expect_total}", exact=True).first).to_be_visible(timeout=10000)
     return toast
+
+
+def drain_toast(page, timeout: int = 12000) -> None:
+    """等「撤销」类回执退场。
+
+    撤销提示受 M-16 保护 6 秒，期间普通回执会被丢弃；不等它退场，
+    紧随其后的「备份已导出」「合并完成」提示就读不到（不是功能缺陷）。
+    先把指针移开，避免 hover 暂停计时。
+    """
+    page.mouse.move(4, 4)
+    try:
+        page.wait_for_selector(".toast", state="detached", timeout=timeout)
+    except Exception:  # noqa: BLE001 - 退场失败不阻塞主流程，断言仍由调用方负责
+        pass
 
 
 def open_settings(page) -> None:
@@ -147,6 +170,7 @@ def main() -> int:
         open_settings(a)
         export_btn = a.get_by_role("button", name="导出备份")
         export_btn.wait_for(timeout=10000)
+        drain_toast(a)
         with a.expect_download() as dl:
             export_btn.click()
         dl.value.save_as(backup_path)
@@ -167,6 +191,7 @@ def main() -> int:
         merge_btn = b.get_by_role("button", name="合并这些数据")
         merge_btn.wait_for(timeout=15000)
         b.screenshot(path=os.path.join(OUT, "13-合并预览.png"))
+        drain_toast(b)
         merge_btn.click()
 
         toast = wait_for_toast(b, "合并完成", timeout=15000)

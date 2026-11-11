@@ -94,6 +94,13 @@ def main() -> int:
         if toast is None:
             errors.append("离线记一笔后没有出现「已记」提示")
         page.wait_for_timeout(400)
+        # 「保存并记下一单」会顺带重开选商品弹层（连续开单设计，RecordEditor.tsx
+        # 里 setPickOpen(true)），弹层遮罩会挡住开单页的「返回」，先关掉再返回。
+        # 用「存在且可见才点」而不是固定等待，避免以后 UI 再变就误报超时。
+        finish = page.get_by_role("button", name="完成（回单据）")
+        if finish.count() > 0 and finish.first.is_visible():
+            finish.first.click()
+            page.wait_for_timeout(300)
         page.get_by_role("button", name="返回").click()
         page.wait_for_timeout(400)
         page.wait_for_selector("text=¥25.00", timeout=5000)
