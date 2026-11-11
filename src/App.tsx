@@ -8,6 +8,7 @@ import {
   sessionReport
 } from './db/calc';
 import { loadAll } from './db/repo';
+import { pickOpenSession } from './db/sessionLogic';
 import { SETTING_KEYS } from './db/types';
 import { fenToStr } from './db/util';
 import { useSync } from './ui/useSync';
@@ -45,10 +46,11 @@ export default function App() {
   }, [data]);
 
   const deviceId = settings[SETTING_KEYS.deviceId] ?? '';
-  const operators = useMemo(
-    () => [settings[SETTING_KEYS.operatorA] ?? '我', settings[SETTING_KEYS.operatorB] ?? '老婆'],
-    [settings]
-  );
+  // 一台手机 = 一个人：operators 恒为一个元素，长度 1，所有 operators[0] 的消费点零改动
+  const operators = useMemo(() => {
+    const self = (settings[SETTING_KEYS.operatorSelf] ?? '').trim();
+    return [self || settings[SETTING_KEYS.deviceName] || '本机'];
+  }, [settings]);
   const warnDays = Number(settings[SETTING_KEYS.expiryWarnDays] ?? '30') || 30;
   const hasSample = (data?.products ?? []).some((p) => p.sample);
   const sampleNoticeDismissed = settings[SETTING_KEYS.sampleNoticeDismissed] === '1';
@@ -69,12 +71,10 @@ export default function App() {
   );
   const avgCost = useMemo(() => productAvgCostFen(data?.batches ?? []), [data]);
 
-  const openSession = useMemo(() => {
-    const rows = (data?.sessions ?? []).filter(
-      (s) => s.status === 'open' && s.deviceId === deviceId
-    );
-    return rows.sort((a, b) => (a.startedAt < b.startedAt ? 1 : -1))[0];
-  }, [data, deviceId]);
+  const openSession = useMemo(
+    () => pickOpenSession(data?.sessions ?? [], deviceId),
+    [data, deviceId]
+  );
 
   const openSummary = useMemo(
     () =>
@@ -213,8 +213,7 @@ export default function App() {
         editor={editor}
         sub={sub}
         tab={tab}
-        theme={theme}
-        onToggleTheme={toggleTheme}
+        sync={sync}
         onBack={() => setSub(null)}
         onSelectTab={(t) => {
           setTab(t);
@@ -231,7 +230,7 @@ export default function App() {
       >
         {data && appData ? (
           <AppDataProvider value={appData} actions={appActions}>
-            <AppMain tab={tab} sub={sub} editor={editor} />
+            <AppMain tab={tab} sub={sub} editor={editor} theme={theme} onToggleTheme={toggleTheme} />
           </AppDataProvider>
         ) : null}
       </AppShell>

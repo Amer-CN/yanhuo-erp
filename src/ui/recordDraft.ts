@@ -1,10 +1,14 @@
-// 单据草稿：自动存 sessionStorage，防止补记中途被打断白做。
+// 单据草稿：自动存 localStorage，防止补记中途被打断白做。
+// 用 localStorage 而非 sessionStorage：PWA 被系统回收（摊位切微信再回来）后
+// sessionStorage 会随进程蒸发，localStorage 才能把半张单留住。
 // 金额一律整数分；输入框保留文本，避免受控输入跳光标。
 
 import type { PayMethod, SalesOrder } from '../db/types';
 import { fenToStr, strToFen } from '../db/util';
 
 export interface RecordLineDraft {
+  /** 稳定行标识：删行后不让后面所有卡片重挂载（输入框失焦） */
+  key: string;
   productId: string;
   unit: 'box' | 'base';
   qtyBase: number;
@@ -68,7 +72,7 @@ export function writeLastPay(pay: PayMethod): void {
 
 export function saveDraft(draft: RecordDraft, key: string = DRAFT_KEY): void {
   try {
-    sessionStorage.setItem(key, JSON.stringify(draft));
+    localStorage.setItem(key, JSON.stringify(draft));
   } catch {
     /* 存不下就只留在内存 */
   }
@@ -77,17 +81,24 @@ export function saveDraft(draft: RecordDraft, key: string = DRAFT_KEY): void {
 export function loadDraft(key: string = DRAFT_KEY): RecordDraft | null {
   try {
     const legacy = legacyKeyFor(key);
-    const raw = sessionStorage.getItem(key) ?? (legacy ? sessionStorage.getItem(legacy) : null);
+    const raw = localStorage.getItem(key) ?? (legacy ? localStorage.getItem(legacy) : null);
     if (!raw) return null;
     const d = JSON.parse(raw) as Partial<RecordDraft>;
-    if (!Array.isArray(d.lines) || d.lines.length === 0) return null;
+    if (!Array.isArray(d.lines)) return null;
+    // 与保存侧契约一致：有行或有备注都算有效草稿。
+    // 只填了备注的草稿以前会被这里丢掉，用户看到「已保存草稿」回来却是空的。
+    const hasLines = d.lines.length > 0;
+    const hasNote = typeof d.note === 'string' && d.note.trim().length > 0;
+    if (!hasLines && !hasNote) return null;
     return {
       sessionId: typeof d.sessionId === 'string' ? d.sessionId : undefined,
       orderId: typeof d.orderId === 'string' ? d.orderId : undefined,
       payMethod: d.payMethod === 'wechat' || d.payMethod === 'alipay' ? d.payMethod : 'cash',
       operator: typeof d.operator === 'string' ? d.operator : '',
       note: typeof d.note === 'string' ? d.note : '',
-      lines: d.lines.map((l) => ({
+      lines: d.lines.map((l, i) => ({
+        // 老草稿没有 key：用「商品+下标」兜底，只影响首次恢复时的重挂载
+        key: typeof l.key === 'string' && l.key ? l.key : `${l.productId}-${i}`,
         productId: l.productId,
         unit: l.unit === 'box' ? 'box' : 'base',
         qtyBase: Number(l.qtyBase) || 1,
@@ -106,12 +117,20 @@ export function loadDraft(key: string = DRAFT_KEY): RecordDraft | null {
 
 export function clearDraft(key: string = DRAFT_KEY): void {
   try {
-    sessionStorage.removeItem(key);
+    localStorage.removeItem(key);
     const legacy = legacyKeyFor(key);
-    if (legacy) sessionStorage.removeItem(legacy);
+    // 旧键也要从同一个存储里清，否则升级后旧键会一直留着
+    if (legacy) localStorage.removeItem(legacy);
   } catch {
     /* ignore */
   }
+}
+
+/** 草稿行稳定标识（用作 React key，删中间行时不让其它行重挂载） */
+export function newLineKey(): string {
+  const c = globalThis.crypto;
+  if (c && typeof c.randomUUID === 'function') return c.randomUUID();
+  return `l-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 8)}`;
 }
 
 /** 按文本重算金额；非法返回 -1 */
@@ -143,6 +162,7 @@ export function draftFromOrder(
     operator: order.operator,
     note: order.note ?? '',
     lines: lines.map((l) => ({
+      key: newLineKey(),
       productId: l.productId,
       unit: l.unit,
       qtyBase: l.qtyBase,

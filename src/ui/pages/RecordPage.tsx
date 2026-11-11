@@ -149,7 +149,7 @@ export default function RecordPage({
       </Card>
 
       <Card flush>
-        <div className="form-head" style={{ margin: '4px 4px 8px' }}>
+        <div className="form-head form-head--inset">
           <h2>本场流水</h2>
           <button type="button" className="link-btn" onClick={onOpenHistory}>
             看全部

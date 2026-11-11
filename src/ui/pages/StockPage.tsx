@@ -7,12 +7,16 @@ import { createAdjustment } from '../../db/repo';
 import { fenToStr, localDate, MS_PER_DAY, qtyToStr } from '../../db/util';
 import { Btn, Empty, Field, Sheet, Stat, rowProps, type Done } from '../kit';
 
+/** 设置里没配置时的默认临期预警天数（与 App 的默认值保持一致） */
+const DEFAULT_EXPIRY_WARN_DAYS = 30;
+
 export default function StockPage({
   products,
   batches,
   inv,
   fifo,
   deviceId,
+  warnDays = DEFAULT_EXPIRY_WARN_DAYS,
   onDone
 }: {
   products: Product[];
@@ -20,12 +24,23 @@ export default function StockPage({
   inv: Map<string, number>;
   fifo: FifoResult;
   deviceId: string;
+  /** 临期阈值（天），跟设置页里的值走，别写死 30 */
+  warnDays?: number;
   onDone: Done;
 }) {
   const [q, setQ] = useState('');
   const [openId, setOpenId] = useState<string | null>(null);
   const [adjust, setAdjust] = useState('');
   const [reason, setReason] = useState('');
+  /*
+   * 调整方向单独成段，不让用户输入负号。
+   * 原因：iOS / 安卓的 inputMode="numeric" 键盘没有减号键，
+   * 原来 placeholder 写「-2」等于让用户填一个打不出来的数（盘亏根本记不上）。
+   * 默认「少了」：摊位上盘亏 / 摔坏远多于盘盈。
+   */
+  const [dir, setDir] = useState<'loss' | 'more'>('loss');
+  // 写库中禁点：盘亏重复提交会连记两笔调整
+  const [saving, setSaving] = useState(false);
 
   const list = useMemo(() => {
     const kw = q.trim().toLowerCase();
@@ -53,30 +68,60 @@ export default function StockPage({
 
   const open = products.find((p) => p.id === openId);
 
+  // 一次算好批次行（原来同一次渲染里调两遍 batchStock）
+  const rows = useMemo(() => (open ? batchStock(batches, open.id, fifo) : []), [batches, open, fifo]);
+  const openStock = open ? inv.get(open.id) ?? 0 : 0;
+  /**
+   * 库存口径：件数取 inventory（含盘亏/退货调整），成本取 FIFO 批次剩余。
+   * 两者的差就是「没摊到批次上的调整」，显式标出来，避免同屏数字看着矛盾。
+   */
+  const batchRemainingTotal = useMemo(
+    () => rows.reduce((sum, r) => sum + r.remaining, 0),
+    [rows]
+  );
+  const adjustGap = openStock - batchRemainingTotal;
+
   const submitAdjust = async () => {
-    if (!open) return;
+    if (!open || saving) return;
     const n = Number(adjust);
     if (!Number.isFinite(n) || n === 0) {
-      onDone('填个非 0 的数（负数=少了，正数=多了）', 'error');
+      onDone('填个非 0 的数，方向点上面「少了 / 多了」', 'error');
       return;
     }
-    await createAdjustment(
-      {
-        productId: open.id,
-        qtyBase: Math.round(n),
-        type: n < 0 ? 'loss' : 'correction',
-        reason: reason || undefined
-      },
-      deviceId
-    );
-    onDone('已修正库存');
-    setAdjust('');
-    setReason('');
-    setOpenId(null);
+    // 输入框只收正数，符号由分段决定：少了 → 负库存调整，多了 → 盘盈修正
+    const signed = dir === 'loss' ? -Math.abs(n) : Math.abs(n);
+    setSaving(true);
+    try {
+      await createAdjustment(
+        {
+          productId: open.id,
+          qtyBase: Math.round(signed),
+          type: dir === 'loss' ? 'loss' : 'correction',
+          reason: reason || undefined
+        },
+        deviceId
+      );
+      onDone(dir === 'loss' ? '已记盘亏' : '已记盘盈');
+      setAdjust('');
+      setReason('');
+      setDir('loss');
+      setOpenId(null);
+    } catch (e) {
+      // 写失败必须说一声，否则用户以为盘亏已经记上了
+      onDone(`没记上：${e instanceof Error ? e.message : '未知错误'}`, 'error');
+    } finally {
+      setSaving(false);
+    }
   };
 
   return (
-    <div className="page-stack">
+    /*
+     * 滚动模型：这一页不跟着整页滚。
+     * .app-main--split 把外层 overflow 关掉，唯一的滚动条长在 .stock-page__scroll 里，
+     * 所以统计卡 / 缺货提示 / 搜索框永远留在原位（不会被长列表挤出屏幕），
+     * 也不会出现「外层一条 + 内层一条」的双层滚动条。
+     */
+    <div className="page-stack stock-page">
       <div className="stat-grid">
         <Stat k="库存总件数" v={totalQty} />
         <Stat k="库存成本" v={<span>¥{fenToStr(totalValue)}</span>} tone="brand" />
@@ -100,52 +145,77 @@ export default function StockPage({
         />
       </div>
 
-      {list.length === 0 ? (
-        <Empty icon={<Boxes size={24} />} text="还没有商品" />
-      ) : (
-        <ul className="glass-list">
-          {list.map((p) => {
-            const stock = inv.get(p.id) ?? 0;
-            return (
-              <li
-                key={p.id}
-                className="glass-list__item glass-list__item--interactive list-item"
-                {...rowProps(() => setOpenId(p.id))}
-              >
-                <span className="glass-list__leading">
-                  {stock < 0 ? (
-                    <TriangleAlert size={22} aria-hidden="true" style={{ color: 'var(--gl-color-error)' }} />
-                  ) : (
-                    <Boxes size={22} aria-hidden="true" />
-                  )}
-                </span>
-                <div className="glass-list__content">
-                  <div className="glass-list__title-row">
-                    <div className="glass-list__title">{p.name}</div>
-                    {p.boxQty > 1 ? (
-                      <span className="glass-badge">
-                        1箱={p.boxQty}
-                        {p.unitBase}
-                      </span>
+      {/*
+        列表区：唯一可滚的一层。min-height:0 + flex:1 由 .stock-page__scroll 提供，
+        商品再多也只是这里滚，上面的搜索框不会跟着走。
+        data-scroll-root 是给弹层滚动锁看的：这一页真正在滚的是这里，不是 .app-main。
+      */}
+      <div className="stock-page__scroll" data-scroll-root="1">
+        {list.length === 0 ? (
+          products.length === 0 ? (
+            <Empty icon={<Boxes size={24} />} text="还没有商品" />
+          ) : q.trim() ? (
+            /*
+             * 有搜索词但没命中（M-08）：老实现和「一个商品都没有」共用「还没有商品」，
+             * 搜错字/用了别名时摊主会以为货丢了。这里明确说是没搜到，并给一键清空。
+             */
+            <Empty
+              icon={<Search size={24} />}
+              text={`没搜到「${q.trim()}」`}
+              action={
+                <Btn block={false} size="sm" variant="secondary" onClick={() => setQ('')}>
+                  看全部商品
+                </Btn>
+              }
+            />
+          ) : (
+            <Empty icon={<Boxes size={24} />} text="商品都归档了，去「更多 → 商品管理」看看" />
+          )
+        ) : (
+          <ul className="glass-list">
+            {list.map((p) => {
+              const stock = inv.get(p.id) ?? 0;
+              return (
+                <li
+                  key={p.id}
+                  className="glass-list__item glass-list__item--interactive list-item"
+                  {...rowProps(() => setOpenId(p.id))}
+                >
+                  <span className="glass-list__leading">
+                    {stock < 0 ? (
+                      <TriangleAlert size={22} aria-hidden="true" style={{ color: 'var(--gl-color-error)' }} />
+                    ) : (
+                      <Boxes size={22} aria-hidden="true" />
+                    )}
+                  </span>
+                  <div className="glass-list__content">
+                    <div className="glass-list__title-row">
+                      <div className="glass-list__title">{p.name}</div>
+                      {p.boxQty > 1 ? (
+                        <span className="glass-badge">
+                          1箱={p.boxQty}
+                          {p.unitBase}
+                        </span>
+                      ) : null}
+                    </div>
+                    <div className="glass-list__subtitle">
+                      库存 {qtyToStr(stock, p.boxQty, p.unitBase)}
+                    </div>
+                  </div>
+                  <div className="glass-list__trailing">
+                    {stock < 0 ? (
+                      <span className="glass-badge glass-badge--error">负库存</span>
+                    ) : stock === 0 ? (
+                      <span className="glass-badge glass-badge--error">没货</span>
                     ) : null}
+                    <ChevronRight size={18} aria-hidden="true" />
                   </div>
-                  <div className="glass-list__subtitle">
-                    库存 {qtyToStr(stock, p.boxQty, p.unitBase)}
-                  </div>
-                </div>
-                <div className="glass-list__trailing">
-                  {stock < 0 ? (
-                    <span className="glass-badge glass-badge--error">负库存</span>
-                  ) : stock === 0 ? (
-                    <span className="glass-badge glass-badge--error">没货</span>
-                  ) : null}
-                  <ChevronRight size={18} aria-hidden="true" />
-                </div>
-              </li>
-            );
-          })}
-        </ul>
-      )}
+                </li>
+              );
+            })}
+          </ul>
+        )}
+      </div>
 
       {open ? (
         <Sheet title={open.name} onClose={() => setOpenId(null)}>
@@ -153,7 +223,7 @@ export default function StockPage({
             <div className="row-between">
               <span className="muted-text">当前库存</span>
               <span style={{ fontWeight: 'var(--yh-weight-semibold)', fontVariantNumeric: 'tabular-nums' }}>
-                {qtyToStr(inv.get(open.id) ?? 0, open.boxQty, open.unitBase)}
+                {qtyToStr(openStock, open.boxQty, open.unitBase)}
               </span>
             </div>
 
@@ -161,11 +231,18 @@ export default function StockPage({
               <h2 className="section-title" style={{ marginBottom: 8 }}>
                 批次明细
               </h2>
-              {batchStock(batches, open.id, fifo).length === 0 ? (
+              {/* 件数含盘亏/退货调整，成本按批次算：差额在这里显式说明，同屏数字才对得上 */}
+              <p className="tiny-text" style={{ marginTop: 0 }}>
+                成本按批次计，不含盘亏/退货调整
+                {adjustGap !== 0
+                  ? `；其中调整 ${adjustGap > 0 ? `+${adjustGap}` : adjustGap} ${open.unitBase}（未分摊到批次）`
+                  : ''}
+              </p>
+              {rows.length === 0 ? (
                 <Empty icon={<Boxes size={24} />} text="还没录进货" />
               ) : (
                 <div className="stack-sm">
-                  {batchStock(batches, open.id, fifo).map(({ batch, remaining }) => {
+                  {rows.map(({ batch, remaining }) => {
                     const days = batch.expiryDate
                       ? Math.round(
                           (new Date(`${batch.expiryDate}T00:00:00`).getTime() -
@@ -189,7 +266,7 @@ export default function StockPage({
                                 {days !== null
                                   ? `（${days < 0 ? '已过期' : `剩 ${days} 天`}）`
                                   : ''}
-                                {days !== null && days <= 30 ? (
+                                {days !== null && days <= warnDays ? (
                                   <span className="glass-badge glass-badge--error" style={{ marginLeft: 6 }}>
                                     临期
                                   </span>
@@ -213,16 +290,35 @@ export default function StockPage({
                 修正库存（盘亏/盘盈）
               </h2>
               <p className="tiny-text" style={{ marginTop: 0 }}>
-                盘点发现对不上时用：负数=少了，正数=多了，单位是{open.unitBase}。
+                盘点发现对不上时用：先点方向，数量只填正数，单位是{open.unitBase}。
               </p>
               <div className="page-stack">
-                <Field label={`调整数量（${open.unitBase}）`}>
+                {/* 方向在这里点，不用打负号：数字键盘本来就没有减号键 */}
+                <div className="glass-segmented glass-segmented--full" role="group" aria-label="调整方向">
+                  <button
+                    type="button"
+                    className="glass-segmented__item"
+                    aria-pressed={dir === 'loss'}
+                    onClick={() => setDir('loss')}
+                  >
+                    少了（盘亏 / 摔坏）
+                  </button>
+                  <button
+                    type="button"
+                    className="glass-segmented__item"
+                    aria-pressed={dir === 'more'}
+                    onClick={() => setDir('more')}
+                  >
+                    多了（盘盈）
+                  </button>
+                </div>
+                <Field label={`调整数量（${open.unitBase}）`} hint="填正数就行，方向上面已经选了">
                   <input
                     className="glass-input"
                     inputMode="numeric"
                     value={adjust}
-                    onChange={(e) => setAdjust(e.target.value)}
-                    placeholder="-2"
+                    onChange={(e) => setAdjust(e.target.value.replace(/\D/g, ''))}
+                    placeholder="2"
                   />
                 </Field>
                 <Field label="原因（可空）">
@@ -233,7 +329,7 @@ export default function StockPage({
                     placeholder="摔坏 / 数错"
                   />
                 </Field>
-                <Btn block variant="secondary" onClick={submitAdjust}>
+                <Btn block variant="secondary" onClick={submitAdjust} disabled={saving}>
                   记一笔调整
                 </Btn>
               </div>

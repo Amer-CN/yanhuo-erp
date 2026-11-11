@@ -2,7 +2,15 @@
 <html lang="zh-CN" data-theme="dark">
   <head>
     <meta charset="UTF-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+    <!--
+      interactive-widget=resizes-content：安卓 Chrome 弹键盘时收缩「布局视口」，
+      底部固定条（结算浮条 / tab 栏）才会跟着上移到键盘上方，
+      而不是被键盘盖住。iOS 不支持这个值，会被忽略（后果见滚动模型说明）。
+    -->
+    <meta
+      name="viewport"
+      content="width=device-width, initial-scale=1.0, viewport-fit=cover, interactive-widget=resizes-content"
+    />
     <meta name="theme-color" content="#070a10" />
     <meta name="apple-mobile-web-app-capable" content="yes" />
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />

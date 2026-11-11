@@ -1,8 +1,7 @@
 import { ChevronRight, Package, Receipt, Settings } from 'lucide-react';
-import type { KeyboardEvent } from 'react';
 import type { Session } from '../db/types';
 import { fenToStr, isoToTime } from '../db/util';
-import { Btn, Card, Empty } from './kit';
+import { Btn, Card, Empty, rowProps } from './kit';
 import type { SubPage } from './AppShell';
 
 /** 「更多」页：本场汇总 + 商品管理 / 销售记录 / 设置与同步入口。 */
@@ -80,17 +79,7 @@ export default function MorePage({
       <ul className="glass-list">
         <li
           className="glass-list__item glass-list__item--interactive list-item"
-          {...{
-            role: 'button',
-            tabIndex: 0,
-            onClick: () => onOpen('products'),
-            onKeyDown: (e: KeyboardEvent) => {
-              if (e.key === 'Enter' || e.key === ' ') {
-                e.preventDefault();
-                onOpen('products');
-              }
-            }
-          }}
+          {...rowProps(() => onOpen('products'))}
         >
           <span className="glass-list__leading">
             <Package size={22} aria-hidden="true" />
@@ -106,17 +95,7 @@ export default function MorePage({
 
         <li
           className="glass-list__item glass-list__item--interactive list-item"
-          {...{
-            role: 'button',
-            tabIndex: 0,
-            onClick: () => onOpen('history'),
-            onKeyDown: (e: KeyboardEvent) => {
-              if (e.key === 'Enter' || e.key === ' ') {
-                e.preventDefault();
-                onOpen('history');
-              }
-            }
-          }}
+          {...rowProps(() => onOpen('history'))}
         >
           <span className="glass-list__leading">
             <Receipt size={22} aria-hidden="true" />
@@ -132,17 +111,7 @@ export default function MorePage({
 
         <li
           className="glass-list__item glass-list__item--interactive list-item"
-          {...{
-            role: 'button',
-            tabIndex: 0,
-            onClick: () => onOpen('settings'),
-            onKeyDown: (e: KeyboardEvent) => {
-              if (e.key === 'Enter' || e.key === ' ') {
-                e.preventDefault();
-                onOpen('settings');
-              }
-            }
-          }}
+          {...rowProps(() => onOpen('settings'))}
         >
           <span className="glass-list__leading">
             <Settings size={22} aria-hidden="true" />

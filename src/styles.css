@@ -41,15 +41,54 @@ body {
 
 /* ------------------------------------------------------------ 布局 */
 
-.app-shell {
+/*
+ * GlassKit 的 .glass-bg 带 overflow-x:hidden，那会让它本身变成「滚动容器」：
+ * 里面所有 position:sticky（顶栏、开单页 .record-top）都会以一个不滚动的祖先
+ * 为参照，于是等于失效 —— 这就是「返回键要滑到顶部才点得到」的根因。
+ * clip 只裁剪、不建立滚动容器（且能与 overflow-y:visible 共存），sticky 因此复活。
+ */
+.glass-bg {
+  overflow-x: clip;
+  /* GlassKit 给的是 min-height:100vh；外壳已锁成 100dvh，iOS 地址栏展开时
+     vh > dvh，会多出一截能被拖出来的空白。对齐到 dvh（内容变长时仍会自然长高）。 */
   min-height: 100dvh;
-  display: flex;
-  flex-direction: column;
 }
 
+@supports not (overflow: clip) {
+  .glass-bg {
+    overflow-x: hidden;
+  }
+}
+
+/*
+ * 底栏浮在视口上（.glass-tab-bar-dock 是 fixed），
+ * 外壳自己已经锁成一屏高，再给 .glass-bg 留这条 padding 只会凭空多出一条
+ * 「滚不动的空白」，把整页顶出视口。改由 .app-main 的 padding-bottom 统一预留。
+ */
+.glass-bg.glass-bg--has-tab-bar-floating {
+  padding-bottom: 0;
+}
+
+/*
+ * 外壳 = 「固定视口 + 内容区自己滚」。
+ * 第三行写 minmax(0, 1fr)：把 min-height:0 直接写进轨道定义里，
+ * 比 flex 版本更不会被后来者误删（删了列表就永远不滚，而且不会报错）。
+ * 第 2 行留给 UpdateBar；它是条件渲染，不出现时该行高度为 0，
+ * 所以头部 / 主体用显式 grid-row 定位，不依赖 DOM 顺序里有没有更新条。
+ */
+.app-shell {
+  height: 100vh; /* 老浏览器兜底 */
+  height: 100dvh;
+  display: grid;
+  grid-template-rows: auto auto minmax(0, 1fr);
+  overflow: hidden; /* 整页不再跟着内容长，滚动只发生在 .app-main 里 */
+}
+
+/* 顶栏是网格第 1 行，天然固定：不再靠 sticky（sticky 的祖先只要有一层
+   overflow 就会失效，那正是「返回键滑走」的病根）。 */
 .app-nav {
-  position: sticky;
-  top: 0;
+  grid-row: 1;
+  position: static;
   z-index: var(--yh-z-nav);
   width: 100%;
   max-width: var(--yh-page-max);
@@ -74,15 +113,56 @@ body {
   text-shadow: 0 2px 14px rgba(0, 0, 0, 0.35);
 }
 
+/*
+ * 内容区是唯一的滚动容器（滚动条出现在这一层，而不是整页）。
+ * - min-height:0：网格/flex 子项默认 min-height:auto，不写就永远不滚
+ * - overscroll-behavior-y:contain（不是 none）：滚到顶继续拉时不再把滚动链
+ *   冒泡给 body —— 否则 iOS 会「整页回弹 + 露出地址栏」，PWA 里表现为黑边闪一下；
+ *   用 none 会连橡皮筋手感一起关掉，太硬
+ * - padding-bottom：给底部浮动 tab 栏让位（96px 已够；带结算浮条的记账页
+ *   另有 .app-main--dock 覆盖成 172px，见下）
+ */
 .app-main {
-  flex: 1;
+  grid-row: 3;
   width: 100%;
   max-width: var(--yh-page-max);
   margin: 0 auto;
-  padding: var(--yh-space-1) var(--yh-page-pad) calc(150px + env(safe-area-inset-bottom, 0px));
+  min-height: 0;
+  overflow-y: auto;
+  overscroll-behavior-y: contain;
+  -webkit-overflow-scrolling: touch;
+  padding: var(--yh-space-1) var(--yh-page-pad) calc(96px + env(safe-area-inset-bottom, 0px));
   display: flex;
   flex-direction: column;
   gap: var(--yh-page-gap);
+}
+
+/*
+ * 记账页底部有 fixed 的 .checkout-dock。实测（390×844）：
+ *   底部安全区 0 → 浮条 bottom = 16(tab 栏浮起) + 74(--yh-dock-bottom-gap) = 90px 离底，
+ *   浮条自身 74px 高 → 浮条顶边离底 164px。
+ * 所以留 172px（164 + 8 呼吸位），否则滚到底时最后一条会被浮条压住 10~20px，
+ * 而且再怎么滚也露不出来。其余 tab 用 96px 就够（实测间距 15px）。
+ */
+.app-main--dock {
+  padding-bottom: calc(172px + env(safe-area-inset-bottom, 0px));
+}
+
+/* 弹层打开时的滚动锁（kit.tsx 的 lockBodyScroll 会打这个标记）：
+   用 overflow:hidden 而不是 display:none —— hidden 仍保留 scrollTop，
+   解锁时能原地还原；display 会把滚动位置清零。
+   第二条对应「页面自己声明了主滚动区」的情况（data-scroll-root，如库存页），
+   这时锁 .app-main 没用（它本来就 overflow:hidden），要锁真正在滚的那一层。 */
+.app-main[data-locked='1'],
+.app-main [data-scroll-root][data-locked='1'] {
+  overflow: hidden;
+}
+
+/* 软键盘弹出时，浏览器按 scroll-margin 把输入框滚到键盘上方，而不是贴着底边 */
+.app-main input,
+.app-main textarea,
+.app-main select {
+  scroll-margin-block: 120px;
 }
 
 .section-title {
@@ -98,6 +178,42 @@ body {
   display: flex;
   flex-direction: column;
   gap: var(--yh-page-gap);
+}
+
+/* -------------------------------------------------------- 库存页：只让列表滚 */
+
+/*
+ * 诉求：搜索框 / 统计卡这类「操作入口」不该被长列表挤出屏幕。
+ * 做法：整页分成「固定区（统计卡 + 缺货提示 + 搜索框）」和「列表区」，
+ * 只让列表区滚。为避免双层滚动条，这一页的 .app-main 自己不再滚
+ * （.app-main--split 把它的 overflow 关掉），滚动只发生在 .stock-page__scroll。
+ * 为什么不选「.app-main 继续滚 + 固定区 position:sticky」：
+ * 固定区有 250px 上下高（两张统计卡 + 提示 + 搜索框），吸顶后
+ * 640px 高的手机上只剩不到 390px 给列表，比现在更憋屈。
+ */
+.app-main--split {
+  overflow: hidden; /* 唯一滚动容器下移到 .stock-page__scroll，避免双层滚动条 */
+}
+
+/* 页面根：吃掉 .app-main 的剩余高度，自己再分成「不滚的固定区 + 只滚的列表区」 */
+.stock-page {
+  flex: 1 1 auto;
+  min-height: 0; /* 不写的话 flex 子项按内容撑高，列表就压不下去 */
+}
+
+/* 统计卡 / 缺货提示 / 搜索框：一律不参与伸缩，长列表挤不走它们 */
+.stock-page > * {
+  flex: none;
+}
+
+/* 唯一的滚动区：flex:1 + min-height:0 才会真的收缩并长出滚动条 */
+.stock-page > .stock-page__scroll {
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow-y: auto;
+  overscroll-behavior-y: contain;
+  -webkit-overflow-scrolling: touch;
+  padding-bottom: var(--yh-space-1); /* 滚到底时最后一行不贴裁切边 */
 }
 
 /* 卡片内边距收紧（GlassKit 默认偏大） */
@@ -296,6 +412,84 @@ body {
   color: var(--gl-color-error);
 }
 
+/* ------------------------------------------------- 商品横条（覆写上方卡片规则） */
+/*
+ * 为什么保留上面的双列卡片规则再覆写：卡片在平板/桌面仍是可接受的信息密度，
+ * 但摊位手机上 390px 宽只能显示 6 个商品（3 行 × 2 列），20-60 个货要反复滚。
+ * 改成单列横条后每行 56px，一屏 7-9 个；价格与库存右对齐成同一列，扫视更快。
+ *
+ * DOM 顺序是 name → price → meta → stock，在 2×2 网格里正好落成：
+ *   名称            ¥价格
+ *   单位/装箱       库存
+ * 所以这一版只改 CSS，不动 JSX 结构。
+ * 56px 高于 44px 触控下限；密度靠留白做，不靠缩字号。
+ */
+.product-grid {
+  grid-template-columns: minmax(0, 1fr);
+  gap: var(--yh-space-2);
+}
+
+.prod-btn {
+  /* 覆盖上面的 flex-direction: column：横条用网格定位四个子元素 */
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: center;
+  column-gap: var(--yh-space-3);
+  row-gap: 1px;
+  min-height: 56px;
+  padding: var(--yh-space-2) var(--yh-card-tight-pad);
+  /* 108px 卡片用 24px 圆角合适，56px 横条会显得“胖”，降到 16px */
+  border-radius: var(--yh-radius-md);
+}
+
+/* 价格贴右、与库存同列右对齐，形成一列可纵向扫视的数字 */
+.prod-btn__price {
+  grid-column: 2;
+  grid-row: 1;
+  text-align: right;
+  font-size: var(--yh-text-lg);
+}
+
+.prod-btn__name {
+  grid-column: 1;
+  grid-row: 1;
+}
+
+.prod-btn__meta {
+  grid-column: 1;
+  grid-row: 2;
+}
+
+.prod-btn__stock {
+  grid-column: 2;
+  grid-row: 2;
+  text-align: right;
+  /* 覆盖上面的 margin-top: auto —— grid 下它会把内容撑开、行高变脏 */
+  margin-top: 0;
+}
+
+/* 斜向高光在 108px 卡片上是质感，在 56px 横条上会显得脏，压一半 */
+.prod-btn::after {
+  opacity: 0.5;
+}
+
+/* 平板同样保持单列/两列横条：原 3 列是为了卡片，横条下 3 列会让名称被挤成一字一行 */
+@media (min-width: 520px) {
+  .product-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+/* 已删除（作废）的销售记录行：透明度 + 删除线同时给，
+   强光下只压透明度看不出“这单不算钱”，必须保留 line-through */
+.glass-list__item.is-voided {
+  opacity: 0.55;
+}
+
+.glass-list__item.is-voided .glass-list__title {
+  text-decoration: line-through;
+}
+
 /* ------------------------------------------------------------ 结算浮条 */
 
 .checkout-dock {
@@ -396,7 +590,11 @@ body {
 .stepper {
   display: inline-flex;
   align-items: center;
-  gap: var(--yh-space-0-5);
+  /*
+   * gap 从 2px 提到 4px：原来两个 44px 圆钮几乎贴在一起，
+   * 连点「+」时手指一滑就落到「−」上（卖 10 个变 5 个）。
+   */
+  gap: var(--yh-space-1);
   border-radius: var(--yh-radius-pill);
   background: var(--gl-surface-4);
   border: 1px solid var(--gl-border-subtle);
@@ -420,7 +618,8 @@ body {
 }
 
 .stepper .val {
-  min-width: 34px; /* 数字槽：容纳 3 位数，组件内部固定 */
+  /* 44px 数字槽：1 位数和 3 位数宽度一致，连点加号时数字不会左右跳 */
+  min-width: 44px;
   text-align: center;
   font-weight: var(--yh-weight-semibold);
   font-variant-numeric: tabular-nums;
@@ -461,7 +660,17 @@ body {
   overscroll-behavior: contain;
 }
 
+/*
+ * 天分组标题吸顶（只在 HistoryPage 用）。
+ * 它吸的是 .app-main 这条滚动容器 —— 中间层（.page-stack、`<div key={day}>`）
+ * 都不能有 overflow，否则最近滚动祖先被截断，sticky 会静默失效。
+ * background 必须不透明：玻璃卡是半透明的，不铺底会让下面的行透上来。
+ */
 .day-header {
+  position: sticky;
+  top: 0;
+  z-index: 1;
+  background: var(--yh-canvas);
   display: flex;
   align-items: baseline;
   justify-content: space-between;
@@ -475,6 +684,32 @@ body {
   font-size: var(--yh-text-xs);
   font-weight: var(--yh-weight-medium);
   color: var(--gl-color-text-muted);
+}
+
+/*
+ * 报表页的单品表：**只做横向滚动，纵向交给 .app-main**（M-02）。
+ *
+ * 老写法是 `max-height:60dvh; overflow:auto`，于是页面上同时存在两条纵向滚动条：
+ * 表格自己一条、.app-main 一条。表格内滚到底时 `overscroll-behavior:contain`
+ * 还会把滚动链断掉 —— 用户在表格上方怎么滑页面都不动，以为界面卡死。
+ * 现在去掉 max-height：表格高度=内容高度，纵向不会溢出，自然不会出现第二条滚动条。
+ * 代价：表头（.glass-table thead th 的 sticky）改为随页面一起滚走 —— 这是
+ * 拿「表头常驻」换掉「滚不动/两条滚动条」，对一屏几十行的单品表更划算。
+ * 横向仍然要滚：390px 宽放不下 7 列。
+ */
+.glass-table-wrap {
+  overflow-x: auto;
+  overflow-y: hidden; /* 显式声明：永远不在这层纵向滚，避免溢出时冒出第二条滚动条 */
+  overscroll-behavior-x: contain;
+}
+
+.glass-table thead th {
+  position: sticky;
+  top: 0;
+  z-index: 1;
+  background: var(--yh-canvas);
+  border-bottom: 0;
+  box-shadow: inset 0 -1px 0 var(--gl-border-medium);
 }
 
 .mini-card {
@@ -503,6 +738,11 @@ body {
   font-size: var(--yh-card-title-size);
   font-weight: var(--yh-weight-semibold);
   color: var(--gl-color-text-heading);
+}
+
+/* 卡片内小标题的左右留白：原来 RecordPage/ReportPage 三处各写一遍内联 margin */
+.form-head--inset {
+  margin: var(--yh-space-1) var(--yh-space-1) var(--yh-space-2);
 }
 
 /* 顶栏和底部玻璃在深色下更沉稳 */
@@ -880,8 +1120,38 @@ body {
   }
 }
 
+/* ------------------------------------------------------ Toast 触控目标（44） */
+/*
+ * 2026-11-11 实测回归（a11y 第 [4] 段量到「知道了 72×32」）：
+ * GlassKit 的 .glass-toast__action 是 height:32px，只靠 ::after 把可点区扩了 6px 上下
+ * —— 布局盒子仍是 32，脚本与读屏量到的就是 32，低于 44 触控下限。
+ * 这里只把按钮本体在**纵向**抬到 44：Toast 容器因此最高约 70px，远低于 96px，
+ * 不会把提示条撑成一条大横幅。横向不强行 44（长中文会被迫换行），
+ * 现有 padding 已让「撤销 / 知道了」都超过 44px 宽。
+ */
+.glass-toast .glass-toast__action {
+  min-height: var(--yh-touch-min, 44px);
+  padding-block: 0;
+}
+
+/* 关闭按钮（只在错误语气出现）：28×28 的圆点太小，补成 44 的圆 */
+.glass-toast .glass-toast__close {
+  min-width: var(--yh-touch-min, 44px);
+  min-height: var(--yh-touch-min, 44px);
+  margin-inline: 0;
+}
+
 /* 减动效：保留颜色/透明度反馈，去掉位移与弹层动画 */
 @media (prefers-reduced-motion: reduce) {
+  /* 新增的滚动容器不能自带平滑滚动；scroll-snap 也不加（列表吸附在
+     慢设备上会明显掉帧）。这条只是兜底：项目里没有人用 scroll-behavior。 */
+  .app-main,
+  .app-main--editor,
+  .glass-table-wrap,
+  .stock-page__scroll {
+    scroll-behavior: auto;
+  }
+
   .checkout-dock {
     animation: none;
   }

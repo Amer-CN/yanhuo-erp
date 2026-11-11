@@ -17,6 +17,10 @@ export default function ProductsPage({
   const [q, setQ] = useState('');
   const [editing, setEditing] = useState<Product | 'new' | null>(null);
   const [delConfirm, setDelConfirm] = useState(false);
+  // 商品表单与停用/删除都走这里：写库中一律禁点，避免同一商品建两份
+  const [saving, setSaving] = useState(false);
+  const [deleting, setDeleting] = useState(false);
+  const [delError, setDelError] = useState('');
 
   const list = useMemo(() => {
     const kw = q.trim().toLowerCase();
@@ -31,14 +35,38 @@ export default function ProductsPage({
   }, [products, q]);
 
   const save = async (input: ProductInput) => {
-    if (editing === 'new') {
-      await createProduct(input);
-      onDone('商品已建');
-    } else if (editing) {
-      await updateProduct(editing.id, input);
-      onDone('已保存');
+    if (saving) return;
+    setSaving(true);
+    try {
+      if (editing === 'new') {
+        await createProduct(input);
+        onDone('商品已建');
+      } else if (editing) {
+        await updateProduct(editing.id, input);
+        onDone('已保存');
+      }
+      setEditing(null);
+    } finally {
+      // 失败不 catch：抛回 ProductFormModal，由表单就地显示原因（不关框）
+      setSaving(false);
     }
-    setEditing(null);
+  };
+
+  /** 删除/停用：失败时确认框保持打开并就地提示 */
+  const doDelete = async () => {
+    if (!editing || editing === 'new' || deleting) return;
+    setDeleting(true);
+    setDelError('');
+    try {
+      await deleteProduct(editing.id);
+      onDone('已处理');
+      setDelConfirm(false);
+      setEditing(null);
+    } catch (e) {
+      setDelError(e instanceof Error ? e.message : '删除失败，稍后重试');
+    } finally {
+      setDeleting(false);
+    }
   };
 
   return (
@@ -126,10 +154,19 @@ export default function ProductsPage({
                   variant="secondary"
                   size="sm"
                   onClick={async () => {
-                    await updateProduct(editing.id, { archived: !editing.archived });
-                    onDone(editing.archived ? '已启用' : '已停用');
-                    setEditing(null);
+                    if (saving) return;
+                    setSaving(true);
+                    try {
+                      await updateProduct(editing.id, { archived: !editing.archived });
+                      onDone(editing.archived ? '已启用' : '已停用');
+                      setEditing(null);
+                    } catch (e) {
+                      onDone(`没改上：${e instanceof Error ? e.message : '未知错误'}`, 'error');
+                    } finally {
+                      setSaving(false);
+                    }
                   }}
+                  disabled={saving}
                 >
                   <span className="icon-text">
                     <Power size={16} aria-hidden="true" />
@@ -140,7 +177,10 @@ export default function ProductsPage({
                   block={false}
                   variant="danger"
                   size="sm"
-                  onClick={() => setDelConfirm(true)}
+                  onClick={() => {
+                    setDelError('');
+                    setDelConfirm(true);
+                  }}
                 >
                   <span className="icon-text">
                     <Trash2 size={16} aria-hidden="true" /> 删除
@@ -155,16 +195,27 @@ export default function ProductsPage({
       {delConfirm && editing && editing !== 'new' ? (
         <ConfirmSheet
           title={`删除「${editing.name}」？`}
-          description="有进货/销售记录的商品不会被删，只会停用。"
+          description={
+            <span>
+              有进货/销售记录的商品不会被删，只会停用。
+              {delError ? (
+                <>
+                  <br />
+                  <span className="glass-hint glass-hint--error" role="alert">
+                    {delError}
+                  </span>
+                </>
+              ) : null}
+            </span>
+          }
           confirmText="删除"
           danger
-          onConfirm={async () => {
+          busy={deleting}
+          onConfirm={() => void doDelete()}
+          onCancel={() => {
             setDelConfirm(false);
-            await deleteProduct(editing.id);
-            onDone('已处理');
-            setEditing(null);
+            setDelError('');
           }}
-          onCancel={() => setDelConfirm(false)}
         />
       ) : null}
     </div>

@@ -5,6 +5,9 @@ import { createBatch, createProduct, deleteBatch, RecordError } from '../../db/r
 import { DELETED_PRODUCT, fenToStr, localDate, qtyToStr, strToFen } from '../../db/util';
 import { Btn, Card, ConfirmSheet, Empty, Field, ProductFormModal, Sheet, rowProps, type Done } from '../kit';
 
+/** 「今天已录」抽屉只显示最近这么多条；条数统计仍按全量算 */
+const TODAY_LIST_LIMIT = 30;
+
 interface PurchaseForm {
   productId: string;
   qty: string;
@@ -49,8 +52,13 @@ export default function PurchasePage({
   const [todayOpen, setTodayOpen] = useState(false);
   const [delBatchId, setDelBatchId] = useState<string | null>(null);
   // 删除失败的就地提示：已卖出的批次不能删（不能只用 toast，否则用户看不到原因）
-  const [delError, setDelError] = useState<string | null>(null);
+  // 必须带上出错的批次 id：提示渲染在 Sheet 内部的失败条目下方，避免被模态遮罩盖住
+  const [delError, setDelError] = useState<{ batchId: string; message: string } | null>(null);
   const [errors, setErrors] = useState<{ product?: string; qty?: string; cost?: string }>({});
+  // 写库中禁止再点：同一批货录两遍会直接改写 FIFO 成本
+  const [saving, setSaving] = useState(false);
+  const [delConfirmError, setDelConfirmError] = useState('');
+  const [deleting, setDeleting] = useState(false);
 
   const product = active.find((p) => p.id === productId);
   const factor = unit === 'box' && product && product.boxQty > 1 ? product.boxQty : 1;
@@ -62,12 +70,17 @@ export default function PurchasePage({
   const totalCost = qtyBase * unitCostFen;
 
   const today = localDate();
+  // 统计走全量（原来直接拿截断后的 length 当总数，第 31 条起永远显示 30）
+  const todayCount = useMemo(
+    () => batches.filter((b) => b.receivedAt === today).length,
+    [batches, today]
+  );
   const todayBatches = useMemo(
     () =>
       batches
         .filter((b) => b.receivedAt === today)
         .sort((a, b) => (a.createdAt < b.createdAt ? 1 : -1))
-        .slice(0, 30),
+        .slice(0, TODAY_LIST_LIMIT),
     [batches, today]
   );
 
@@ -79,6 +92,7 @@ export default function PurchasePage({
   };
 
   const save = async () => {
+    if (saving) return;
     const next: typeof errors = {};
     if (!product) next.product = '先选一个商品';
     if (qtyBase <= 0) next.qty = '数量要大于 0';
@@ -86,25 +100,61 @@ export default function PurchasePage({
     setErrors(next);
     if (Object.keys(next).length > 0) return;
 
-    await createBatch(
-      {
-        productId: product!.id,
-        qtyBase,
-        unitCostFen,
-        batchNo: batchNo || undefined,
-        produceDate: produceDate || undefined,
-        expiryDate: expiryDate || undefined,
-        supplier: supplier || undefined,
-        receivedAt
-      },
-      deviceId
-    );
-    onDone(`已进货 ${product!.name} ${qtyToStr(qtyBase, product!.boxQty, product!.unitBase)}`);
-    resetForm();
+    setSaving(true);
+    try {
+      await createBatch(
+        {
+          productId: product!.id,
+          qtyBase,
+          unitCostFen,
+          batchNo: batchNo || undefined,
+          produceDate: produceDate || undefined,
+          expiryDate: expiryDate || undefined,
+          supplier: supplier || undefined,
+          receivedAt
+        },
+        deviceId
+      );
+      onDone(`已进货 ${product!.name} ${qtyToStr(qtyBase, product!.boxQty, product!.unitBase)}`);
+      resetForm();
+    } catch (e) {
+      // 没存上必须说清楚：否则用户以为录过了，第二遍会改写 FIFO 成本
+      onDone(`没存上：${e instanceof Error ? e.message : '未知错误'}`, 'error');
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  /** 删除一条进货：失败时确认框保持打开并就地显示原因 */
+  const doDeleteBatch = async () => {
+    const id = delBatchId;
+    if (!id || deleting) return;
+    setDeleting(true);
+    setDelConfirmError('');
+    try {
+      await deleteBatch(id);
+      setDelError(null);
+      /*
+       * M-14：这里**没有**「撤销」按钮，是刻意的。
+       * 撤销必须「按原 id 把批次恢复」，否则换了 id 就等于凭空多出一条进货，
+       * 和已同步/已审计的数据对不上，属于半吊子撤销。db 层目前只有
+       * createBatch（repo.ts:240 一律 `id: uuid()`）与 deleteBatch，
+       * 没有按 id 恢复的入口，而 db 层不归本次改动 —— 所以如实告诉用户恢复路径。
+       */
+      onDone('已删除这条进货。删错了可在「设置与同步 → 本地备份 / 导入备份」恢复', 'warning');
+      setDelBatchId(null);
+    } catch (e) {
+      // 已卖出的批次会被 repo 拦下
+      const message = e instanceof RecordError ? e.message : '删除失败，稍后重试';
+      setDelConfirmError(message);
+      setDelError({ batchId: id, message });
+    } finally {
+      setDeleting(false);
+    }
   };
 
   return (
-    <div className="page-stack">
+    <div className="page-stack page-stack--fixed-bar">
       <Card>
         <div className="form-head">
           <h2>录入进货</h2>
@@ -163,10 +213,16 @@ export default function PurchasePage({
             <Field label={`数量（${unit === 'box' ? '箱' : product?.unitBase ?? '个'}）`} error={errors.qty}>
               <input
                 className="glass-input"
-                inputMode="decimal"
+                inputMode="numeric"
                 value={qty}
                 onChange={(e) => {
-                  patchForm({ qty: e.target.value });
+                  /*
+                   * L-09：只收数字。
+                   * 原来 inputMode="decimal" 并且原样存字符串，于是「1.5 个」能填进去，
+                   * 提交时 qtyBase = Math.round(1.5 * factor) 被静默取整成 2 ——
+                   * 账面凭空多出一件，摊主完全看不出是哪一步改的。
+                   */
+                  patchForm({ qty: e.target.value.replace(/\D/g, '') });
                   setErrors((p) => ({ ...p, qty: undefined }));
                 }}
               />
@@ -191,10 +247,6 @@ export default function PurchasePage({
               {fenToStr(totalCost)}
             </p>
           ) : null}
-
-          <Btn block onClick={save}>
-            保存这一条
-          </Btn>
 
           <details className="purchase-extra">
             <summary>批次信息（可选：批号、生产日期、有效期、厂家）</summary>
@@ -252,6 +304,18 @@ export default function PurchasePage({
         </div>
       </Card>
 
+      {/*
+       * 保存按钮移出卡片流（三.8）：原来夹在「进价」和「批次信息」折叠面板之间，
+       * 页面一滚按钮就跑到屏幕上方，单手拇指够不到。
+       * 复用开单页底栏样式，加 --above-dock 变体抬到浮动 Tab Bar 之上；
+       * saving 的禁用态一起带过来，避免同一批货连点两遍改坏 FIFO 成本。
+       */}
+      <div className="record-actions record-actions--above-dock">
+        <Btn block onClick={save} disabled={saving}>
+          {saving ? '保存中…' : '保存这一条'}
+        </Btn>
+      </div>
+
       <ul className="glass-list">
         <li
           className="glass-list__item glass-list__item--interactive list-item"
@@ -261,20 +325,24 @@ export default function PurchasePage({
             <PackagePlus size={22} aria-hidden="true" />
           </span>
           <div className="glass-list__content">
-            <div className="glass-list__title">今天已录 {todayBatches.length} 条</div>
+            <div className="glass-list__title">今天已录 {todayCount} 条</div>
             <div className="glass-list__subtitle">点开看明细 / 删错</div>
           </div>
         </li>
       </ul>
 
-      {delError ? (
-        <p className="glass-hint glass-hint--error" role="alert" style={{ margin: '8px 2px 0' }}>
-          {delError}
-        </p>
-      ) : null}
-
       {todayOpen ? (
-        <Sheet title="今天录入的进货" onClose={() => setTodayOpen(false)}>
+        <Sheet
+          title="今天录入的进货"
+          subtitle={`共 ${todayCount} 条${
+            todayCount > todayBatches.length ? ` · 显示最近 ${todayBatches.length} 条` : ''
+          }`}
+          onClose={() => {
+            setTodayOpen(false);
+            // 关掉明细就清掉上一次的删除失败提示，避免下次点开还残留
+            setDelError(null);
+          }}
+        >
           {todayBatches.length === 0 ? (
             <Empty icon={<PackagePlus size={24} />} text="今天还没录进货" />
           ) : (
@@ -305,12 +373,23 @@ export default function PurchasePage({
                         aria-label={`删除 ${pname(b.productId)} 这条进货`}
                         onClick={() => {
                           setDelError(null);
+                          setDelConfirmError('');
                           setDelBatchId(b.id);
                         }}
                       >
                         <Trash2 size={16} aria-hidden="true" />
                       </Btn>
                     </div>
+                    {/* 删除失败原因就地显示在这一条下面：Sheet 是带遮罩的模态，提示放到页面主体会被挡住 */}
+                    {delError?.batchId === b.id ? (
+                      <p
+                        className="glass-hint glass-hint--error"
+                        role="alert"
+                        style={{ margin: '6px 0 0' }}
+                      >
+                        {delError.message}
+                      </p>
+                    ) : null}
                   </div>
                 );
               })}
@@ -336,20 +415,19 @@ export default function PurchasePage({
           title="删除这条进货记录？"
           confirmText="删除"
           danger
-          onConfirm={async () => {
-            const id = delBatchId;
+          busy={deleting}
+          description={
+            delConfirmError ? (
+              <span className="glass-hint glass-hint--error" role="alert">
+                {delConfirmError}
+              </span>
+            ) : undefined
+          }
+          onConfirm={() => void doDeleteBatch()}
+          onCancel={() => {
             setDelBatchId(null);
-            if (!id) return;
-            try {
-              await deleteBatch(id);
-              setDelError(null);
-              onDone('已删除', 'warning');
-            } catch (e) {
-              // 已卖出的批次会被 repo 拦下，就地提示原因，不弹 alert
-              setDelError(e instanceof RecordError ? e.message : '删除失败，稍后重试');
-            }
+            setDelConfirmError('');
           }}
-          onCancel={() => setDelBatchId(null)}
         />
       ) : null}
     </div>

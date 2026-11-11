@@ -5,7 +5,6 @@ import {
   Banknote,
   QrCode,
   Wallet,
-  User,
   PackagePlus
 } from 'lucide-react';
 import type { PayMethod, Product, SalesOrder } from '../db/types';
@@ -15,7 +14,7 @@ import { fenToStr } from '../db/util';
 import { Btn, ConfirmSheet, Empty, Field, type Done } from './kit';
 import ProductPicker from './ProductPicker';
 import RecordLineCard from './RecordLineCard';
-import { clearDraft, writeLastPay, type RecordDraft } from './recordDraft';
+import { writeLastPay, type RecordDraft } from './recordDraft';
 import { useRecordDraft } from './useRecordDraft';
 
 const PAY_ICON: Record<PayMethod, typeof Banknote> = {
@@ -69,15 +68,16 @@ export default function RecordEditor({
     draft,
     setDraft,
     productById,
-    draftStorageKey,
     errorIndex,
     errorText,
     setErrorIndex,
     showDraftHint,
-    amountRefs,
+    registerAmountRef,
+    registerQtyRef,
     setLines,
     addProduct,
     changeQty,
+    setQty,
     switchUnit,
     toggleGift,
     setAmount,
@@ -86,7 +86,8 @@ export default function RecordEditor({
     buildInputFrom,
     buildInput,
     totals,
-    resetDraft
+    resetDraft,
+    discardDraft
   } = useRecordDraft({ mode, products, avgCost, operators, deviceId, sessionId, orderId, initial });
 
   const [pickOpen, setPickOpen] = useState(false);
@@ -124,12 +125,20 @@ export default function RecordEditor({
             };
 
       if (andNext) {
-        clearDraft(draftStorageKey);
+        // 用 discardDraft（含 debounce 队列）：只清 storage 会在卸载 flush 时把
+        // 刚保存的这一单又写回草稿箱，下次开单冒出「继续上次没记完的单？」（L-11）
+        discardDraft();
         setDraft((d) => ({ ...d, note: '', lines: [] }));
         setErrorIndex(null);
         window.setTimeout(() => addBtnRef.current?.focus(), 30);
+        /*
+         * 连续开单是摊位常态：不自动开弹层的话，每单固定多一次「添加商品」。
+         * 弹层用 initialFocus="panel"（ProductPicker.tsx:48），焦点给面板不给输入框，
+         * 所以不会一保存完就弹键盘。
+         */
+        window.setTimeout(() => setPickOpen(true), 30);
       } else {
-        clearDraft(draftStorageKey);
+        discardDraft();
       }
       onSaved(order, andNext, undo);
     } catch (e) {
@@ -145,8 +154,23 @@ export default function RecordEditor({
     }
   };
 
-  const onRemoveLine = (idx: number) =>
+  const onRemoveLine = (idx: number) => {
+    const removed = draft.lines[idx];
+    if (!removed) return;
     setLines((lines) => lines.filter((_, i) => i !== idx));
+    // 删掉的可能正是报错那一行：不复位的话红字会停在下一行上
+    setErrorIndex(null);
+    /*
+     * 误触（戴手套 / 强光 / 手抖）后不该只能重选重填，所以给一条可撤销的提示。
+     * 插回按原索引，靠 RecordLineDraft.key 稳定，其它行不会重挂载；
+     * 顺便把草稿里可能已改过的金额原样带回来（removed 是删之前的快照）。
+     */
+    onDone(`已移除 ${productById.get(removed.productId)?.name ?? '商品'}`, 'warning', {
+      label: '撤销',
+      onClick: () =>
+        setLines((lines) => [...lines.slice(0, idx), removed, ...lines.slice(idx)])
+    });
+  };
 
   const requestClose = () => {
     if (draft.lines.length > 0 || draft.note.trim()) setConfirmClose(true);
@@ -219,26 +243,6 @@ export default function RecordEditor({
           </div>
         </div>
 
-        <div className="record-bar">
-          <div className="record-bar__label">操作人</div>
-          <div className="glass-segmented record-bar__seg" role="group" aria-label="操作人">
-            {operators.map((op) => (
-              <button
-                key={op}
-                type="button"
-                className="glass-segmented__item"
-                aria-pressed={draft.operator === op}
-                onClick={() => setDraft((d) => ({ ...d, operator: op }))}
-              >
-                <span className="icon-text">
-                  <User size={16} aria-hidden="true" />
-                  {op}
-                </span>
-              </button>
-            ))}
-          </div>
-        </div>
-
         <div className="form-head">
           <h2 className="section-title">这一单的商品</h2>
           <span className="tiny-text">{draft.lines.length > 0 ? `${draft.lines.length} 行` : ''}</span>
@@ -261,7 +265,7 @@ export default function RecordEditor({
               if (!p) return null;
               return (
                 <RecordLineCard
-                  key={`${l.productId}-${i}`}
+                  key={l.key}
                   line={l}
                   index={i}
                   product={p}
@@ -269,15 +273,29 @@ export default function RecordEditor({
                   err={lineError(l)}
                   errorIndex={errorIndex}
                   errorText={errorText}
-                  amountRef={(el) => {
-                    amountRefs.current[i] = el;
-                  }}
+                  /* L-12：按行 key 注册（而非数组下标），删行后不会留下陈旧引用 */
+                  amountRef={(el) => registerAmountRef(l.key, el)}
+                  qtyRef={(el) => registerQtyRef(l.key, el)}
                   onRemove={() => {
                     // 行删除仍走 hook 的 setLines，保持原来的过滤语义
                     onRemoveLine(i);
                   }}
                   onChangeQty={(delta) => changeQty(i, delta)}
-                  onSwitchUnit={() => switchUnit(i)}
+                  onSetQty={(qty) => setQty(i, qty)}
+                  onSwitchUnit={(unit) => {
+                    /*
+                     * 不足 1 箱时 hook 按 1 箱计（不再是 disabled、也不再静默放大）：
+                     * 这里用一条非模态 Toast 明确告知，且只在这一步提示一次 ——
+                     * 切过去以后再次点「箱」会命中「已经是目标单位」分支，不会再弹。
+                     */
+                    const res = switchUnit(i, unit);
+                    if (res.bumpedToBox) {
+                      onDone(
+                        `已按 1 箱（${p.boxQty}${p.unitBase}）计，可再调整数量`,
+                        'warning'
+                      );
+                    }
+                  }}
                   onToggleGift={() => toggleGift(i)}
                   onSetAmount={(text) => setAmount(i, text)}
                 />
@@ -320,10 +338,22 @@ export default function RecordEditor({
       </div>
 
       <div className="record-actions">
+        {/*
+         * 合计常驻在底栏左侧：单手录到第 4 个商品时不用滚回去确认「这单 380 对不对」。
+         * 上面的 .record-total 明细区保留（还有让利 / 赠品成本）。
+         */}
+        <div className="record-actions__total">
+          <span className="k">合计</span>
+          <span className="v">¥{fenToStr(totals.total)}</span>
+        </div>
         <Btn variant="secondary" block disabled={busy} onClick={() => submit(false)}>
           {busy ? '保存中…' : '只保存'}
         </Btn>
         <Btn block disabled={busy} onClick={() => submit(true)}>
+          {/*
+           * 文案保持「保存并记下一单」不动：e2e-smoke.py:76 按这个可访问名点按钮，
+           * 改名会让 CI 的 e2e 门禁失败。宽度靠 record.css 里收紧 gap / 内边距解决。
+           */}
           {busy ? '保存中…' : '保存并记下一单'}
         </Btn>
       </div>

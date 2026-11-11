@@ -104,7 +104,7 @@ export default function CloseSessionSheet({
   if (uncoveredQty > 0) {
     checks.push({
       icon: CircleAlert,
-      text: `${uncoveredQty} 件成本缺失（可能漏记进货）`,
+      text: `${uncoveredQty} 个（基本单位）成本缺失（可能漏记进货）`,
       action: '去补录',
       onClick: onGoPurchase,
       tone: 'warn'

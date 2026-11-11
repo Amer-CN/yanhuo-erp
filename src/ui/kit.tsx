@@ -154,6 +154,13 @@ export function rowProps(onClick: () => void) {
     tabIndex: 0,
     onClick,
     onKeyDown: (e: KeyboardEvent<HTMLElement>) => {
+      /*
+       * 只响应「行自己」拿到焦点时的 Enter / Space（M-07）。
+       * 行内可能还嵌着按钮（销售记录的「撤销」、进货明细的删除），它们的 keydown
+       * 会冒泡到这一层：老写法下一次 Enter 会同时被当成「撤销」和「打开详情」，
+       * 撤销成功后还顺手弹出那张单的明细框。
+       */
+      if (e.target !== e.currentTarget) return;
       if (e.key === 'Enter' || e.key === ' ') {
         e.preventDefault();
         onClick();
@@ -219,13 +226,97 @@ export function Toast({
 
 /* ---------------------------------------------------------------- 底部弹层 */
 
+/** 关闭动画时长：与 tokens.css 的 --yh-dur-sheet（260ms）同值，改 CSS 时这里同步 */
+const SHEET_CLOSE_MS = 260;
+
+/**
+ * body / 内容区滚动锁引用计数：弹层可以嵌套（确认框开在明细弹层上）。
+ * 只有 0→1 的那一层记录滚动位置并上锁，1→0 时才解除并还原；
+ * 内层进出不改滚动，否则会读到 scrollTop=0 并把页面弹回顶部。
+ *
+ * 改造后整页不再滚动，滚动发生在 .app-main 里，此时 window.scrollY 恒为 0，
+ * 继续锁 body 等于「锁了个寂寞」——弹层打开时背景列表照样能被手指带走。
+ * 所以优先锁滚动容器；容器不存在（或这一页是文档滚动的开单页）才退回锁 body。
+ */
+let sheetLockCount = 0;
+let sheetSavedY = 0;
+/** 本次锁的是哪个容器；null = 本次锁的是 body（或尚未上锁） */
+let sheetLockScroller: HTMLElement | null = null;
+
+/**
+ * 找真正的滚动容器。
+ * 1) 页面自己声明了主滚动区（data-scroll-root，例如库存页把滚动下移到列表区）→ 锁它，
+ *    此时 .app-main 本来就是 overflow:hidden，锁它等于没锁；
+ * 2) 否则锁 .app-main；
+ * 3) 开单页的 .app-main 是 overflow:visible（靠文档滚），锁它既锁不住内容，
+ *    又会挡住 fixed 底栏，所以显式排除；再兜一层计算样式判断，
+ *    免得以后有人把 .app-main 改回 visible 忘了改这里。
+ */
+function scrollLockTarget(): HTMLElement | null {
+  const marked = document.querySelector<HTMLElement>('.app-main [data-scroll-root]');
+  const el = marked ?? document.querySelector<HTMLElement>('.app-main');
+  if (!el || el.classList.contains('app-main--editor')) return null;
+  const { overflowY } = window.getComputedStyle(el);
+  return overflowY === 'visible' ? null : el;
+}
+
+function lockBodyScroll() {
+  if (++sheetLockCount !== 1) return;
+  const scroller = scrollLockTarget();
+  if (scroller) {
+    sheetLockScroller = scroller;
+    sheetSavedY = scroller.scrollTop;
+    scroller.dataset.locked = '1';
+    return;
+  }
+  sheetLockScroller = null;
+  sheetSavedY = window.scrollY;
+  document.body.style.position = 'fixed';
+  document.body.style.top = `-${sheetSavedY}px`;
+  document.body.style.width = '100%';
+}
+
+function unlockBodyScroll() {
+  if (sheetLockCount === 0) return;
+  if (--sheetLockCount !== 0) return;
+  const scroller = sheetLockScroller;
+  sheetLockScroller = null;
+  if (scroller) {
+    delete scroller.dataset.locked;
+    // overflow:hidden 不会清掉 scrollTop（display:none 才会），所以能原地还原
+    scroller.scrollTop = sheetSavedY;
+    return;
+  }
+  document.body.style.position = '';
+  document.body.style.top = '';
+  document.body.style.width = '';
+  window.scrollTo(0, sheetSavedY);
+}
+
+/**
+ * 弹层栈（按挂载顺序，栈顶 = 最上层）。Esc 只让栈顶响应，
+ * 否则一次 Esc 会把确认框和它下面的明细框一起关掉。
+ * 只存实例 token，不存组件引用，避免持有已卸载的 DOM。
+ */
+const sheetStack: symbol[] = [];
+
+function pushSheet(token: symbol) {
+  sheetStack.push(token);
+}
+
+function popSheet(token: symbol) {
+  const i = sheetStack.lastIndexOf(token);
+  if (i >= 0) sheetStack.splice(i, 1);
+}
+
 export function Sheet({
   title,
   subtitle,
   onClose,
   children,
   footer,
-  dismissible = true
+  dismissible = true,
+  initialFocus = 'first'
 }: {
   title: string;
   subtitle?: string;
@@ -234,6 +325,14 @@ export function Sheet({
   footer?: ReactNode;
   /** false = 结账中/保存中，禁止遮罩、Esc 与关闭按钮 */
   dismissible?: boolean;
+  /**
+   * 挂载后焦点给谁：
+   * - 'first'（默认）= 面板内第一个非关闭按钮的可聚焦元素，用于「打开就要输入」的表单，
+   *   行为和 2026-11-08 加的焦点陷阱一致，8 处调用不受影响；
+   * - 'panel' = 面板自身（`.glass-sheet` 已 tabIndex={-1}）。移动端不会因此拉输入法，
+   *   但 aria-modal / 焦点陷阱 / 标题播报仍生效。商品选择器这类「以点选为主」的弹层用它。
+   */
+  initialFocus?: 'first' | 'panel';
 }) {
   const [active, setActive] = useState(false);
   const panelRef = useRef<HTMLDivElement>(null);
@@ -243,18 +342,35 @@ export function Sheet({
   onCloseRef.current = onClose;
   const dismissibleRef = useRef(dismissible);
   dismissibleRef.current = dismissible;
+  // 本实例在弹层栈里的身份；跨渲染保持不变（Symbol 只创建一次）
+  const tokenRef = useRef<symbol | null>(null);
+  if (!tokenRef.current) tokenRef.current = Symbol('sheet');
 
   useEffect(() => {
     const raf = requestAnimationFrame(() => setActive(true));
     return () => cancelAnimationFrame(raf);
   }, []);
 
+  /**
+   * 进出栈跟着「是否已展开」走，而不是跟着挂载走：
+   * close() 之后还有 260ms 过渡，父组件通常才卸载；这段时间里已经视觉关闭的
+   * 弹层要立刻让出栈顶，否则会一直挡住下面那层的 Esc。
+   */
+  useEffect(() => {
+    const token = tokenRef.current!;
+    if (!active) {
+      popSheet(token);
+      return;
+    }
+    pushSheet(token);
+    return () => popSheet(token);
+  }, [active]);
+
   useEffect(() => {
     const prevFocus = document.activeElement as HTMLElement | null;
-    const scrollY = window.scrollY;
-    document.body.style.position = 'fixed';
-    document.body.style.top = `-${scrollY}px`;
-    document.body.style.width = '100%';
+    lockBodyScroll();
+    // 自己这一层的身份：进栈后才能判断“我是不是最上层”
+    const token = tokenRef.current!;
 
     const focusable = () =>
       Array.from(
@@ -264,12 +380,18 @@ export function Sheet({
       );
 
     const items = focusable();
-    // 优先聚焦内容区第一个控件（如搜索框），关闭按钮放最后兜底
-    const first = items.find((el) => !el.classList.contains('glass-sheet__close')) ?? items[0];
-    (first ?? panelRef.current)?.focus({ preventScroll: true });
+    // 焦点落点：'panel' 直接给面板自身（不发键盘），'first' 优先内容区第一个控件（如搜索框），
+    // 关闭按钮放最后兜底。initialFocus 是挂载期常量，随 focusable() 一起留在本闭包里即可。
+    const target =
+      initialFocus === 'panel'
+        ? panelRef.current
+        : (items.find((el) => !el.classList.contains('glass-sheet__close')) ?? items[0] ?? panelRef.current);
+    target?.focus({ preventScroll: true });
 
     const onKey = (e: globalThis.KeyboardEvent) => {
       if (e.key === 'Escape') {
+        // 只有最上层弹层处理 Esc：嵌套时一次按键只关一层
+        if (sheetStack[sheetStack.length - 1] !== token) return;
         e.preventDefault();
         if (dismissibleRef.current) close();
         return;
@@ -279,6 +401,17 @@ export function Sheet({
       if (items.length === 0) return;
       const firstEl = items[0];
       const lastEl = items[items.length - 1];
+      /*
+       * 焦点已经不在面板里（M-15）：initialFocus="panel" 时按 Shift+Tab 会从这里走出去，
+       * 或者用户用鼠标点了背景 —— 模态开着却把焦点送到背景页面，是硬伤。
+       * 先把它拉回面板内的另一端，再走下面的首尾循环。
+       */
+      const panelEl = panelRef.current;
+      if (panelEl && !panelEl.contains(document.activeElement)) {
+        e.preventDefault();
+        (e.shiftKey ? lastEl : firstEl).focus();
+        return;
+      }
       if (e.shiftKey && document.activeElement === firstEl) {
         e.preventDefault();
         lastEl.focus();
@@ -291,18 +424,26 @@ export function Sheet({
 
     return () => {
       document.removeEventListener('keydown', onKey);
-      document.body.style.position = '';
-      document.body.style.top = '';
-      document.body.style.width = '';
-      window.scrollTo(0, scrollY);
+      popSheet(token);
+      unlockBodyScroll();
       prevFocus?.focus?.({ preventScroll: true });
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
+  // 关闭延时动画的定时器：卸载 / 重复关闭都要清掉，避免打到已卸载的弹层
+  const closeTimer = useRef<number | undefined>(undefined);
+  useEffect(
+    () => () => {
+      if (closeTimer.current) window.clearTimeout(closeTimer.current);
+    },
+    []
+  );
+
   const close = () => {
     setActive(false);
-    window.setTimeout(() => onCloseRef.current(), 260);
+    if (closeTimer.current) window.clearTimeout(closeTimer.current);
+    closeTimer.current = window.setTimeout(() => onCloseRef.current(), SHEET_CLOSE_MS);
   };
 
   return (
@@ -406,8 +547,12 @@ export function ProductFormModal({
   const [price, setPrice] = useState(initial ? fenToStr(initial.priceList) : '');
   const [negotiable, setNegotiable] = useState(initial?.negotiable ?? true);
   const [err, setErr] = useState('');
+  const [saving, setSaving] = useState(false);
+  // 分类是「一组按钮」而不是表单控件，不能用 Field 的 label for
+  const catLabelId = useId();
 
   const submit = async () => {
+    if (saving) return;
     if (!name.trim()) {
       setErr('商品名不能为空');
       return;
@@ -422,14 +567,23 @@ export function ProductFormModal({
       setErr('1 箱装几个要填整数（不拆零填 0）');
       return;
     }
-    await onSave({
-      name: name.trim(),
-      category,
-      unitBase: unitBase.trim() || '个',
-      boxQty: bq,
-      priceList: priceFen,
-      negotiable
-    });
+    setErr('');
+    setSaving(true);
+    try {
+      await onSave({
+        name: name.trim(),
+        category,
+        unitBase: unitBase.trim() || '个',
+        boxQty: bq,
+        priceList: priceFen,
+        negotiable
+      });
+    } catch (e) {
+      // 失败就留在表单里显示原因：关掉框再说「没存上」用户会以为存过了
+      setErr(`没存上：${e instanceof Error ? e.message : String(e)}`);
+    } finally {
+      setSaving(false);
+    }
   };
 
   return (
@@ -438,8 +592,8 @@ export function ProductFormModal({
       onClose={onClose}
       footer={
         <div className="stack-sm">
-          <Btn block onClick={submit}>
-            保存
+          <Btn block onClick={submit} disabled={saving}>
+            {saving ? '保存中…' : '保存'}
           </Btn>
           {extraActions}
         </div>
@@ -452,11 +606,13 @@ export function ProductFormModal({
             value={name}
             onChange={(e) => setName(e.target.value)}
             placeholder="比如：大地红 1000 响"
-            autoFocus
           />
         </Field>
 
-        <Field label="分类">
+        <div role="group" aria-labelledby={catLabelId} className="glass-input-group">
+          <div className="glass-label" id={catLabelId}>
+            分类
+          </div>
           <div className="chip-row">
             {CATEGORIES.map((c) => (
               <button
@@ -472,7 +628,7 @@ export function ProductFormModal({
               </button>
             ))}
           </div>
-        </Field>
+        </div>
 
         <div className="form-row">
           <Field label="基本单位">

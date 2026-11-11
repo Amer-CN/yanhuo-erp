@@ -33,6 +33,7 @@ export function useCloseSessionFlow({
   const [closeDone, setCloseDone] = useState<Session | null>(null);
   const [closing, setClosing] = useState(false);
   const [reopenAsk, setReopenAsk] = useState(false);
+  const [reopening, setReopening] = useState(false);
 
   const closeSummary = useMemo(
     () =>
@@ -69,14 +70,18 @@ export function useCloseSessionFlow({
   };
 
   const handleReopen = async () => {
-    if (!closeDone) return;
+    if (!closeDone || reopening) return;
+    setReopening(true);
     try {
       await reopenSession(closeDone.id);
       setReopenAsk(false);
       setCloseDone(null);
       showToast('已恢复本场，可以继续记');
     } catch (e) {
+      // 失败不关确认框：让用户看到原因，可以再点一次
       showToast(`撤销失败：${msgOf(e)}`, 'error');
+    } finally {
+      setReopening(false);
     }
   };
 
@@ -84,6 +89,7 @@ export function useCloseSessionFlow({
     closeOpen,
     closeDone,
     closing,
+    reopening,
     reopenAsk,
     setCloseOpen,
     setCloseDone,
@@ -161,7 +167,8 @@ export function CloseSessionFlow({
           description="撤销后本场恢复进行中，可以继续记；下一场开始后就不能再撤销了。"
           confirmText="撤销结账"
           danger
-          onConfirm={flow.handleReopen}
+          busy={flow.reopening}
+          onConfirm={() => void flow.handleReopen()}
           onCancel={() => flow.setReopenAsk(false)}
         />
       ) : null}

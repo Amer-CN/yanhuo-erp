@@ -40,9 +40,12 @@ export default function ProductPicker({
   const selectedKinds = selected.size;
 
   return (
+    // 不聚焦搜索框：摊位开单是「点商品」而不是打字，一打开就弹输入法会把半屏
+    // 商品盖掉（诉求 1）。焦点落在面板本身，aria-modal / 焦点陷阱 / 标题播报都保留。
     <Sheet
       title="选商品"
       subtitle={selectedKinds > 0 ? `本单已加 ${selectedKinds} 种` : '点商品加入本单'}
+      initialFocus="panel"
       onClose={onDone}
       footer={
         <Btn block onClick={onDone}>
@@ -60,7 +63,6 @@ export default function ProductPicker({
             aria-label="搜商品名"
             value={q}
             onChange={(e) => setQ(e.target.value)}
-            autoFocus
           />
         </div>
 

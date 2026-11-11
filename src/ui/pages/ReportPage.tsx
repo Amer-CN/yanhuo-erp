@@ -18,6 +18,7 @@ import {
   type ProductMargin
 } from '../../db/calc';
 import { DELETED_PRODUCT, fenToStr, isoToLocalDate, isoToTime, qtyToStr } from '../../db/util';
+import { pickOpenSession } from '../../db/sessionLogic';
 import { Btn, Card, Empty, Sheet, Stat, type Done } from '../kit';
 
 type SortKey = 'gross' | 'revenue' | 'qty';
@@ -230,7 +231,7 @@ function MarginTable({
 
   return (
     <Card flush>
-      <div className="form-head" style={{ margin: '4px 4px 8px' }}>
+      <div className="form-head form-head--inset">
         <h2>单品（按{sort === 'gross' ? '毛利' : sort === 'revenue' ? '销售额' : '数量'}降序）</h2>
         {selected ? <span className="tiny-text">{sessionLabel(selected)}</span> : null}
       </div>
@@ -338,10 +339,19 @@ function MarginTable({
 }
 
 /** 临期 / 过期预警 */
-function ExpiryWarnings({ warnings, warnDays }: { warnings: ExpiryWarning[]; warnDays: number }) {
+function ExpiryWarnings({
+  warnings,
+  warnDays,
+  productById
+}: {
+  warnings: ExpiryWarning[];
+  warnDays: number;
+  /** 用来取商品的 unitBase / boxQty：同屏其它行都写「N 个」，这里不能单独写「件」（M-09） */
+  productById: Map<string, Product>;
+}) {
   return (
     <Card flush>
-      <div className="form-head" style={{ margin: '4px 4px 8px' }}>
+      <div className="form-head form-head--inset">
         <h2>临期 / 过期预警</h2>
         <span className="tiny-text">{warnDays} 天内</span>
       </div>
@@ -349,34 +359,38 @@ function ExpiryWarnings({ warnings, warnDays }: { warnings: ExpiryWarning[]; war
         <Empty icon={<TriangleAlert size={24} />} text="没有临期批次" />
       ) : (
         <ul className="glass-list" style={{ borderRadius: 'var(--yh-radius-lg)' }}>
-          {warnings.map((w) => (
-            <li key={w.batch.id} className="glass-list__item">
-              <span className="glass-list__leading">
-                <TriangleAlert
-                  size={22}
-                  aria-hidden="true"
-                  style={{
-                    color: w.daysLeft < 0 ? 'var(--yh-bad-ink)' : 'var(--gl-color-warning)'
-                  }}
-                />
-              </span>
-              <div className="glass-list__content">
-                <div className="glass-list__title-row">
-                  <div className="glass-list__title">{w.productName}</div>
-                  <span
-                    className={`glass-badge ${
-                      w.daysLeft < 0 ? 'glass-badge--error' : 'glass-badge--warning'
-                    }`}
-                  >
-                    {w.daysLeft < 0 ? '已过期' : `剩 ${w.daysLeft} 天`}
-                  </span>
+          {warnings.map((w) => {
+            const p = productById.get(w.batch.productId);
+            return (
+              <li key={w.batch.id} className="glass-list__item">
+                <span className="glass-list__leading">
+                  <TriangleAlert
+                    size={22}
+                    aria-hidden="true"
+                    style={{
+                      color: w.daysLeft < 0 ? 'var(--yh-bad-ink)' : 'var(--gl-color-warning)'
+                    }}
+                  />
+                </span>
+                <div className="glass-list__content">
+                  <div className="glass-list__title-row">
+                    <div className="glass-list__title">{w.productName}</div>
+                    <span
+                      className={`glass-badge ${
+                        w.daysLeft < 0 ? 'glass-badge--error' : 'glass-badge--warning'
+                      }`}
+                    >
+                      {w.daysLeft < 0 ? '已过期' : `剩 ${w.daysLeft} 天`}
+                    </span>
+                  </div>
+                  <div className="glass-list__subtitle">
+                    批号 {w.batch.batchNo ?? '无'} · 有效期至 {w.batch.expiryDate} · 剩{' '}
+                    {qtyToStr(w.remaining, p?.boxQty ?? 0, p?.unitBase ?? '个')}
+                  </div>
                 </div>
-                <div className="glass-list__subtitle">
-                  批号 {w.batch.batchNo ?? '无'} · 有效期至 {w.batch.expiryDate} · 剩 {w.remaining} 件
-                </div>
-              </div>
-            </li>
-          ))}
+              </li>
+            );
+          })}
         </ul>
       )}
     </Card>
@@ -427,12 +441,11 @@ export default function ReportPage({
     [sessions, deviceId]
   );
 
+  // 本机进行中的场次：与首页共用 db/sessionLogic.pickOpenSession 的口径，
+  // 依赖项仍是 sessions/deviceId（deviceSessions 由二者派生，等价）。
   const openSession = useMemo(
-    () =>
-      deviceSessions
-        .filter((s) => s.status === 'open')
-        .sort((a, b) => (a.startedAt < b.startedAt ? 1 : -1))[0],
-    [deviceSessions]
+    () => pickOpenSession(sessions, deviceId),
+    [sessions, deviceId]
   );
 
   const closed = useMemo(
@@ -521,7 +534,7 @@ export default function ReportPage({
           <TriangleAlert size={20} aria-hidden="true" />
           <p>
             收款合计 ¥{fenToStr(payTotal)} 与销售额 ¥{fenToStr(summary.revenueFen)} 对不上，
-            可能是导入了旧数据或补记后未重算。请检查这一场的作废单与补记。
+            可能是导入了旧数据或补记后未重算。请检查这一场的删除单与补记。
           </p>
         </div>
       ) : null}
@@ -530,7 +543,7 @@ export default function ReportPage({
         <div className="glass-status">
           <TriangleAlert size={20} aria-hidden="true" />
           <p>
-            有 {fifo.uncoveredQty} 件销量没有对应的进货批次（漏录进货或超卖），这部分成本用均价估算，毛利先显示为「—」。
+            有 {fifo.uncoveredQty} 个（基本单位）销量没有对应的进货批次（漏录进货或超卖），这部分成本用均价估算，毛利先显示为「—」。
             去「进货」补录后会自动恢复。
           </p>
         </div>
@@ -546,7 +559,7 @@ export default function ReportPage({
         onGoRecord={onGoRecord}
       />
 
-      <ExpiryWarnings warnings={warnings} warnDays={warnDays} />
+      <ExpiryWarnings warnings={warnings} warnDays={warnDays} productById={productByName} />
 
       {pickerOpen ? (
         <Sheet

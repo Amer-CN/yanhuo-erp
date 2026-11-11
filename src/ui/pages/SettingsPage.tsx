@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 import { useLiveQuery } from 'dexie-react-hooks';
-import { Download, Upload, Smartphone, Trash2, TriangleAlert, RotateCcw, Save } from 'lucide-react';
+import { Download, Upload, Smartphone, Trash2, TriangleAlert, RotateCcw, Save, Moon, Sun } from 'lucide-react';
 import { db } from '../../db/db';
 import { clearAllData, loadAll, setSetting } from '../../db/repo';
 import {
@@ -22,6 +22,7 @@ import { SETTING_KEYS, type Product, type Setting } from '../../db/types';
 import { afterMerge, clearCloud, getSyncConfig } from '../../db/sync';
 import SyncPanel from '../SyncPanel';
 import type { SyncApi } from '../useSync';
+import type { Theme } from '../AppShell';
 import { fenToStr } from '../../db/util';
 import { Btn, Card, ConfirmSheet, Field, Sheet, type Done } from '../kit';
 
@@ -58,9 +59,15 @@ function diffProducts(current: Product[], incoming: Product[]): string[] {
   return diffs;
 }
 
+/**
+ * 设置项在「导入合并」预览里的中文名（只列**真正会被合并改写**的键）。
+ *
+ * L-08：operatorA / operatorB 已进 merge.ts 的 LOCAL_IDENTITY_KEYS（按设备保留、
+ * 永不覆盖），把它们列进「设置变化」等于预告一个不会发生的改名 —— 摊主会以为
+ * 另一台手机把操作人改掉了。operatorSelf 同理（本机专属，也不进预览）。
+ * 目前只有临期天数会被合并改写，所以这里只剩它。
+ */
 const SETTING_LABELS: Record<string, string> = {
-  [SETTING_KEYS.operatorA]: '操作人 A',
-  [SETTING_KEYS.operatorB]: '操作人 B',
   [SETTING_KEYS.expiryWarnDays]: '临期预警天数'
 };
 
@@ -125,21 +132,36 @@ async function shareOrDownload(file: File, backup: BackupFile, title = '烟花�
   }
 }
 
-/** 本机名 / 操作人 / 临期天数 */
+/** 本机名 / 本机操作人编号 / 临期天数 / 外观 */
 function MachineSection({
   settings,
-  deviceId
+  deviceId,
+  theme,
+  onToggleTheme,
+  onDone
 }: {
   settings: Record<string, string>;
   deviceId: string;
+  theme: Theme;
+  onToggleTheme: () => void;
+  onDone: Done;
 }) {
   const [deviceName, setDeviceName] = useState(settings[SETTING_KEYS.deviceName] ?? '');
-  const [opA, setOpA] = useState(settings[SETTING_KEYS.operatorA] ?? '我');
-  const [opB, setOpB] = useState(settings[SETTING_KEYS.operatorB] ?? '老婆');
+  // 旧的 operatorA/B 只保留读（历史单里仍是旧字符串），设置页只暴露本机编号
+  const [opSelf, setOpSelf] = useState(settings[SETTING_KEYS.operatorSelf] ?? '');
   const [warn, setWarn] = useState(settings[SETTING_KEYS.expiryWarnDays] ?? '30');
 
+  /**
+   * 存设置（M-10）：失败必须说一声。
+   * 这几个字段都是 onBlur 静默落库的，配额满 / 事务冲突时 setSetting 会抛错，
+   * 不提示的话用户以为编号已经存好，之后每张单都记在旧编号上（对账时才发现）。
+   */
   const saveText = async (key: string, value: string) => {
-    await setSetting(key, value);
+    try {
+      await setSetting(key, value);
+    } catch (e) {
+      onDone(`没存上：${e instanceof Error ? e.message : String(e)}`, 'error');
+    }
   };
 
   return (
@@ -155,24 +177,33 @@ function MachineSection({
             placeholder="手机 / 平板"
           />
         </Field>
-        <div className="form-row">
-          <Field label="操作人 A">
-            <input
-              className="glass-input"
-              value={opA}
-              onChange={(e) => setOpA(e.target.value)}
-              onBlur={() => saveText(SETTING_KEYS.operatorA, opA.trim() || '我')}
-            />
-          </Field>
-          <Field label="操作人 B">
-            <input
-              className="glass-input"
-              value={opB}
-              onChange={(e) => setOpB(e.target.value)}
-              onBlur={() => saveText(SETTING_KEYS.operatorB, opB.trim() || '老婆')}
-            />
-          </Field>
-        </div>
+        <Field
+          label="本机操作人编号"
+          hint="这台手机记账时记在谁名下。另一台手机设成 002。留空会退回设备名（两台都留空就都叫「本机」，历史单分不出谁卖的）。只影响本机，不会同步。"
+        >
+          <input
+            className="glass-input"
+            inputMode="numeric"
+            maxLength={3}
+            value={opSelf}
+            onChange={(e) => setOpSelf(e.target.value.replace(/[^\d]/g, ''))}
+            /*
+             * 留空不静默放过（M-11）：回填 001 并落库。
+             * 因为 App 里 operators[0] 是 operatorSelf → deviceName → '本机' 三级回落，
+             * 两台手机都留空时历史单全部显示「本机」，报表里两个人彻底分不开。
+             */
+            onBlur={() => {
+              const next = opSelf.trim();
+              if (!next) {
+                setOpSelf('001');
+                void saveText(SETTING_KEYS.operatorSelf, '001');
+                return;
+              }
+              void saveText(SETTING_KEYS.operatorSelf, next);
+            }}
+            placeholder="001"
+          />
+        </Field>
         <Field label="临期预警提前几天">
           <input
             className="glass-input"
@@ -184,6 +215,41 @@ function MachineSection({
         </Field>
         <p className="tiny-text" style={{ margin: 0 }}>
           本机编号：{deviceId.slice(0, 8)}（合并数据时用来区分来源）
+        </p>
+      </div>
+
+      {/*
+       * 外观单独成段（M-13）：原来它夹在「临期预警」输入框正下方，
+       * 正是失焦后手指的自然落点，一按整屏变色又没有任何反馈。
+       * 现在用分隔线隔开、挪到卡片末尾，并在切换后给一条 Toast 说明切到了哪一档。
+       */}
+      <div
+        style={{
+          marginTop: 14,
+          paddingTop: 12,
+          borderTop: '1px solid var(--gl-border-subtle)'
+        }}
+      >
+        <div className="tiny-text" style={{ marginBottom: 6 }}>
+          外观
+        </div>
+        <Btn
+          block
+          variant="secondary"
+          onClick={() => {
+            onToggleTheme();
+            // 切换后立刻说明结果：整屏变色如果没有文字确认，用户会怀疑自己点错了
+            onDone(`已切到${theme === 'dark' ? '浅色' : '深色'}外观`);
+          }}
+          aria-label={`切换外观，当前${theme === 'dark' ? '深色' : '浅色'}`}
+        >
+          <span className="icon-text">
+            {theme === 'dark' ? <Moon size={18} aria-hidden="true" /> : <Sun size={18} aria-hidden="true" />}
+            外观：{theme === 'dark' ? '深色' : '浅色'}
+          </span>
+        </Btn>
+        <p className="tiny-text" style={{ margin: '8px 0 0' }}>
+          点一下在深色 / 浅色之间切换。摊位强光下用浅色，晚上收摊用深色。
         </p>
       </div>
     </Card>
@@ -478,6 +544,8 @@ function DangerSection({
   const [undoConfirm, setUndoConfirm] = useState(false);
   const [clearStep, setClearStep] = useState<0 | 1 | 2 | 3>(0);
   const [pendingCfg, setPendingCfg] = useState<ReturnType<typeof getSyncConfig>>(null);
+  // 清空本机进行中：重复点会连跑两遍（第二遍必然报错），按钮一并禁掉
+  const [clearing, setClearing] = useState(false);
 
   // 每次导入新备份时重置「合并前先备份」勾选（与原来 pickFile 里的重置一致）
   useEffect(() => {
@@ -530,12 +598,22 @@ function DangerSection({
 
   /** 危险操作三段式：1 确认清本机 → 2 再确认 → 3（有云端配置时）是否清云端 */
   const runClearLocal = async () => {
+    if (clearing) return;
     setClearStep(0);
-    await clearAllData();
-    onDone('已清空', 'warning');
+    setClearing(true);
+    try {
+      await clearAllData();
+      onDone('已清空', 'warning');
+    } catch (e) {
+      // 清空失败必须如实告知，否则用户以为账本已经空了
+      onDone(`没清掉：${e instanceof Error ? e.message : String(e)}`, 'error');
+    } finally {
+      setClearing(false);
+    }
   };
 
   const confirmClearStep = async () => {
+    if (clearing) return;
     if (clearStep === 1) {
       setClearStep(2);
       return;
@@ -567,13 +645,17 @@ function DangerSection({
     }
   };
 
+  /**
+   * 取消 / 关掉对话框 = **永远是安全出口**：只关闭，绝不清任何数据。
+   *
+   * 历史事故（H-01，已修，**别改回**）：第 3 段「同时清空云端账本？」原来把「取消」
+   * 实现成「跳过清云端、但仍清本机」，于是摊主想「先不清云端」点一下取消，
+   * 本机账本当场被清空且不可恢复（清空本机没有撤销）。
+   * 现在只有 confirmClearStep（确认）能走到 clearAllData / clearCloud，
+   * cancel / 遮罩 / Esc / 关闭按钮一律短路到这里。
+   */
   const cancelClearStep = () => {
-    // 第三段取消 = 只跳过清云端，仍清本机（与原生 confirm 的分支一致）
-    if (clearStep === 3) {
-      setPendingCfg(null);
-      void runClearLocal();
-      return;
-    }
+    setPendingCfg(null);
     setClearStep(0);
   };
 
@@ -724,10 +806,13 @@ function DangerSection({
               ? '导出备份后再操作。'
               : clearStep === 2
                 ? '清空后无法恢复（除了导入之前导出的备份）。'
-                : '两台手机都会被清空。'
+                : '两台手机都会被清空。点「不清了（保留数据）」只关掉这一步，什么都不会清。'
           }
           confirmText={clearStep === 1 ? '继续' : clearStep === 2 ? '清空本机' : '一并清空云端'}
+          /* 第 3 步的取消必须写成安全语义：原来它就叫「取消」，却会清本机 */
+          cancelText={clearStep === 3 ? '不清了（保留数据）' : '取消'}
           danger
+          busy={clearing}
           onConfirm={() => void confirmClearStep()}
           onCancel={cancelClearStep}
         />
@@ -744,11 +829,15 @@ export default function SettingsPage({
   settings,
   deviceId,
   sync,
+  theme,
+  onToggleTheme,
   onDone
 }: {
   settings: Record<string, string>;
   deviceId: string;
   sync: SyncApi;
+  theme: Theme;
+  onToggleTheme: () => void;
   onDone: Done;
 }) {
   const [pending, setPending] = useState<PendingMerge | null>(null);
@@ -783,7 +872,13 @@ export default function SettingsPage({
 
   return (
     <div className="page-stack">
-      <MachineSection settings={settings} deviceId={deviceId} />
+      <MachineSection
+        settings={settings}
+        deviceId={deviceId}
+        theme={theme}
+        onToggleTheme={onToggleTheme}
+        onDone={onDone}
+      />
 
       <BackupSection settings={settings} deviceId={deviceId} onDone={onDone} onPickFile={pickFile} />
 
