@@ -54,6 +54,20 @@ export function productAvgCostFen(batches: Batch[]): Map<string, number> {
   return avg;
 }
 
+/**
+ * 批次 FIFO 排序键：到货日 → 创建时间 → id。
+ *
+ * 这是「批次排队口径」的唯一来源：`fifoAllocate` 的批次排序与
+ * `repo.createBatch` 里「新批次是否插在队尾」的判定（isFifoLast）必须逐字节一致，
+ * 否则补录进货后该重算的已结账快照会被静默跳过，历史成本长期偏差且不报错。
+ *
+ * 注意：`receivedAt` 按原样插值，不做 `|| createdAt` 兜底——`Batch.receivedAt`
+ * 在类型与写入路径上都必填，兜底会悄悄改变既有口径。
+ */
+export function batchOrderKey(b: Batch): string {
+  return `${b.receivedAt}|${b.createdAt}|${b.id}`;
+}
+
 /** 从某商品的批次队列按 FIFO 扣 need；返回扣到的成本、剩余需求与新队列下标 */
 function takeFromBatches(
   arr: Batch[],
@@ -101,8 +115,8 @@ export function fifoAllocate(
   }
   for (const arr of byProduct.values()) {
     arr.sort((a, b) => {
-      const ka = `${a.receivedAt}|${a.createdAt}|${a.id}`;
-      const kb = `${b.receivedAt}|${b.createdAt}|${b.id}`;
+      const ka = batchOrderKey(a);
+      const kb = batchOrderKey(b);
       return ka < kb ? -1 : ka > kb ? 1 : 0;
     });
   }

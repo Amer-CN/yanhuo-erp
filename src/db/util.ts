@@ -50,8 +50,12 @@ export const MS_PER_DAY = 24 * 60 * 60 * 1000;
 
 /** 分 → 显示字符串（不带 ¥） */
 export function fenToStr(fen: number): string {
-  const sign = fen < 0 ? '-' : '';
-  const abs = Math.abs(Math.round(fen));
+  // 先取整、再判符号：反过来（先按 fen 判符号再 Math.round）会让 -0.4 显示成 '-0.00'，
+  // 因为 Math.round(-0.4) === -0 而符号取的是原始值。`rounded < 0` 对 -0 为 false，
+  // 所以 -0 天然落到 '0.00'。
+  const rounded = Math.round(fen);
+  const sign = rounded < 0 ? '-' : '';
+  const abs = Math.abs(rounded);
   const yuan = Math.floor(abs / 100);
   const cents = String(abs % 100).padStart(2, '0');
   return `${sign}${yuan}.${cents}`;

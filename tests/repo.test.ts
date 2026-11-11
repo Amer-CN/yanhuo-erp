@@ -29,7 +29,7 @@ import {
   type RecordLineInput
 } from '../src/db/repo';
 import { SETTING_KEYS } from '../src/db/types';
-import { DEVICE, makeBatch, makeProduct, resetDb } from './helpers';
+import { DEVICE, makeBatch, makeProduct, resetDb, T0 } from './helpers';
 
 function line(amountFen: number, overrides: Partial<RecordLineInput> = {}): RecordLineInput {
   return {
@@ -333,7 +333,8 @@ describe('商品 / 进货 / 设置 / 调整', () => {
     // 卖掉 3 个 → FIFO 剩余 7 < 10，删了会让历史成本退回兜底均价
     await expect(deleteBatch(sold.id)).rejects.toMatchObject({
       code: 'BATCH_IN_USE',
-      message: '这批货已经卖出去了，不能删；只能改数量'
+      // 提示必须指向用户真能做的动作（仓库没有修改批次的能力，不能承诺「改数量」）
+      message: '这批货已经卖出去了，不能删（删了历史成本会变）；数量对不上请到「库存」里记一笔修正库存'
     });
     expect(await db.batches.get(sold.id)).toBeTruthy();
     expect(await db.outbox.get(`batch:${sold.id}`)).toMatchObject({ op: 'upsert' });
@@ -343,6 +344,106 @@ describe('商品 / 进货 / 设置 / 调整', () => {
     await deleteBatch(untouched.id);
     expect(await db.batches.get(untouched.id)).toBeUndefined();
     expect(await db.outbox.get(`batch:${untouched.id}`)).toMatchObject({ op: 'delete' });
+  });
+
+  it('删掉没卖过的批次不改变明细成本与已结账快照（判定门槛即保证）', async () => {
+    await db.products.put(makeProduct('p1'));
+    await db.batches.put(makeBatch('b1', 'p1', 10, 100));
+    // 队尾批次：10 个 @300，加权均价 200 —— 若兜底均价参与成本，删除它必然改变金额
+    await db.batches.put(makeBatch('b2', 'p1', 10, 300, '2026-11-02'));
+    const order = await saveRecord(input([line(3000, { productId: 'p1', qtyBase: 3 })]));
+    const sessionId = order.sessionId as string;
+    await closeSession(sessionId, '我');
+
+    const snapshot = async () => {
+      const all = await loadAll();
+      const fifo = fifoAllocate(all.batches, all.orders, all.lines);
+      return {
+        costs: [...fifo.lineCost.entries()].sort((a, b) => (a[0] < b[0] ? -1 : 1)),
+        summary: (await db.sessions.get(sessionId))?.summary,
+        recomputed: sessionReport(sessionId, all.orders, all.lines, fifo)
+      };
+    };
+
+    const before = await snapshot();
+    expect(before.summary?.costFen).toBe(300); // 3 × 100，全部来自 b1
+    expect(before.recomputed.costFen).toBe(300);
+
+    await deleteBatch('b2'); // 未被扣过 → 允许删除
+
+    const after = await snapshot();
+    expect(await db.batches.get('b2')).toBeUndefined();
+    expect(after.costs).toEqual(before.costs);
+    expect(after.summary).toEqual(before.summary);
+    expect(after.recomputed.costFen).toBe(300);
+  });
+
+  it('批次占用判定只看该商品明细（别的商品卖超不影响）', async () => {
+    await db.products.put(makeProduct('p1'));
+    await db.products.put(makeProduct('p2'));
+    await db.batches.put(makeBatch('p1-b1', 'p1', 5, 100));
+    await db.batches.put(makeBatch('p2-b1', 'p2', 5, 100));
+    // p2 卖超 3 个：它的批次被扣光
+    await saveRecord(input([line(1000, { productId: 'p2', qtyBase: 8 })]));
+
+    // p1 一个没卖 → 允许删除
+    await deleteBatch('p1-b1');
+    expect(await db.batches.get('p1-b1')).toBeUndefined();
+
+    // p1 卖出后同一口径必须拦住（判定确实读到 p1 的明细）
+    await db.batches.put(makeBatch('p1-b2', 'p1', 5, 100));
+    await saveRecord(input([line(1000, { productId: 'p1', qtyBase: 1 })]));
+    await expect(deleteBatch('p1-b2')).rejects.toMatchObject({ code: 'BATCH_IN_USE' });
+  });
+
+  it('补录队尾进货补齐超卖后，已结账场次快照按新成本重算', async () => {
+    await db.products.put(makeProduct('p1'));
+    await db.batches.put(makeBatch('b1', 'p1', 4, 100));
+    const order = await saveRecord(input([line(6000, { productId: 'p1', qtyBase: 6 })]));
+    const sessionId = order.sessionId as string;
+    const closed = await closeSession(sessionId, '我');
+    // 只进了 4 个：4×100 + 超卖的 2 个按兜底均价 100 → 600
+    expect(closed.summary?.costFen).toBe(600);
+
+    // 补录一张队尾进货：6 个销量全部由批次覆盖 → 4×100 + 2×300
+    await createBatch(
+      { productId: 'p1', qtyBase: 10, unitCostFen: 300, receivedAt: '2026-11-02' },
+      DEVICE
+    );
+
+    const all = await loadAll();
+    const expected = sessionReport(
+      sessionId,
+      all.orders,
+      all.lines,
+      fifoAllocate(all.batches, all.orders, all.lines)
+    );
+    expect(expected.costFen).toBe(1000);
+
+    const after = await db.sessions.get(sessionId);
+    expect(after?.status).toBe('closed');
+    expect(after?.summary).toEqual(expected);
+  });
+
+  it('队尾进货且没超卖时不重写已结账快照（避免无谓重写与同步抖动）', async () => {
+    await db.products.put(makeProduct('p1'));
+    await db.batches.put(makeBatch('b1', 'p1', 10, 100));
+    const order = await saveRecord(input([line(1000, { productId: 'p1', qtyBase: 2 })]));
+    const sessionId = order.sessionId as string;
+    await closeSession(sessionId, '我');
+    const before = await db.sessions.get(sessionId);
+    // 清掉结账时留下的入队记录，便于断言「没有再次写快照」
+    await db.outbox.delete(`session:${sessionId}`);
+
+    await createBatch(
+      { productId: 'p1', qtyBase: 10, unitCostFen: 300, receivedAt: '2026-11-02' },
+      DEVICE
+    );
+
+    expect(await db.outbox.get(`session:${sessionId}`)).toBeUndefined();
+    const after = await db.sessions.get(sessionId);
+    expect(after?.updatedAt).toBe(before?.updatedAt);
+    expect(after?.summary).toEqual(before?.summary);
   });
 
   it('设置读写、设备 ID 稳定、启动默认设置只补缺失项', async () => {
@@ -372,27 +473,67 @@ describe('商品 / 进货 / 设置 / 调整', () => {
     expect(await db.outbox.get(`adjustment:${a.id}`)).toMatchObject({ op: 'upsert' });
   });
 
-  it('loadAll 返回全部 7 张表；clearAllData 清库并重置迁移标记', async () => {
+  it('调整量按 Math.round 落库：负数半入朝 +∞（-2.5 → -2，不是 -3）', async () => {
+    const a = await createAdjustment({ productId: 'p1', qtyBase: -2.5, type: 'loss' }, DEVICE);
+    expect(a.qtyBase).toBe(-2);
+    // 正数方向对照：+2.5 → +3
+    const b = await createAdjustment({ productId: 'p1', qtyBase: 2.5, type: 'correction' }, DEVICE);
+    expect(b.qtyBase).toBe(3);
+  });
+
+  it('loadAll 返回 7 张业务表，且每张表条数与 count() 一致', async () => {
     await db.products.put(makeProduct('p1'));
     await db.batches.put(makeBatch('b1', 'p1', 5, 100));
-    const order = await saveRecord(input([line(1000)]));
+    await saveRecord(input([line(1000)]));
     await setSetting(SETTING_KEYS.sessionsMigrated, '1');
 
     const all = await loadAll();
+
+    // 逐表对比 count()：取代原先恒真的 expect(Array.isArray(...)).toBe(true)
+    expect(all.products).toHaveLength(await db.products.count());
+    expect(all.batches).toHaveLength(await db.batches.count());
+    expect(all.orders).toHaveLength(await db.orders.count());
+    expect(all.lines).toHaveLength(await db.lines.count());
+    expect(all.adjustments).toHaveLength(await db.adjustments.count());
+    expect(all.sessions).toHaveLength(await db.sessions.count());
+    expect(all.settings).toHaveLength(await db.settings.count());
+    // 上面 7 条已经覆盖 AppData 的全部字段；这里再钉住「确实有数据」这个前提
     expect(all.products).toHaveLength(1);
-    expect(all.batches).toHaveLength(1);
     expect(all.orders).toHaveLength(1);
     expect(all.lines.length).toBeGreaterThan(0);
-    expect(Array.isArray(all.sessions)).toBe(true);
-    expect(Array.isArray(all.settings)).toBe(true);
+  });
+
+  it('clearAllData 清空业务表、冲突留痕与发件箱，并重置迁移标记', async () => {
+    await db.products.put(makeProduct('p1'));
+    await saveRecord(input([line(1000)]));
+    await setSetting(SETTING_KEYS.sessionsMigrated, '1');
+    // 造一条冲突留痕：清空必须一并清掉，否则界面还显示历史冲突数
+    await db.conflicts.add({ at: T0, kind: 'order', recordId: 'o1', local: '{}', remote: '{}' });
+    expect(await db.conflicts.count()).toBe(1);
 
     await clearAllData();
+
     expect(await db.products.count()).toBe(0);
     expect(await db.orders.count()).toBe(0);
+    expect(await db.lines.count()).toBe(0);
+    expect(await db.conflicts.count()).toBe(0);
+    // 两次 setSetting 会登记发件箱 → outbox 必须最后清；改动清理顺序这条就会变红
     expect(await db.outbox.count()).toBe(0);
     expect(await getSetting(SETTING_KEYS.sessionsMigrated)).toBe('');
     expect(await getSetting(SETTING_KEYS.seeded)).toBe('');
-    expect(order.id).toBeTruthy();
+  });
+});
+
+describe('测试脚手架自检', () => {
+  it('resetDb 后 conflicts 与 outbox 均为 0', async () => {
+    await db.conflicts.add({ at: T0, kind: 'order', recordId: 'o1', local: '{}', remote: '{}' });
+    await db.outbox.put({ id: 'order:o1', kind: 'order', recordId: 'o1', op: 'upsert', queuedAt: 1 });
+    expect(await db.conflicts.count()).toBe(1);
+
+    await resetDb();
+
+    expect(await db.conflicts.count()).toBe(0);
+    expect(await db.outbox.count()).toBe(0);
   });
 });
 

@@ -80,6 +80,14 @@ runs:
       shell: bash
       run: python scripts/e2e-offline.py
 
+    # 依赖前面已启动的 dev server（http://127.0.0.1:5173/，a11y-check.py 的默认 BASE，不传参即用它）。
+    # TODO(2026-11-10 起观察期)：稳定两周后去掉 continue-on-error，转为正式门禁。
+    - name: 无障碍回归（观察期，不阻塞部署）
+      continue-on-error: true
+      timeout-minutes: 5
+      shell: bash
+      run: python scripts/a11y-check.py
+
     - name: Upload screenshots
       if: failure()
       uses: actions/upload-artifact@v4

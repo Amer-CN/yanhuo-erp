@@ -103,6 +103,23 @@ describe('importMerge', () => {
     expect((await db.settings.get('operatorA'))?.value).toBe('本机');
     expect((await db.settings.get('expiryWarnDays'))?.value).toBe('7');
   });
+
+  it('导入不覆盖本机 operatorSelf（本机身份键）', async () => {
+    await db.settings.put({ key: 'operatorSelf', value: '001' });
+
+    const result = await importMerge(
+      makeBackup({
+        settings: [
+          { key: 'operatorSelf', value: '999' },
+          { key: 'expiryWarnDays', value: '7' }
+        ]
+      })
+    );
+
+    expect(result.settingsImported).toBe(1);
+    expect((await db.settings.get('operatorSelf'))?.value).toBe('001');
+    expect((await db.settings.get('expiryWarnDays'))?.value).toBe('7');
+  });
 });
 
 describe('场次合并', () => {

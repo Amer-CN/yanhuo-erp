@@ -38,6 +38,23 @@ export function groupOrdersBySession(
 }
 
 /**
+ * 本机「进行中」的场次：`status === 'open'` 且 `deviceId` 属于本机。
+ * 异常情况下出现多条时取 `startedAt` 最晚的一场（倒序后取第一个）。
+ *
+ * 首页与报表页必须指向同一场，所以这条规则只在这里实现一次——
+ * 之前两处各写一份，规则一改就会悄悄分叉。
+ *
+ * 说明：
+ * - 入参不会被修改（`filter` 已产出新数组，`sort` 作用在副本上）；
+ * - 比较器沿用历史写法（相等时返回 -1），与两处旧实现取 `[0]` 的结果保持一致。
+ */
+export function pickOpenSession(sessions: Session[], deviceId: string): Session | undefined {
+  return sessions
+    .filter((s) => s.status === 'open' && s.deviceId === deviceId)
+    .sort((a, b) => (a.startedAt < b.startedAt ? 1 : -1))[0];
+}
+
+/**
  * 两台设备 / 备份合并时的场次冲突决策：
  * 1. closed 优先于 open（避免已结账场次被拉回进行中）
  * 2. 同状态取 updatedAt 新者

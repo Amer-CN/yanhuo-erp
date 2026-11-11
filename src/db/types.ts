@@ -157,6 +157,11 @@ export const SETTING_KEYS = {
   deviceName: 'deviceName',
   operatorA: 'operatorA',
   operatorB: 'operatorB',
+  /**
+   * 本机操作人编号（如 '001'）。一台手机 = 一个人，所以只存本机、不参与云同步；
+   * operatorA/B 仅保留读取老数据，不再在设置页暴露。
+   */
+  operatorSelf: 'operatorSelf',
   expiryWarnDays: 'expiryWarnDays',
   lastExportAt: 'lastExportAt',
   lastImportAt: 'lastImportAt',

@@ -16,13 +16,30 @@ create table if not exists public.yh_records (
   deleted boolean not null default false
 );
 
-create index if not exists yh_records_ledger_updated
-  on public.yh_records (ledger, updated_at);
-
 -- 复合游标（updated_at, id）：拉取翻页按这两列排序与比较，同毫秒记录不会漏。
 -- 老库升级：单独执行下面这条即可（可重复执行）。
 create index if not exists yh_records_ledger_updated_id
   on public.yh_records (ledger, updated_at, id);
+
+-- 收敛旧的两列索引 yh_records_ledger_updated(ledger, updated_at)：
+-- 它是上面三列索引的严格前缀（同列序、同方向、无 WHERE 谓词），独立查询价值已归零，
+-- 只会让每次 INSERT/UPDATE 多维护一棵 B 树。先建新索引、再删旧索引，
+-- 升级过程中任何时刻都至少有一棵可用索引（先失败也不影响旧索引继续生效）。
+--
+-- 覆盖证据（全部远端查询见 src/db/sync.ts，均以 ledger 等值为前导列）：
+--   * pull 无游标：ledger=eq.{key}&order=updated_at.asc,id.asc → 三列索引直接给出有序游标；
+--   * pull 旧水位：ledger=eq.{key}&updated_at=gte.{ts} → 第二列范围扫描，第三列不约束无代价；
+--   * pull 新游标：ledger=eq.{key}&or=(updated_at.gt.{ts},and(updated_at.eq.{ts},id.gt.{id}))
+--     → 等价于 (updated_at,id) 行比较，正是三列索引的键序；
+--   * clearCloud 软删除：ledger=eq.{key} 单条件 PATCH，命中任一 ledger 前导索引；
+--   * push on_conflict=id 走主键、(testSyncConfig) select=id&limit=1 无过滤，与本索引无关。
+--
+-- 注：drop index 会短暂持有表级排他锁；本表规模极小，锁为瞬时。
+-- 需零锁可改为 drop index concurrently（但不能在事务块内执行）。
+-- 回滚（恢复旧索引，可重复执行）：
+--   create index if not exists yh_records_ledger_updated
+--     on public.yh_records (ledger, updated_at);
+drop index if exists public.yh_records_ledger_updated;
 
 create index if not exists yh_records_ledger_record_updated
   on public.yh_records (ledger, record_updated_at);

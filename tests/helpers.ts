@@ -15,6 +15,9 @@ export async function resetDb(): Promise<void> {
     db.sessions.clear(),
     db.settings.clear()
   ]);
+  // 冲突留痕与发件箱不在「7 张业务表」里，但必须一并清：
+  // 漏清 conflicts 会让后一条用例的 count() 断言读到上一条的残留（表现为随机变红）。
+  await db.conflicts.clear();
   await db.outbox.clear();
 }
 

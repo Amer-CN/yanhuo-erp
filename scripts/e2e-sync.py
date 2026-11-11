@@ -4,9 +4,16 @@
     python scripts/e2e-sync.py
 
 断言面使用「更多 → 销售记录」：它按本机收到的全部订单聚合，不受场次归属设备限制。
+
+⚠️ 本脚本是**全仓唯一不设 `yh-sync-disabled=1` 的脚本**：它就是要真的发同步请求。
+- 默认（不设 SYNC_*）跑本地假 Supabase（scripts/mock-supabase.mjs），不会碰真实账本；
+- 真实模式（设 SYNC_URL / SYNC_KEY / SYNC_LEDGER）必须使用**测试专用账本**：
+  `cleanup_cloud()` 会把整个账本 PATCH 成 `deleted=true`，那是对账本的破坏性操作。
+  若 SYNC_LEDGER 等于内置生产账本码（src/db/syncDefaults.ts），脚本会直接退出。
 """
 
 import os
+import re
 import subprocess
 import sys
 import time
@@ -30,7 +37,33 @@ REAL_KEY = os.environ.get("SYNC_KEY")
 REAL_LEDGER = os.environ.get("SYNC_LEDGER")
 USE_MOCK = not (REAL_URL and REAL_KEY and REAL_LEDGER)
 
+# 内置（生产）账本码：从源码读，避免这里硬编码后与 src/db/syncDefaults.ts 漂移
+SYNC_DEFAULTS = os.path.join(ROOT, "src", "db", "syncDefaults.ts")
+
 errors: list[str] = []
+
+
+def builtin_ledger_key() -> str:
+    """读取内置生产账本码；读不到就返回空串（只影响护栏，不影响正常跑测试）。"""
+    try:
+        with open(SYNC_DEFAULTS, encoding="utf-8") as f:
+            text = f.read()
+    except OSError:
+        return ""
+    m = re.search(r"ledgerKey:\s*'([^']+)'", text)
+    return m.group(1) if m else ""
+
+
+def guard_production_ledger() -> None:
+    """真实模式下拒绝用内置生产账本：cleanup_cloud() 会把整本账软删。"""
+    if USE_MOCK:
+        return
+    prod = builtin_ledger_key()
+    if prod and REAL_LEDGER == prod:
+        sys.exit(
+            "拒绝用生产账本跑 E2E：SYNC_LEDGER 等于内置生产账本码，"
+            "cleanup_cloud() 会把真账本整体软删。请改用测试专用账本。"
+        )
 
 
 def config():
@@ -157,6 +190,8 @@ def wait_history(page, want: str, timeout: int = 35) -> bool:
 
 
 def main() -> int:
+    # 第一行护栏：真实模式下绝不允许对着内置生产账本跑（cleanup_cloud 会整体软删）
+    guard_production_ledger()
     mock = None
     if USE_MOCK:
         mock = subprocess.Popen(
