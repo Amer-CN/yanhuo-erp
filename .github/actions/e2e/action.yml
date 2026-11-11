@@ -33,29 +33,21 @@ runs:
         python -m pip install --upgrade pip
         python -m pip install -r scripts/requirements.txt
 
-        # runner 偶发 DNS 抖动（azure.archive.ubuntu.com 解析失败）会让 apt 直接 100 退出，
-        # 进而使 playwright --with-deps 失败。先带重试预热系统字体依赖，减少一次抖动就整步失败的概率。
-        # 注：composite action 不支持 step 级 timeout-minutes，超时保护只能靠 job 级设置。
-        for i in 1 2 3; do
-          if sudo apt-get update -o Acquire::Retries=5 \
-            && sudo apt-get install -y --no-install-recommends fonts-noto-cjk fonts-wqy-zenhei; then
-            echo "apt 系统依赖就绪（第 $i 次尝试）"
-            break
-          fi
-          echo "apt-get 失败，第 $i 次，等 15 秒重试"
-          sleep 15
-        done
+        # 中文字体只影响截图渲染，装不上不阻塞（断言基于 DOM 文本）。
+        # 单独装、只试一次，避免 apt 抖动拖垮整个 job（job 级上限 20 分钟）。
+        sudo apt-get update -o Acquire::Retries=2 || true
+        sudo apt-get install -y --no-install-recommends fonts-noto-cjk || echo "中文字体未装上，继续（不影响断言）"
 
-        # playwright 安装同样重试：--with-deps 内部仍会跑 apt，DNS 抖动时需要整体重来。
+        # 关键：不传「连系统依赖一起装」的开关。ubuntu-latest 已预装 Chromium 所需的库，
+        # 传了会跑 apt 全量安装，runner DNS 抖动时会卡 10 分钟并击穿 job 超时。
         for i in 1 2 3; do
-          if python -m playwright install --with-deps chromium; then
+          if python -m playwright install chromium; then
             break
           fi
-          echo "playwright install 失败，第 $i 次，等 15 秒重试"
-          sleep 15
+          echo "playwright 安装失败，第 $i 次，等 10 秒重试"
+          sleep 10
         done
-        # 最后再确认一次：仍失败则整个步骤失败，避免门禁被静默跳过。
-        python -m playwright install --with-deps chromium
+        python -m playwright install chromium
 
     - name: Build
       shell: bash
