@@ -32,6 +32,29 @@ runs:
       run: |
         python -m pip install --upgrade pip
         python -m pip install -r scripts/requirements.txt
+
+        # runner 偶发 DNS 抖动（azure.archive.ubuntu.com 解析失败）会让 apt 直接 100 退出，
+        # 进而使 playwright --with-deps 失败。先带重试预热系统字体依赖，减少一次抖动就整步失败的概率。
+        # 注：composite action 不支持 step 级 timeout-minutes，超时保护只能靠 job 级设置。
+        for i in 1 2 3; do
+          if sudo apt-get update -o Acquire::Retries=5 \
+            && sudo apt-get install -y --no-install-recommends fonts-noto-cjk fonts-wqy-zenhei; then
+            echo "apt 系统依赖就绪（第 $i 次尝试）"
+            break
+          fi
+          echo "apt-get 失败，第 $i 次，等 15 秒重试"
+          sleep 15
+        done
+
+        # playwright 安装同样重试：--with-deps 内部仍会跑 apt，DNS 抖动时需要整体重来。
+        for i in 1 2 3; do
+          if python -m playwright install --with-deps chromium; then
+            break
+          fi
+          echo "playwright install 失败，第 $i 次，等 15 秒重试"
+          sleep 15
+        done
+        # 最后再确认一次：仍失败则整个步骤失败，避免门禁被静默跳过。
         python -m playwright install --with-deps chromium
 
     - name: Build
