@@ -1,5 +1,5 @@
 import { useMemo, useState } from 'react';
-import { Search, Boxes, TriangleAlert, ChevronRight } from 'lucide-react';
+import { Search, Boxes, TriangleAlert, ChevronRight, X } from 'lucide-react';
 import type { Batch, Product } from '../../db/types';
 import type { FifoResult } from '../../db/calc';
 import { batchStock } from '../../db/calc';
@@ -29,6 +29,12 @@ export default function StockPage({
   onDone: Done;
 }) {
   const [q, setQ] = useState('');
+  /*
+   * 只看缺货：从统计卡角标点进来（见下面的 stat-badge）。
+   * 用局部 state 而不是路由/全局：离开这一页筛选就该自动失效，
+   * 免得用户切回来发现列表少了东西、以为货被删了。
+   */
+  const [onlyLow, setOnlyLow] = useState(false);
   const [openId, setOpenId] = useState<string | null>(null);
   const [adjust, setAdjust] = useState('');
   const [reason, setReason] = useState('');
@@ -47,8 +53,10 @@ export default function StockPage({
     return products
       .filter((p) => !p.archived)
       .filter((p) => (kw ? p.name.toLowerCase().includes(kw) : true))
+      // 缺货口径与 lowCount 完全一致（stock <= 0），不另立一套判断
+      .filter((p) => (onlyLow ? (inv.get(p.id) ?? 0) <= 0 : true))
       .sort((a, b) => a.sortOrder - b.sortOrder || a.name.localeCompare(b.name, 'zh'));
-  }, [products, q]);
+  }, [products, q, onlyLow, inv]);
 
   const { totalQty, totalValue, lowCount } = useMemo(() => {
     let qty = 0;
@@ -123,16 +131,32 @@ export default function StockPage({
      */
     <div className="page-stack stock-page">
       <div className="stat-grid">
-        <Stat k="库存总件数" v={totalQty} />
+        {/*
+         * 缺货提示从「常驻玻璃横幅」改成「统计卡角标」。
+         * 原因：那条横幅高约 56px，只要有一个商品没货就一直在，等于用最贵的一屏空间
+         * 换一句「年后进货前先看一眼」。现在缺货只体现为「库存总件数」右上角一个数字，
+         * 点一下就把列表筛成只有没货的，再点一下复原 —— 同样的信息，零占位。
+         *
+         * 为什么外面还要包一层 .stat-slot：角标要绝对定位贴着这张卡的角，
+         * 直接改 kit 的 Stat 会波及别的页面；包一层只影响这一处。
+         */}
+        <div className="stat-slot">
+          <Stat k="库存总件数" v={totalQty} />
+          {lowCount > 0 ? (
+            <button
+              type="button"
+              className="stat-badge"
+              aria-label={`缺货 ${lowCount} 个，点击只看缺货`}
+              aria-pressed={onlyLow}
+              onClick={() => setOnlyLow((v) => !v)}
+            >
+              {/* 视觉上是小胶囊；按钮本体被 CSS 撑到 44×44 满足触控下限 */}
+              <span className="stat-badge__pill">缺货 {lowCount}</span>
+            </button>
+          ) : null}
+        </div>
         <Stat k="库存成本" v={<span>¥{fenToStr(totalValue)}</span>} tone="brand" />
       </div>
-
-      {lowCount > 0 ? (
-        <div className="glass-status low-stock">
-          <TriangleAlert size={20} aria-hidden="true" />
-          <p>{lowCount} 个商品没货了，年后进货前先看一眼。</p>
-        </div>
-      ) : null}
 
       <div className="glass-search">
         <Search className="glass-search__icon" size={18} aria-hidden="true" />
@@ -143,14 +167,36 @@ export default function StockPage({
           value={q}
           onChange={(e) => setQ(e.target.value)}
         />
+        {/*
+         * 筛选中的「退出」入口。放在搜索行里而不是另起一行：
+         * 标题旁角标是「进入」，这里负责「出来」，两者都零占位。
+         */}
+        {onlyLow ? (
+          <button
+            type="button"
+            className="stock-filter-chip"
+            aria-label="只看缺货，点击取消筛选"
+            onClick={() => setOnlyLow(false)}
+          >
+            <span>只看缺货</span>
+            <X size={14} aria-hidden="true" />
+          </button>
+        ) : null}
       </div>
 
       {/*
         列表区：唯一可滚的一层。min-height:0 + flex:1 由 .stock-page__scroll 提供，
         商品再多也只是这里滚，上面的搜索框不会跟着走。
         data-scroll-root 是给弹层滚动锁看的：这一页真正在滚的是这里，不是 .app-main。
+
+        --surface：列表非空时才给滚动容器铺玻璃面。空态（Empty）自己有排版，
+        垫一块空的玻璃矩形只会显得像加载失败。
+        圆角的来龙去脉见 styles.css 里 .stock-page__scroll--surface 上方的注释。
       */}
-      <div className="stock-page__scroll" data-scroll-root="1">
+      <div
+        className={`stock-page__scroll${list.length > 0 ? ' stock-page__scroll--surface' : ''}`}
+        data-scroll-root="1"
+      >
         {list.length === 0 ? (
           products.length === 0 ? (
             <Empty icon={<Boxes size={24} />} text="还没有商品" />
@@ -164,6 +210,17 @@ export default function StockPage({
               text={`没搜到「${q.trim()}」`}
               action={
                 <Btn block={false} size="sm" variant="secondary" onClick={() => setQ('')}>
+                  看全部商品
+                </Btn>
+              }
+            />
+          ) : onlyLow ? (
+            /* 刚补完货 / 盘盈后缺货清空：说明是「筛选没了」而不是「商品没了」 */
+            <Empty
+              icon={<Boxes size={24} />}
+              text="现在没有缺货商品了"
+              action={
+                <Btn block={false} size="sm" variant="secondary" onClick={() => setOnlyLow(false)}>
                   看全部商品
                 </Btn>
               }

@@ -16,8 +16,58 @@
   font-size: var(--yh-text-xs);
 }
 
-.first-run-card--warn {
-  border-color: color-mix(in srgb, var(--gl-color-warning) 45%, transparent);
+/*
+ * 2026-11-11：.first-run-card--warn（跨天未结那张 72px 警示卡）已删除。
+ * 现在跨天只用「标题旁的小徽标 + 一次性 Toast + Sheet」表达，样式见下面的 .crossday-pill。
+ */
+
+/* ------------------------------------------------- 跨天未结：本场标题行徽标 */
+/*
+ * 徽标本体撑到 44×44（触控下限，也是 a11y 脚本 getBoundingClientRect 量到的盒子），
+ * 再用负的纵向 margin 把多出来的高度在版面上「收」回去 —— 行高保持约 20px，
+ * 卡片不会被一个小标记顶高。视觉上的胶囊是里面的 .crossday-pill__text（20px）。
+ */
+.session-head__line {
+  display: flex;
+  align-items: center;
+  gap: var(--yh-space-2);
+  min-width: 0;
+}
+
+.crossday-pill {
+  flex: 0 0 auto;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: var(--yh-touch-min, 44px);
+  min-height: var(--yh-touch-min, 44px);
+  margin-block: calc((var(--yh-touch-min, 44px) - 20px) / -2);
+  padding: 0 var(--yh-space-1);
+  background: none;
+  border: 0;
+  cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+}
+
+.crossday-pill__text {
+  display: inline-flex;
+  align-items: center;
+  height: 20px;
+  padding: 0 var(--yh-space-2);
+  border-radius: var(--yh-radius-pill);
+  font-size: var(--yh-text-xs);
+  font-weight: var(--yh-weight-semibold);
+  line-height: 1;
+  white-space: nowrap;
+  color: var(--gl-color-warning-on-surface, var(--gl-color-warning));
+  background: color-mix(in srgb, var(--gl-color-warning) 18%, transparent);
+  border: 1px solid color-mix(in srgb, var(--gl-color-warning) 45%, transparent);
+}
+
+.crossday-pill:focus-visible {
+  outline: var(--yh-focus-width) solid var(--yh-focus-ring);
+  outline-offset: var(--yh-space-0-5);
+  border-radius: var(--yh-radius-sm);
 }
 
 .session-summary__revenue {

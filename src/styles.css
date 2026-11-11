@@ -216,6 +216,54 @@ body {
   padding-bottom: var(--yh-space-1); /* 滚到底时最后一行不贴裁切边 */
 }
 
+/* ---------------------------------------------------------------- 列表圆角 */
+/*
+ * 2026-11-11 手感修复：列表滚到中间时，四个圆角变成直角。
+ *
+ * 根因（不是描边丢了，是圆角根本不在可视窗口上）：
+ * 1) GlassKit 把圆角画在 `.glass-list` 自己身上——`border-radius: var(--gl-radius-btn)`（16px），
+ *    背景 `var(--gl-surface-1)`、1px 描边、`backdrop-filter: blur(...)` 也都在这一个盒子上；
+ * 2) 但我们这块列表的**可视窗口**是外面那层 `.stock-page__scroll`：它是矩形、`overflow-y:auto`。
+ *    列表比窗口高时，列表自己的头尾（含那四个 16px 圆角）被滚出窗口，窗口里剩下的
+ *    只是列表的**中段**——一段四四方方的矩形；容器再按自己的直角边界把溢出部分裁掉，
+ *    于是滚到中部/底部时，四角就是尖的。
+ *
+ * 修法：把「圆角」搬到真正裁切内容的那一层——滚动容器自己变成圆角视口
+ * （`overflow-y:auto` + `border-radius` 时，浏览器会按圆角裁剪滚动内容，这正是我们要的）。
+ * 玻璃质感（半透背景 / 模糊 / 描边 / 投影）一并搬过来，否则会只剩一个圆角的透明框。
+ * 里层 `.glass-list` 同时退成「无圆角 / 透明 / 无描边」，避免双层描边和 16px 与 18px
+ * 圆角错位的那 1~2px 白边。
+ *
+ * 只在列表非空时铺面（--surface，由 StockPage 按 list.length 加）：
+ * 空态用的是 Empty 排版，垫一块空玻璃矩形会像加载失败。
+ */
+.stock-page__scroll--surface {
+  border-radius: var(--gl-radius-btn); /* 必须与 .glass-list 的令牌同源，别写死 px */
+  border: 1px solid var(--gl-border-subtle);
+  background: var(--gl-surface-1);
+  backdrop-filter: blur(var(--gl-blur-light));
+  -webkit-backdrop-filter: blur(var(--gl-blur-light));
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08), var(--gl-inset-subtle);
+}
+
+/* 里层列表：圆角/背景/描边/投影全部由上面的滚动容器负责，自己归零 */
+.stock-page__scroll > .glass-list {
+  border-radius: 0;
+  border: 0;
+  background: transparent;
+  backdrop-filter: none;
+  -webkit-backdrop-filter: none;
+  box-shadow: none;
+}
+
+/*
+ * 说明：项目里只有库存页有「列表自己的滚动窗口」。
+ * - HistoryPage 的列表跟着 .app-main 整页滚（.app-main 不是圆角容器），圆角随页面滚走
+ *   是正常的卡片行为，不是这个 bug；
+ * - ReportPage 的 .glass-table-wrap 只做横向滚动（见下方 M-02），表格铺在 Card 的表面上，
+ *   纵向不裁切，所以没有「四角变直角」的问题，不做改动。
+ */
+
 /* 卡片内边距收紧（GlassKit 默认偏大） */
 .glass-card.card-pad {
   padding: var(--yh-card-pad-y) var(--yh-card-pad-x);
@@ -324,6 +372,100 @@ body {
 
 .stat .v.bad {
   color: var(--yh-bad-ink);
+}
+
+/* ------------------------------------------------------------ 缺货角标 */
+/*
+ * 缺货提示从「常驻横幅」改成统计卡右上角的角标（2026-11-11）。
+ * 横幅高 56px 且只要有一个商品没货就一直在；角标零占位，点一下就把列表筛成缺货。
+ *
+ * .stat-slot 只是给角标一个定位上下文：不改 kit 里的 Stat（那是全站共用组件），
+ * 包一层只影响库存页这一张卡。
+ */
+.stat-slot {
+  position: relative;
+  display: flex;
+}
+
+.stat-slot > .stat {
+  flex: 1 1 auto;
+  min-width: 0;
+}
+
+/*
+ * 按钮本体撑到 44×44（触控下限，也是 a11y 脚本 getBoundingClientRect 量到的东西），
+ * 视觉上的胶囊是里面的 .stat-badge__pill —— 只有 22px 高，贴卡片右上角。
+ * 多出来的透明区域落在卡片右半边的空白处：数字在左下、标签在左上，谁都不挡。
+ */
+.stat-badge {
+  position: absolute;
+  inset-block-start: 0;
+  inset-inline-end: 0;
+  min-width: var(--yh-touch-min, 44px);
+  min-height: var(--yh-touch-min, 44px);
+  padding: var(--yh-space-1) var(--yh-space-1) 0 0;
+  display: inline-flex;
+  align-items: flex-start;
+  justify-content: flex-end;
+  background: none;
+  border: 0;
+  cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+}
+
+.stat-badge__pill {
+  display: inline-flex;
+  align-items: center;
+  min-height: 22px;
+  padding: 0 var(--yh-space-2);
+  border-radius: var(--yh-radius-pill);
+  font-size: var(--yh-text-xs);
+  font-weight: var(--yh-weight-semibold);
+  line-height: 1;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+  color: var(--gl-color-warning-on-surface, var(--gl-color-warning));
+  background: color-mix(in srgb, var(--gl-color-warning) 16%, transparent);
+  border: 1px solid color-mix(in srgb, var(--gl-color-warning) 42%, transparent);
+}
+
+/* 正在筛选时角标加重，跟搜索框里的「只看缺货 ×」呼应 */
+.stat-badge[aria-pressed='true'] .stat-badge__pill {
+  background: color-mix(in srgb, var(--gl-color-warning) 34%, transparent);
+  border-color: color-mix(in srgb, var(--gl-color-warning) 70%, transparent);
+}
+
+.stat-badge:focus-visible {
+  outline: var(--yh-focus-width) solid var(--yh-focus-ring);
+  outline-offset: var(--yh-space-0-5);
+  border-radius: var(--yh-radius-sm);
+}
+
+/* 搜索行里多出来的筛选 chip：只在这一行有第二个子元素时才需要 gap */
+.stock-page .glass-search {
+  gap: var(--yh-space-2);
+}
+
+.stock-filter-chip {
+  flex: 0 0 auto;
+  display: inline-flex;
+  align-items: center;
+  gap: var(--yh-space-1);
+  min-height: var(--yh-touch-min, 44px);
+  padding: 0 var(--yh-space-3) 0 var(--yh-space-2);
+  border-radius: var(--yh-radius-pill);
+  font-size: var(--yh-text-xs);
+  font-weight: var(--yh-weight-semibold);
+  white-space: nowrap;
+  cursor: pointer;
+  color: var(--gl-color-warning-on-surface, var(--gl-color-warning));
+  background: color-mix(in srgb, var(--gl-color-warning) 16%, transparent);
+  border: 1px solid color-mix(in srgb, var(--gl-color-warning) 42%, transparent);
+}
+
+.stock-filter-chip:focus-visible {
+  outline: var(--yh-focus-width) solid var(--yh-focus-ring);
+  outline-offset: var(--yh-space-0-5);
 }
 
 @media (min-width: 520px) {
@@ -1047,9 +1189,11 @@ body {
   grid-template-columns: repeat(3, minmax(0, 1fr));
 }
 
-.low-stock p {
-  margin: 0;
-}
+/*
+ * 2026-11-11：「N 个商品没货了」的常驻玻璃横幅已删除（改成库存总件数卡上的角标）。
+ * 那条横幅只要有一个商品没货就占着列表上方约 56px，用户要求「不占位」。
+ * .low-stock / .glass-status.low-stock 已无任何引用，样式一并删掉，免得后人以为还有这个组件。
+ */
 
 .prod-btn__stock.low {
   color: var(--yh-bad-ink);

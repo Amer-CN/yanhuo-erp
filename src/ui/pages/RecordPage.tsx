@@ -1,9 +1,9 @@
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { ChevronRight, Clock, Receipt, Sparkles, WifiOff } from 'lucide-react';
 import type { Product, SaleLine, SalesOrder, Session, SessionSummary } from '../../db/types';
 import { PAY_LABEL } from '../../db/types';
 import { fenToStr, isoToLocalDate, isoToTime, localDate } from '../../db/util';
-import { Btn, Card, Empty, rowProps } from '../kit';
+import { Btn, Card, Empty, Sheet, Toast, rowProps } from '../kit';
 
 function startLabel(session: Session): string {
   const d = new Date(session.startedAt);
@@ -52,7 +52,16 @@ export default function RecordPage({
   onOpenHistory: () => void;
   onGoStock: () => void;
 }) {
+  /*
+   * 跨天未结的三件套，全是这一页的局部状态（不往上提全局）：
+   * - crossDayOpen：处理面板开着没；
+   * - crossDayDismissed：「这次跨天已经处理过 / 明确选了继续记」——只负责**不再自动提醒**，
+   *   不负责隐藏徽标。徽标必须一直在，用户随时能改主意；
+   * - crossDayHint：进页面时那一次性的 Toast 文案（按本地日期去重，见下面的 effect）。
+   */
   const [crossDayDismissed, setCrossDayDismissed] = useState(false);
+  const [crossDayOpen, setCrossDayOpen] = useState(false);
+  const [crossDayHint, setCrossDayHint] = useState<string | null>(null);
 
   const productMap = useMemo(() => {
     const m = new Map<string, Product>();
@@ -73,6 +82,47 @@ export default function RecordPage({
   const hasSession = Boolean(session);
   const empty = summary.orderCount === 0;
 
+  /*
+   * 跨天提醒从「常驻 72px 大卡片」改成「一次性 Toast + 标题旁小徽标」。
+   * 去重口径：按**本地日期**记在 sessionStorage —— 同一天反复切 tab 不再骚扰，
+   * 但跨天这事儿一天至少露一次脸。sessionStorage 拿不到（隐私模式）就只靠本页 state，
+   * 最坏结果是多提示一次，不会丢信息。
+   */
+  useEffect(() => {
+    if (!crossDay || crossDayDismissed) return;
+    const key = `yh-crossday-hint-${localDate()}`;
+    try {
+      if (sessionStorage.getItem(key) === '1') return;
+      sessionStorage.setItem(key, '1');
+    } catch {
+      /* 隐私模式：只靠下面的 state 与 crossDayDismissed 去重 */
+    }
+    setCrossDayHint('昨天那场还没结账，点标题旁的标记处理');
+  }, [crossDay, crossDayDismissed]);
+
+  // Toast 自己退场：6 秒够读完一行，又不至于长时间压在流水和弹层上方
+  useEffect(() => {
+    if (!crossDayHint) return;
+    const timer = window.setTimeout(() => setCrossDayHint(null), 6000);
+    return () => window.clearTimeout(timer);
+  }, [crossDayHint]);
+
+  /* 关掉面板 = 「这次我知道了」：auto 提醒不再弹，但徽标照旧常驻 */
+  const dismissCrossDay = () => {
+    setCrossDayDismissed(true);
+    setCrossDayOpen(false);
+  };
+
+  /*
+   * 打开面板时立刻收掉提醒：Toast 和 Sheet 都停在底部同一块区域，
+   * 同时出现会盖住弹层标题（实测截图里「这场还没结账」被压住一半）。
+   * 点了徽标就说明用户已经看见了，提醒没有存在意义。
+   */
+  const openCrossDayPanel = () => {
+    setCrossDayHint(null);
+    setCrossDayOpen(true);
+  };
+
   return (
     <div className="page-stack">
       {!online ? (
@@ -82,29 +132,37 @@ export default function RecordPage({
         </div>
       ) : null}
 
-      {crossDay && session && !crossDayDismissed ? (
-        <div className="first-run-card first-run-card--warn">
-          <div>
-            <div className="first-run-card__title">昨天那场还没结账</div>
-            <div className="tiny-text">这场从 {startLabel(session)} 开始，继续记会并进这一场</div>
-          </div>
-          <div className="row" style={{ gap: 8 }}>
-            <Btn block={false} size="sm" variant="secondary" onClick={() => setCrossDayDismissed(true)}>
-              继续记
-            </Btn>
-            <Btn block={false} size="sm" onClick={onCloseSession}>
-              去结账
-            </Btn>
-          </div>
-        </div>
-      ) : null}
+      {/*
+        2026-11-11：这里原来是一张 .first-run-card--warn（约 72px，两个按钮）。
+        它跨天就常驻，等于每天开场先吃掉一屏，而「继续记 / 去结账」其实是低频决策。
+        现在改成：本场标题行上的小徽标（下面 session-head__line 里）+ 首次进入的一次性 Toast，
+        面板里再讲清后果。徽标和卡片下方的「收摊结账」按钮是两个入口，文案不重复。
+      */}
 
       <Card>
         {hasSession && session ? (
           <>
             <div className="row-between" style={{ alignItems: 'flex-start' }}>
               <div>
-                <div className="tiny-text">本场 · {startLabel(session)} 开始</div>
+                <div className="session-head__line">
+                  <span className="tiny-text">本场 · {startLabel(session)} 开始</span>
+                  {/*
+                   * 跨天未结的徽标：只在开场日期 < 今天时出现（口径没变，别改成按自然日算金额）。
+                   * 为什么必须留着它：一场（session）是**连续经营单元**，跨天没结 = 昨天没结。
+                   * 这时候「继续记」会把今天的单并进昨天那一场，报表按场次统计时两天的金额分不开，
+                   * 结账时间与 closedBy 也会落错。徽标就是让这件事随时可见、随时可改的入口。
+                   */}
+                  {crossDay ? (
+                    <button
+                      type="button"
+                      className="crossday-pill"
+                      aria-label="跨天未结账，打开处理面板"
+                      onClick={openCrossDayPanel}
+                    >
+                      <span className="crossday-pill__text">跨天未结</span>
+                    </button>
+                  ) : null}
+                </div>
                 <div className="session-summary__revenue" aria-live="polite">
                   ¥{fenToStr(summary.revenueFen)}
                 </div>
@@ -209,6 +267,53 @@ export default function RecordPage({
           </span>
         </Btn>
       </div>
+
+      {/*
+        跨天未结的处理面板。复用 kit 里的 Sheet，不另造组件。
+        这里必须把「继续记」的后果讲白 —— 它不是「关掉一个提示」，而是账务口径的选择：
+        一场 = 连续经营单元，跨天不结就是把今天并进昨天那场。
+      */}
+      {crossDay && session && crossDayOpen ? (
+        <Sheet
+          title="这场还没结账"
+          onClose={dismissCrossDay}
+          footer={
+            <div className="stack-sm">
+              <Btn block variant="secondary" onClick={dismissCrossDay}>
+                继续记
+              </Btn>
+              <Btn
+                block
+                onClick={() => {
+                  dismissCrossDay();
+                  onCloseSession();
+                }}
+              >
+                去结账
+              </Btn>
+            </div>
+          }
+        >
+          <div className="page-stack">
+            <p className="muted-text" style={{ margin: 0 }}>
+              从 {startLabel(session)} 开到 现在 · 已记 {summary.orderCount} 单 ¥
+              {fenToStr(summary.revenueFen)}
+            </p>
+            <p className="tiny-text" style={{ margin: 0 }}>
+              <strong>继续记</strong>：今天的单会并进这一场，两天的金额分不开；
+              <strong>去结账</strong>：先把这场结掉，今天开新的一场。
+            </p>
+          </div>
+        </Sheet>
+      ) : null}
+
+      {/*
+        一次性提醒（不是常驻卡片）：进来时告诉用户「标记在标题旁」，
+        说完自己走，不占版面。同一天只提醒一次（见上面的 sessionStorage 去重）。
+      */}
+      {crossDayHint && !crossDayOpen ? (
+        <Toast message={crossDayHint} tone="warning" onClose={() => setCrossDayHint(null)} />
+      ) : null}
     </div>
   );
 }
