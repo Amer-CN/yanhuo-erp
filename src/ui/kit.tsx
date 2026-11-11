@@ -316,7 +316,7 @@ export function Sheet({
   children,
   footer,
   dismissible = true,
-  initialFocus = 'first'
+  initialFocus = 'panel'
 }: {
   title: string;
   subtitle?: string;
@@ -326,11 +326,14 @@ export function Sheet({
   /** false = 结账中/保存中，禁止遮罩、Esc 与关闭按钮 */
   dismissible?: boolean;
   /**
-   * 挂载后焦点给谁：
-   * - 'first'（默认）= 面板内第一个非关闭按钮的可聚焦元素，用于「打开就要输入」的表单，
-   *   行为和 2026-11-08 加的焦点陷阱一致，8 处调用不受影响；
-   * - 'panel' = 面板自身（`.glass-sheet` 已 tabIndex={-1}）。移动端不会因此拉输入法，
-   *   但 aria-modal / 焦点陷阱 / 标题播报仍生效。商品选择器这类「以点选为主」的弹层用它。
+   * 挂载后焦点给谁（2026-11-11 起默认 'panel'，别再改回 'first'）：
+   * - 'panel'（默认）= 面板自身（`.glass-sheet` 已 tabIndex={-1}）。
+   *   移动端只有「焦点落到 input」才会拉起输入法；默认给面板，
+   *   「点开就弹键盘、半屏被盖住」从根上不会发生。aria-modal / 焦点陷阱 /
+   *   标题播报 / Esc 栈顶判定全部不变。
+   * - 'first' = 面板内第一个非关闭按钮的可聚焦元素。**只给「用户点进来就是要打字」的表单**
+   *   （见下方 ProductFormModal：唯一的用法）。逐个弹层打补丁修输入法问题会漏，
+   *   所以策略写在默认值上；以后新增弹层除非真的要打字，否则什么都别传。
    */
   initialFocus?: 'first' | 'panel';
 }) {
@@ -589,6 +592,9 @@ export function ProductFormModal({
   return (
     <Sheet
       title={initial ? '编辑商品' : '新建商品'}
+      /* 全仓唯一显式要 'first' 的弹层：新建/编辑商品就是「进来先填商品名」，
+         焦点直接落在第一个输入框，省一次点击（其它弹层一律用默认 'panel'）。 */
+      initialFocus="first"
       onClose={onClose}
       footer={
         <div className="stack-sm">

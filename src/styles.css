@@ -15,8 +15,15 @@
   --gl-list-title-white-space: normal;
   --gl-list-subtitle-white-space: normal;
 
-  /* 提示条落在顶栏下面，别压住标题 */
-  --gl-toast-top: calc(env(safe-area-inset-top, 0px) + 78px);
+  /*
+   * 提示条统一落在顶栏下面（2026-11-11 把底部版废掉：底部会压住 Tab Bar、
+   * 结算浮条和设置页的按钮，而且那里正是用户刚点的地方）。
+   * 64px 是顶栏实测高度（Playwright 390×844 量到 .app-nav = 64）：
+   * 上下内边距各 calc(--yh-space-2 8px + 2px) = 10px，内容取 .app-brand /
+   * .glass-pill 的 44px（--yh-touch-min）→ 10 + 44 + 10 = 64；+8px 是与顶栏的呼吸位。
+   * 全站只此一处定义，record.css 直接 top: var(--gl-toast-top)，别再按页面改位置。
+   */
+  --gl-toast-top: calc(env(safe-area-inset-top, 0px) + 64px + var(--yh-space-2));
 }
 
 html {
@@ -256,6 +263,50 @@ body {
   box-shadow: none;
 }
 
+/* ------------------------------------------------- 库存列表行（等高、单行） */
+/*
+ * 2026-11-11 实测：34 个商品里有 3 行高的、也有 2 行高的，同一个列表像两种组件。
+ * 两个成因叠在一起：
+ * 1) GlassKit 的 .glass-list__title-row 默认 flex-wrap: wrap，且 :root 把
+ *    --gl-list-title-white-space 设成了 normal（别页多行副标题要用，不能全局改）；
+ * 2) 右侧 trailing 还挂着「负库存 / 没货」badge，与左侧抢宽度，把名字挤成换行。
+ * 修法：标题单行省略 + title-row 不换行 + badge 不参与伸缩；状态词搬进副标题
+ * （StockPage 已改 JSX，trailing 只剩 chevron）；再给行一个统一的 min-height。
+ * 这几条都只作用在 .stock-page，不动别的页面的列表。
+ */
+.stock-page .glass-list__item {
+  min-height: 72px;
+  padding-block: var(--yh-space-2); /* 16→8：多出来的高度交给 min-height，行高才可预测 */
+}
+
+.stock-page .glass-list__title-row {
+  flex-wrap: nowrap;
+}
+
+.stock-page .glass-list__title {
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+/* badge 先保证不换行、不被压缩：要让出宽度的是名字（省略号），不是 badge */
+.stock-page .glass-list__title-row > .glass-badge {
+  flex: none;
+}
+
+/* 「库存 0 · 没货」里的状态词：保留错误色，但不再是一枚 badge */
+.stock-page .stock-flag {
+  color: var(--gl-color-error);
+  font-weight: var(--yh-weight-semibold);
+}
+
+/* 极窄屏（iPhone SE / 分屏）：连「1箱=N个」都省掉，名字优先；装箱信息在详情里还有 */
+@media (max-width: 380px) {
+  .stock-page .glass-list__title-row > .glass-badge {
+    display: none;
+  }
+}
+
 /*
  * 说明：项目里只有库存页有「列表自己的滚动窗口」。
  * - HistoryPage 的列表跟着 .app-main 整页滚（.app-main 不是圆角容器），圆角随页面滚走
@@ -474,152 +525,133 @@ body {
   }
 }
 
-/* ------------------------------------------------------------ 商品网格 */
-
+/* ------------------------------------------------------------ 商品行（选商品弹层） */
+/*
+ * 2026-11-11：这里原来有**两套** .prod-btn —— 双列卡片（:491）+ 单列横条覆写（:574）。
+ * 横条沿用了卡片的高光、--yh-shadow-2 重投影和大圆角，打开选商品弹层像进了另一个 App。
+ * 现在只留一套，直接对齐库存/流水列表行的视觉语言，令牌全部取自 GlassKit，不自造数值：
+ *   - 面/描边/圆角/投影 = .glass-list（--gl-surface-1 / --gl-border-subtle /
+ *     --gl-radius-btn / 同一个 inset 投影），行的 hover/active = --gl-surface-2/3
+ *     （见 .glass-list__item--interactive），分隔线 = --gl-border-subtle；
+ *   - 左右内边距与行间距 = --gl-space-lg（20px）/ --gl-space-sm（12px），
+ *     就是 .glass-list__item 的 padding 与 gap。
+ * 目标：选商品弹层看起来是「同一个 App 的列表」。
+ */
 .product-grid {
-  display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: var(--yh-product-grid-gap);
-}
-
-@media (min-width: 520px) {
-  .product-grid {
-    grid-template-columns: repeat(3, minmax(0, 1fr));
-  }
+  display: flex;
+  flex-direction: column;
+  /* 行之间靠分隔线，不用网格间隙：gap 会让分隔线悬空 */
+  gap: 0;
+  background: var(--gl-surface-1);
+  border: 1px solid var(--gl-border-subtle);
+  border-radius: var(--gl-radius-btn);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08), var(--gl-inset-subtle);
+  overflow: hidden;
 }
 
 .prod-btn {
   position: relative;
-  display: flex;
-  flex-direction: column;
-  gap: var(--yh-space-1);
-  min-height: var(--yh-product-card-min);
-  padding: var(--yh-card-tight-pad);
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: center;
+  column-gap: var(--gl-space-sm);
+  row-gap: 1px;
+  width: 100%;
+  /* 56px 高于 44px 触控下限；80 个货一屏能扫 7-9 个，密度靠留白不靠缩字号 */
+  min-height: 56px;
+  padding: var(--yh-space-2) var(--gl-space-lg);
   text-align: left;
   color: var(--gl-color-text);
-  background: var(--gl-surface-2);
-  border: var(--yh-border-width) solid var(--gl-border-medium);
-  border-radius: var(--yh-radius-xl);
-  backdrop-filter: blur(var(--gl-blur-light));
-  -webkit-backdrop-filter: blur(var(--gl-blur-light));
-  box-shadow: var(--yh-shadow-2);
+  background: transparent;
+  /* 描边在容器上：行如果各带一条边，行与行之间会出现双线 */
+  border: 0;
+  border-radius: 0;
   cursor: pointer;
-  transition:
-    transform var(--yh-dur-fast) var(--yh-ease-standard),
-    background var(--yh-dur-base) var(--yh-ease-standard),
-    border-color var(--yh-dur-base) var(--yh-ease-standard);
-  overflow: hidden;
+  transition: background var(--yh-dur-fast) var(--yh-ease-standard);
 }
 
-.prod-btn::after {
+/* 行间分隔线：与 .glass-list__item::after 同款（左右各让出 20px 内边距）。
+   ::after 以前是卡片的斜向高光，现在让给分隔线，高光彻底删掉。 */
+.prod-btn:not(:last-child)::after {
   content: '';
   position: absolute;
-  inset: 0;
-  background: linear-gradient(150deg, rgba(255, 255, 255, 0.12), transparent 46%);
+  inset-inline: var(--gl-space-lg);
+  bottom: 0;
+  height: 1px;
+  background: var(--gl-border-subtle);
   pointer-events: none;
 }
 
+.prod-btn:hover,
+.prod-btn:focus-visible {
+  background: var(--gl-surface-2);
+  outline: none;
+}
+
+/* 键盘焦点环画在行内侧，和 .glass-list__item--interactive:focus-visible 一致 */
+.prod-btn:focus-visible {
+  box-shadow: inset 0 0 0 2px var(--gl-border-focus);
+}
+
 .prod-btn:active {
-  transform: scale(0.965);
-  border-color: var(--gl-color-primary);
+  background: var(--gl-surface-3);
 }
 
 .prod-btn__name {
+  grid-column: 1;
+  grid-row: 1;
+  min-width: 0;
   font-size: var(--yh-text-base);
   font-weight: var(--yh-weight-semibold);
   line-height: var(--yh-leading-snug);
   color: var(--gl-color-text-heading);
-  word-break: break-word;
+  /* 单行省略：列表行不该被长商品名撑高（与 .glass-list__title 同一策略） */
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
+/* 价格贴右，与库存同列右对齐，形成一列可纵向扫视的数字。
+   字号/颜色跟列表行的金额（.record-actions__total .v）一致：18px + 价格色。 */
 .prod-btn__price {
-  font-size: var(--yh-text-xl);
+  grid-column: 2;
+  grid-row: 1;
+  text-align: right;
+  font-size: var(--yh-text-lg);
   font-weight: var(--yh-weight-semibold);
-  color: var(--yh-ink-price);
+  color: var(--yh-price-ink);
   font-variant-numeric: tabular-nums;
+  white-space: nowrap;
 }
 
 .prod-btn__meta {
-  font-size: var(--yh-text-2xs);
+  grid-column: 1;
+  grid-row: 2;
+  min-width: 0;
+  font-size: var(--yh-text-xs);
   color: var(--gl-color-text-muted);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
 .prod-btn__stock {
-  margin-top: auto;
-  font-size: var(--yh-text-2xs);
+  grid-column: 2;
+  grid-row: 2;
+  text-align: right;
+  font-size: var(--yh-text-xs);
   color: var(--gl-color-text-muted);
+  white-space: nowrap;
 }
 
 .prod-btn__stock.low {
   color: var(--gl-color-error);
 }
 
-/* ------------------------------------------------- 商品横条（覆写上方卡片规则） */
-/*
- * 为什么保留上面的双列卡片规则再覆写：卡片在平板/桌面仍是可接受的信息密度，
- * 但摊位手机上 390px 宽只能显示 6 个商品（3 行 × 2 列），20-60 个货要反复滚。
- * 改成单列横条后每行 56px，一屏 7-9 个；价格与库存右对齐成同一列，扫视更快。
- *
- * DOM 顺序是 name → price → meta → stock，在 2×2 网格里正好落成：
- *   名称            ¥价格
- *   单位/装箱       库存
- * 所以这一版只改 CSS，不动 JSX 结构。
- * 56px 高于 44px 触控下限；密度靠留白做，不靠缩字号。
- */
-.product-grid {
-  grid-template-columns: minmax(0, 1fr);
-  gap: var(--yh-space-2);
-}
-
-.prod-btn {
-  /* 覆盖上面的 flex-direction: column：横条用网格定位四个子元素 */
-  display: grid;
-  grid-template-columns: minmax(0, 1fr) auto;
-  align-items: center;
-  column-gap: var(--yh-space-3);
-  row-gap: 1px;
-  min-height: 56px;
-  padding: var(--yh-space-2) var(--yh-card-tight-pad);
-  /* 108px 卡片用 24px 圆角合适，56px 横条会显得“胖”，降到 16px */
-  border-radius: var(--yh-radius-md);
-}
-
-/* 价格贴右、与库存同列右对齐，形成一列可纵向扫视的数字 */
-.prod-btn__price {
-  grid-column: 2;
-  grid-row: 1;
-  text-align: right;
-  font-size: var(--yh-text-lg);
-}
-
-.prod-btn__name {
-  grid-column: 1;
-  grid-row: 1;
-}
-
-.prod-btn__meta {
-  grid-column: 1;
-  grid-row: 2;
-}
-
-.prod-btn__stock {
-  grid-column: 2;
-  grid-row: 2;
-  text-align: right;
-  /* 覆盖上面的 margin-top: auto —— grid 下它会把内容撑开、行高变脏 */
-  margin-top: 0;
-}
-
-/* 斜向高光在 108px 卡片上是质感，在 56px 横条上会显得脏，压一半 */
-.prod-btn::after {
-  opacity: 0.5;
-}
-
-/* 平板同样保持单列/两列横条：原 3 列是为了卡片，横条下 3 列会让名称被挤成一字一行 */
-@media (min-width: 520px) {
-  .product-grid {
-    grid-template-columns: repeat(2, minmax(0, 1fr));
-  }
+/* 本单已加过的行：淡淡一层选中底（对应 .glass-list__item.is-selected），
+   具体加了几件由元信息行里的「已加 N」胶囊说明，不再靠 44px 的左侧角标位。 */
+.prod-btn.is-added {
+  background: color-mix(in srgb, var(--yh-accent) 10%, transparent);
 }
 
 /* 已删除（作废）的销售记录行：透明度 + 删除线同时给，

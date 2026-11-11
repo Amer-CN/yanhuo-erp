@@ -62,6 +62,14 @@ export default function RecordPage({
   const [crossDayDismissed, setCrossDayDismissed] = useState(false);
   const [crossDayOpen, setCrossDayOpen] = useState(false);
   const [crossDayHint, setCrossDayHint] = useState<string | null>(null);
+  /*
+   * 「这一场还没记单 / 账面没货可能是漏记进货」的引导。
+   * 原来是一条常驻 .link-btn（高约 44px，天天占一屏），但它只是低频排查线索：
+   * (a) 进页面首次弹一次 Toast，按**场次 id** 用 sessionStorage 去重（同一场只提醒一次，
+   *     换了场次再提醒——文案说的是「这一场」，按日期去重会串场）；
+   * (b) 本场卡片的 0 单区域里留一个 12px 文字链当常驻入口，不占独立一行、不压结算浮条。
+   */
+  const [stockHint, setStockHint] = useState<string | null>(null);
 
   const productMap = useMemo(() => {
     const m = new Map<string, Product>();
@@ -81,6 +89,7 @@ export default function RecordPage({
   const crossDay = Boolean(session && isoToLocalDate(session.startedAt) < localDate());
   const hasSession = Boolean(session);
   const empty = summary.orderCount === 0;
+  const sessionId = session?.id ?? null;
 
   /*
    * 跨天提醒从「常驻 72px 大卡片」改成「一次性 Toast + 标题旁小徽标」。
@@ -107,6 +116,29 @@ export default function RecordPage({
     return () => window.clearTimeout(timer);
   }, [crossDayHint]);
 
+  /*
+   * 有场次但 0 单：进页面首次提醒「可能漏记进货」。
+   * 去重键带场次 id —— 提醒针对的是「这一场」，同一场反复切 tab 不再啰嗦，
+   * 但换一场（哪怕同一天）应该再露一次脸；sessionStorage 不可用时最坏多提示一次。
+   */
+  useEffect(() => {
+    if (!sessionId || !empty) return;
+    const key = `yh-empty-session-hint-${sessionId}`;
+    try {
+      if (sessionStorage.getItem(key) === '1') return;
+      sessionStorage.setItem(key, '1');
+    } catch {
+      /* 隐私模式：只靠本页 state 去重 */
+    }
+    setStockHint('这一场还没记单。如果账面没货，可能是漏记进货了');
+  }, [sessionId, empty]);
+
+  useEffect(() => {
+    if (!stockHint) return;
+    const timer = window.setTimeout(() => setStockHint(null), 6000);
+    return () => window.clearTimeout(timer);
+  }, [stockHint]);
+
   /* 关掉面板 = 「这次我知道了」：auto 提醒不再弹，但徽标照旧常驻 */
   const dismissCrossDay = () => {
     setCrossDayDismissed(true);
@@ -120,6 +152,8 @@ export default function RecordPage({
    */
   const openCrossDayPanel = () => {
     setCrossDayHint(null);
+    // 两条提示都停在顶部同一个位置，跨天这条更重要：打开面板时把另一条也收掉
+    setStockHint(null);
     setCrossDayOpen(true);
   };
 
@@ -180,20 +214,37 @@ export default function RecordPage({
               </Btn>
             </div>
 
-            <div className="pay-rows">
-              <div className="pay-row">
-                <span>现金</span>
-                <span>¥{fenToStr(summary.cashFen)}</span>
+            {empty ? (
+              /*
+               * 本场 0 单区域。原来是三行支付方式、全是 ¥0，等于白占半张卡。
+               * 这里换成一句状态 + 12px 文字链：常驻入口还在，但不占独立一行，
+               * 也不像原来那样悬在结算浮条上方 44px。
+               */
+              <div className="session-empty">
+                <Clock size={22} aria-hidden="true" />
+                <div>
+                  <div className="tiny-text">这一场还没记单</div>
+                  <button type="button" className="link-btn link-btn--xs" onClick={onGoStock}>
+                    去库存看看
+                  </button>
+                </div>
               </div>
-              <div className="pay-row">
-                <span>微信</span>
-                <span>¥{fenToStr(summary.wechatFen)}</span>
+            ) : (
+              <div className="pay-rows">
+                <div className="pay-row">
+                  <span>现金</span>
+                  <span>¥{fenToStr(summary.cashFen)}</span>
+                </div>
+                <div className="pay-row">
+                  <span>微信</span>
+                  <span>¥{fenToStr(summary.wechatFen)}</span>
+                </div>
+                <div className="pay-row">
+                  <span>支付宝</span>
+                  <span>¥{fenToStr(summary.alipayFen)}</span>
+                </div>
               </div>
-              <div className="pay-row">
-                <span>支付宝</span>
-                <span>¥{fenToStr(summary.alipayFen)}</span>
-              </div>
-            </div>
+            )}
           </>
         ) : (
           <div className="session-empty">
@@ -250,11 +301,8 @@ export default function RecordPage({
         )}
       </Card>
 
-      {empty && hasSession ? (
-        <button type="button" className="link-btn" onClick={onGoStock}>
-          账面没货？去库存看看是不是漏记进货
-        </button>
-      ) : null}
+      {/* 常驻的「账面没货？去库存看看」已收进本场卡片的 0 单区域（见上），
+          不再单独占一行 44px 的 link-btn */}
 
       <div className="checkout-dock record-dock">
         <div className="checkout-dock__total" style={{ textAlign: 'left', marginLeft: 0 }}>
@@ -313,6 +361,25 @@ export default function RecordPage({
       */}
       {crossDayHint && !crossDayOpen ? (
         <Toast message={crossDayHint} tone="warning" onClose={() => setCrossDayHint(null)} />
+      ) : null}
+
+      {/*
+        0 单提醒：Toast 现在统一停在顶部（见 record.css 的 .glass-toast.toast），
+        和跨天提醒是同一个位置，所以两条不同时出——跨天这条会改账务口径，优先级更高。
+        action 文案刻意不带「撤销」二字：M-16 的保护规则会把带「撤销」的按钮判成
+        「必须等用户表态」，提示条就不再自动消失。
+      */}
+      {stockHint && !crossDayHint && !crossDayOpen ? (
+        <Toast
+          message={stockHint}
+          tone="warning"
+          action="去库存"
+          onAction={() => {
+            setStockHint(null);
+            onGoStock();
+          }}
+          onClose={() => setStockHint(null)}
+        />
       ) : null}
     </div>
   );

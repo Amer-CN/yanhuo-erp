@@ -256,15 +256,17 @@ export default function StockPage({
                       ) : null}
                     </div>
                     <div className="glass-list__subtitle">
+                      {/* 状态词内联进副标题（「库存 0 · 没货」）：放在 trailing 会和
+                          左侧商品名抢宽度，窄屏下把名字挤成换行 —— 行高就不再统一 */}
                       库存 {qtyToStr(stock, p.boxQty, p.unitBase)}
+                      {stock < 0 ? (
+                        <span className="stock-flag"> · 负库存</span>
+                      ) : stock === 0 ? (
+                        <span className="stock-flag"> · 没货</span>
+                      ) : null}
                     </div>
                   </div>
                   <div className="glass-list__trailing">
-                    {stock < 0 ? (
-                      <span className="glass-badge glass-badge--error">负库存</span>
-                    ) : stock === 0 ? (
-                      <span className="glass-badge glass-badge--error">没货</span>
-                    ) : null}
                     <ChevronRight size={18} aria-hidden="true" />
                   </div>
                 </li>

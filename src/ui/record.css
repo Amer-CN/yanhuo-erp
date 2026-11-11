@@ -129,6 +129,20 @@
   border-radius: var(--yh-radius-xs);
 }
 
+/*
+ * 卡片内嵌的小号文字链（记账页 0 单区域的「去库存看看」）。
+ * 视觉上只有 12px 一行、不单独占一行 44px 的按钮位；但命中区仍要 ≥44px
+ * （无障碍脚本量的是盒子），所以用上下各 -10px 的负外边距把 44px 的盒子
+ * 压回 24px 的视觉高度 —— 卡片高度不变，手指照样好点。
+ */
+.link-btn--xs {
+  min-height: var(--yh-touch-min);
+  min-width: 0;
+  padding: 0;
+  margin-block: calc(-1 * (var(--yh-touch-min) - 24px) / 2);
+  font-size: var(--yh-text-xs);
+}
+
 /* ------------------------------------------------------------ 单据编辑 */
 
 /*
@@ -464,25 +478,16 @@
   padding-bottom: calc(80px + env(safe-area-inset-bottom, 0px));
 }
 
-/* 商品卡已加角标 */
-.prod-btn.is-added {
-  border-color: var(--yh-border-accent);
-  /* 横条改造（2026-11-11）：角标从右上角挪到左侧，所以这里给左侧让出角标宽度，
-     否则「已加 N」会盖在商品名上。70px = 内边距 14 + 角标位 44 + 间隙 12，全部走令牌。 */
-  padding-left: calc(var(--yh-card-tight-pad) + var(--yh-touch-min) + var(--yh-space-3));
-}
-
 /*
- * 「已加 N」角标：原来是右上角绝对定位，单列横条下右上角正好是价格，
- * 于是「这单加了几个」和「多少钱」糊在一起。改为贴左侧垂直居中——
- * 视觉上仍属于这一行，且不遮挡名称、价格、库存中的任何一个数字。
+ * 「已加 N」从「左侧绝对定位角标」改成元信息行里的行内小胶囊（2026-11-11）：
+ * 绝对定位必须给**所有行**预留 44px 左边距，名称被白白挤窄；而且加了货的行与
+ * 没加的行文字起始位置不一致，看着像两份列表。现在它只是 meta 行的一段行内元素，
+ * 不参与定位，选中态由 .prod-btn.is-added 的淡底说明（见 styles.css）。
  */
 .prod-btn__added {
-  position: absolute;
-  left: var(--yh-card-tight-pad);
-  top: 50%;
-  transform: translateY(-50%);
-  padding: 1px var(--yh-space-2);
+  display: inline-block;
+  margin-left: var(--yh-space-2);
+  padding: 0 var(--yh-space-1);
   border-radius: var(--yh-radius-pill);
   background: var(--yh-accent);
   color: var(--yh-on-accent);
@@ -490,6 +495,7 @@
   font-weight: var(--yh-weight-semibold);
   font-variant-numeric: tabular-nums;
   white-space: nowrap;
+  vertical-align: 1px; /* 胶囊比 12px 的行盒略高，抬 1px 让基线不歪 */
 }
 
 /* 结账检查项 */
@@ -513,15 +519,34 @@
   flex: 0 0 auto;
 }
 
-/* Toast 移到内容下方，避免遮住本场金额与编辑页的支付方式 */
+/*
+ * Toast 统一停在顶部（导航栏下方），不再按页面分位置。
+ * 2026-11-11 的问题：底部版会压住设置页的按钮 / Tab Bar / 结算浮条 —— 而「设置 → 外观」
+ * 这类操作正好在底部，提示条就盖在刚点的按钮上。
+ * 位置只取 styles.css 的 --gl-toast-top（= safe-area + 顶栏 66px + 8px），
+ * 开单页（.app-shell--editor）与列表页因此是同一个 top，不再有 per-page 覆盖。
+ */
 .glass-toast.toast {
-  top: auto;
-  bottom: calc(
-    var(--gl-tab-bar-floating-bottom) + var(--yh-dock-bottom-gap) + 86px +
-      env(safe-area-inset-bottom, 0px)
-  );
+  top: var(--gl-toast-top);
+  bottom: auto;
   width: calc(100vw - var(--yh-space-8));
   max-width: var(--yh-page-max);
+  /*
+   * 提示条再大也不许挡住下面的按钮：本体完全透传指针，只有两个按钮恢复可点。
+   * GlassKit 的 .glass-toast.is-visible 会把 pointer-events 设回 auto，所以要连
+   * .is-visible 一起压（否则提示条显示期间仍然吃点击）。
+   * 代价：hover 不再触发 Toast 的「悬停暂停」，提示条按 6 秒自走 —— 可接受。
+   */
+  pointer-events: none;
+}
+
+.glass-toast.toast.is-visible {
+  pointer-events: none;
+}
+
+.glass-toast .glass-toast__action,
+.glass-toast .glass-toast__close {
+  pointer-events: auto;
 }
 
 /* 窄屏隐藏次要列（390 常见宽度下仍保留核心列） */

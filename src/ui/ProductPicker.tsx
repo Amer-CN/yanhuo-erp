@@ -41,7 +41,8 @@ export default function ProductPicker({
 
   return (
     // 不聚焦搜索框：摊位开单是「点商品」而不是打字，一打开就弹输入法会把半屏
-    // 商品盖掉（诉求 1）。焦点落在面板本身，aria-modal / 焦点陷阱 / 标题播报都保留。
+    // 商品盖掉（诉求 1）。2026-11-11 起 Sheet 默认就是 'panel'，这里保留显式声明，
+    // 让「这一层故意不抢焦点」在调用处一眼可见，不会被后来者当成漏改。
     <Sheet
       title="选商品"
       subtitle={selectedKinds > 0 ? `本单已加 ${selectedKinds} 种` : '点商品加入本单'}
@@ -119,11 +120,16 @@ export default function ProductPicker({
                   <span className="prod-btn__meta">
                     /{p.unitBase}
                     {p.boxQty > 1 ? ` · 1箱${p.boxQty}${p.unitBase}` : ''}
+                    {/*
+                      已加 N 从「左侧绝对定位角标」改成元信息里的行内小胶囊：
+                      绝对定位必须给所有行预留 44px 左边距，名称会被白白挤窄，
+                      而且加了货的行与没加的行文字不对齐。行内胶囊不动布局。
+                    */}
+                    {added > 0 ? <span className="prod-btn__added">已加 {added}</span> : null}
                   </span>
                   <span className={`prod-btn__stock ${stock < 0 ? 'low' : ''}`}>
                     {stock <= 0 ? '账面 0' : `库存 ${qtyToStr(stock, p.boxQty, p.unitBase)}`}
                   </span>
-                  {added > 0 ? <span className="prod-btn__added">已加 {added}</span> : null}
                 </button>
               );
             })}
