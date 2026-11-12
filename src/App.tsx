@@ -107,29 +107,41 @@ export default function App() {
     andNext: boolean,
     undo?: () => Promise<void>
   ) => {
-    const msg =
-      order.totalFen === 0 ? '已记 1 单（赠品）' : `已记 1 单 ¥${fenToStr(order.totalFen)}`;
-    toastCtl.showToast(
-      msg,
-      'success',
-      undo
-        ? {
-            label: '撤销',
-            onClick: () => {
-              void (async () => {
-                try {
-                  await undo();
-                  toastCtl.showToast('已撤销这一单', 'warning');
-                } catch (e) {
-                  toastCtl.showToast(`撤销失败：${msgOf(e)}`, 'error');
-                }
-              })();
+    /*
+     * P3：连续开单（andNext）的回执**不再做成浮层 Toast**。
+     * Toast 置顶 72–150，而保存后自动弹开的「选商品」层顶边在 84，
+     * 标题与「本单已加 N 种」会被整条盖住，用户以为「没开新单 / 页面没反应」。
+     * 现在由 RecordEditor 在底栏内联一行「已记 1 单 ¥xx · 撤销」（.record-receipt），
+     * 撤销用的是同一个 undo 闭包。
+     * 不是连续开单时（「只保存」→ 直接回首页，没有弹层）仍走 Toast。
+     */
+    if (!andNext) {
+      const base =
+        order.totalFen === 0 ? '已记 1 单（赠品）' : `已记 1 单 ¥${fenToStr(order.totalFen)}`;
+      // P4：主串「已记 1 单」不动（e2e / 文档按它断言），断网时只追加一句「待联网上传」
+      const msg = sync.online ? base : `${base} · 待联网上传`;
+      toastCtl.showToast(
+        msg,
+        'success',
+        undo
+          ? {
+              label: '撤销',
+              onClick: () => {
+                void (async () => {
+                  try {
+                    await undo();
+                    toastCtl.showToast('已撤销这一单', 'warning');
+                  } catch (e) {
+                    toastCtl.showToast(`撤销失败：${msgOf(e)}`, 'error');
+                  }
+                })();
+              }
             }
-          }
-        : undefined
-    );
-    if (!andNext) setEditor(null);
-  }, [toastCtl.showToast]);
+          : undefined
+      );
+      setEditor(null);
+    }
+  }, [toastCtl.showToast, sync.online]);
 
   const closeFlow = useCloseSessionFlow({
     data,

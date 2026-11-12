@@ -492,6 +492,23 @@ body {
   border-radius: var(--yh-radius-sm);
 }
 
+/*
+ * P10：库存总件数改成净件数（可为负）后，顶卡补一句「含欠货 -15」。
+ * 贴在卡片右下角：右上角是缺货角标（点击筛选），左下角是件数，谁都不挡。
+ * 只在这一处用，所以不往 kit 的 Stat 上加 props（那是全站共用组件）。
+ */
+.stat-sub {
+  position: absolute;
+  inset-block-end: 0;
+  inset-inline-end: 0;
+  padding: 0 var(--yh-space-1);
+  font-size: var(--yh-text-xs);
+  font-weight: var(--yh-weight-semibold);
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+  color: var(--gl-color-warning-on-surface, var(--gl-color-warning));
+}
+
 /* 搜索行里多出来的筛选 chip：只在这一行有第二个子元素时才需要 gap */
 .stock-page .glass-search {
   gap: var(--yh-space-2);
@@ -1315,6 +1332,21 @@ body {
   min-width: var(--yh-touch-min, 44px);
   min-height: var(--yh-touch-min, 44px);
   margin-inline: 0;
+}
+
+/* --------------------------------------------------- 弹层入场锁（P1 连点穿透） */
+/*
+ * 只给「保存后自动弹」的层上锁（<Sheet arming>，目前只有连续开单的选商品层）。
+ * 手指还停在屏幕上时连点会落到刚出现的商品卡 / 「完成」上，
+ * 实测 5 连点记成 3 单并多卖了一样货。
+ *
+ * 为什么锁面板而不是锁整层遮罩：遮罩必须继续吃指针，否则点击会穿透到下面的
+ * 开单页（可能误触赠品开关、数量框）；kit.tsx 同时把遮罩的关闭回调摘掉，
+ * 所以这一下点击是被吞掉，而不是把刚开的层关掉。
+ * pointer-events 只影响指针，Tab / 读屏不受影响。
+ */
+.glass-sheet-overlay[data-arming='1'] .glass-sheet {
+  pointer-events: none;
 }
 
 /* 减动效：保留颜色/透明度反馈，去掉位移与弹层动画 */

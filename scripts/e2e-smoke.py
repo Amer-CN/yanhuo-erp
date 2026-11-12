@@ -11,7 +11,7 @@ sys.stderr.reconfigure(encoding="utf-8", errors="replace")
 
 from playwright.sync_api import sync_playwright
 
-from e2e_util import wait_for_toast
+from e2e_util import wait_for_save_receipt, wait_for_toast
 
 BASE = os.environ.get("SMOKE_BASE", "http://127.0.0.1:5173/")
 ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
@@ -74,8 +74,16 @@ def main() -> int:
         expect_text(page, "成交金额")
         shot(page, "02-记一笔.png")
         page.get_by_role("button", name="保存并记下一单").click()
+        # 2026-11-12（P3）：连续开单的回执改到底栏内联（.record-receipt），
+        # 不再是浮层 Toast —— Toast 会压住保存后自动弹开的选商品层标题。
+        # 文案仍是「已记 1 单 ¥xx.xx」，断言口径不变。
+        if wait_for_save_receipt(page, "已记 1 单") is None:
+            shot(page, "FAIL-已记回执.png")
+            errors.append("保存后底栏没有出现「已记 1 单」回执")
         expect_text(page, "已记 1 单")
-        page.wait_for_timeout(400)
+        # 自动重开的选商品层要 600ms 后才弹（P1：原来 30ms 会被连点穿透）
+        page.wait_for_selector(".glass-sheet", timeout=5000)
+        page.wait_for_timeout(500)
         # 「保存并记下一单」会顺带重开选商品弹层（连续开单设计，RecordEditor.tsx
         # 里 setPickOpen(true)），弹层遮罩会挡住「返回」，先关掉它再返回。
         finish = page.get_by_role("button", name="完成（回单据）")

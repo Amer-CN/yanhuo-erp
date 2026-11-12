@@ -1,10 +1,11 @@
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { Search, Boxes, TriangleAlert, ChevronRight, X } from 'lucide-react';
 import type { Batch, Product } from '../../db/types';
 import type { FifoResult } from '../../db/calc';
 import { batchStock } from '../../db/calc';
 import { createAdjustment } from '../../db/repo';
 import { fenToStr, localDate, MS_PER_DAY, qtyToStr } from '../../db/util';
+import { normalizeQtyText, QTY_HINT_DECIMAL, QTY_HINT_TOO_LONG } from '../quantityInput';
 import { Btn, Empty, Field, Sheet, Stat, rowProps, type Done } from '../kit';
 
 /** 设置里没配置时的默认临期预警天数（与 App 的默认值保持一致） */
@@ -47,6 +48,25 @@ export default function StockPage({
   const [dir, setDir] = useState<'loss' | 'more'>('loss');
   // 写库中禁点：盘亏重复提交会连记两笔调整
   const [saving, setSaving] = useState(false);
+  /**
+   * 调整数量的即时提示（P2）：与进货页、开单行共用 quantityInput 的口径。
+   * 老实现 `replace(/\D/g,'')` 会把 1.5 静默变成 15（盘亏一次多记十几件）。
+   */
+  const [adjustHint, setAdjustHint] = useState('');
+  const hintTimer = useRef<number | undefined>(undefined);
+  const flashAdjustHint = (text: string) => {
+    setAdjustHint(text);
+    if (hintTimer.current) window.clearTimeout(hintTimer.current);
+    // text 为空 = 主动清掉旧提示（输入又合法了）
+    hintTimer.current = text ? window.setTimeout(() => setAdjustHint(''), 2200) : undefined;
+  };
+  // 卸载时清计时器：关掉弹层 / 离开库存页后不该再 setState
+  useEffect(
+    () => () => {
+      if (hintTimer.current) window.clearTimeout(hintTimer.current);
+    },
+    []
+  );
 
   const list = useMemo(() => {
     const kw = q.trim().toLowerCase();
@@ -58,20 +78,28 @@ export default function StockPage({
       .sort((a, b) => a.sortOrder - b.sortOrder || a.name.localeCompare(b.name, 'zh'));
   }, [products, q, onlyLow, inv]);
 
-  const { totalQty, totalValue, lowCount } = useMemo(() => {
+  const { totalQty, totalValue, lowCount, owedQty } = useMemo(() => {
     let qty = 0;
     let value = 0;
     let low = 0;
+    let owed = 0;
     for (const p of products) {
       const s = inv.get(p.id) ?? 0;
-      qty += Math.max(0, s);
+      /*
+       * P10：总件数改成「净件数」，可为负。
+       * 原来 Math.max(0, s) 把 -15 挂当 0 计，于是同一屏顶卡写「库存总件数 0」、
+       * 下面一行写「库存 -15 挂 · 负库存」—— 结账前扫一眼顶卡会误判「没货」，
+       * 实际是欠货 15 挂。负库存是超卖留下的真实账，不能被抹平。
+       */
+      qty += s;
+      if (s < 0) owed += -s;
       if (s <= 0) low++;
     }
     for (const b of batches) {
       const remain = fifo.batchRemaining.get(b.id) ?? 0;
       if (remain > 0) value += remain * b.unitCostFen;
     }
-    return { totalQty: qty, totalValue: value, lowCount: low };
+    return { totalQty: qty, totalValue: value, lowCount: low, owedQty: owed };
   }, [products, batches, inv, fifo]);
 
   const open = products.find((p) => p.id === openId);
@@ -111,6 +139,7 @@ export default function StockPage({
       );
       onDone(dir === 'loss' ? '已记盘亏' : '已记盘盈');
       setAdjust('');
+      setAdjustHint('');
       setReason('');
       setDir('loss');
       setOpenId(null);
@@ -142,6 +171,18 @@ export default function StockPage({
          */}
         <div className="stat-slot">
           <Stat k="库存总件数" v={totalQty} />
+          {/*
+           * P10 的副标：净件数为负时说明「数里含着欠货」。
+           * 只加角标、不改 Stat 组件（那是全站共用的）。
+           */}
+          {owedQty > 0 ? (
+            <span
+              className="stat-sub"
+              aria-label={`库存总件数含欠货 ${owedQty}，可在列表里点负库存商品查看`}
+            >
+              含欠货 -{owedQty}
+            </span>
+          ) : null}
           {lowCount > 0 ? (
             <button
               type="button"
@@ -371,12 +412,30 @@ export default function StockPage({
                     多了（盘盈）
                   </button>
                 </div>
-                <Field label={`调整数量（${open.unitBase}）`} hint="填正数就行，方向上面已经选了">
+                <Field
+                  label={`调整数量（${open.unitBase}）`}
+                  hint={adjustHint || '填正数就行，方向上面已经选了'}
+                >
                   <input
                     className="glass-input"
                     inputMode="numeric"
                     value={adjust}
-                    onChange={(e) => setAdjust(e.target.value.replace(/\D/g, ''))}
+                    onChange={(e) => {
+                      /*
+                       * P2：与开单行 / 进货页共用 quantityInput 的口径。
+                       * 老实现 replace(/\D/g,'') 会把「1.5」先变 1 再变 15，
+                       * 盘点少 1.5 挂记成少 15 挂，账就对不上了。
+                       * 出现小数点：整次拒绝（不写 state，框内回退原值）+ 就地提示。
+                       */
+                      const parsed = normalizeQtyText(e.target.value);
+                      if (!parsed) {
+                        flashAdjustHint(QTY_HINT_DECIMAL);
+                        return;
+                      }
+                      if (parsed.tooLong) flashAdjustHint(QTY_HINT_TOO_LONG);
+                      else flashAdjustHint('');
+                      setAdjust(parsed.text);
+                    }}
                     placeholder="2"
                   />
                 </Field>

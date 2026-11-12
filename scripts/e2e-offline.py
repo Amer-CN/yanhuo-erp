@@ -12,7 +12,7 @@ sys.stderr.reconfigure(encoding="utf-8", errors="replace")
 
 from playwright.sync_api import sync_playwright
 
-from e2e_util import wait_for_toast
+from e2e_util import wait_for_save_receipt
 
 BASE = sys.argv[1] if len(sys.argv) > 1 else "http://127.0.0.1:4173/"
 ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
@@ -89,10 +89,18 @@ def main() -> int:
         page.get_by_role("button", name="大地红 1000 响").first.click()
         page.get_by_role("button", name="完成（回单据）").click()
         page.get_by_role("button", name="保存并记下一单").click()
-        toast = wait_for_toast(page, "已记")
-        print("    toast:", toast)
-        if toast is None:
-            errors.append("离线记一笔后没有出现「已记」提示")
+        # 2026-11-12（P3）：连续开单的回执改成开单页底栏的内联一行（.record-receipt），
+        # 不再走浮层 Toast（Toast 会压住自动弹开的选商品层标题）。
+        # P4 顺带把离线态写进同一句文案：断网时应含「· 待联网上传」。
+        receipt = wait_for_save_receipt(page, "已记")
+        print("    receipt:", receipt)
+        if receipt is None:
+            errors.append("离线记一笔后没有出现「已记」回执")
+        elif "待联网上传" not in receipt:
+            errors.append(f"离线回执没有提示待上传：{receipt}")
+        page.screenshot(path=os.path.join(OUT, "10-离线已记.png"))
+        # 自动重开的选商品层 600ms 后才弹（P1），等它出现再关
+        page.wait_for_selector(".glass-sheet", timeout=5000)
         page.wait_for_timeout(400)
         # 「保存并记下一单」会顺带重开选商品弹层（连续开单设计，RecordEditor.tsx
         # 里 setPickOpen(true)），弹层遮罩会挡住开单页的「返回」，先关掉再返回。
@@ -104,14 +112,13 @@ def main() -> int:
         page.get_by_role("button", name="返回").click()
         page.wait_for_timeout(400)
         page.wait_for_selector("text=¥25.00", timeout=5000)
-        page.wait_for_selector("text=已记 1 单", timeout=5000)
-        page.screenshot(path=os.path.join(OUT, "10-离线已记.png"))
+        page.screenshot(path=os.path.join(OUT, "10b-离线回首页.png"))
 
         print("[4] 恢复网络，确认数据还在")
         ctx.set_offline(False)
         page.wait_for_timeout(1000)
         page.wait_for_selector("text=¥25.00", timeout=5000)
-        page.wait_for_selector("text=已记 1 单", timeout=5000)
+        page.wait_for_selector("text=本场已记 1 单", timeout=5000)
         page.screenshot(path=os.path.join(OUT, "11-离线恢复网络.png"))
 
         browser.close()

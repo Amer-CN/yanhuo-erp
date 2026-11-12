@@ -15,7 +15,8 @@ export default function ProductPicker({
   selected,
   onAdd,
   onDone,
-  onCreate
+  onCreate,
+  arming = false
 }: {
   products: Product[];
   inv: Map<string, number>;
@@ -24,6 +25,11 @@ export default function ProductPicker({
   onAdd: (p: Product) => void;
   onDone: () => void;
   onCreate?: () => void;
+  /**
+   * 入场锁定（P1）：连续开单保存后这一层是「自动弹」的，开出来的头 400ms
+   * 不响应触摸，避免手指连点直接加到商品 / 点掉「完成」。细则见 kit.tsx 的 Sheet。
+   */
+  arming?: boolean;
 }) {
   const [q, setQ] = useState('');
   const [cat, setCat] = useState<'全部' | Category>('全部');
@@ -47,6 +53,7 @@ export default function ProductPicker({
       title="选商品"
       subtitle={selectedKinds > 0 ? `本单已加 ${selectedKinds} 种` : '点商品加入本单'}
       initialFocus="panel"
+      arming={arming}
       onClose={onDone}
       footer={
         <Btn block onClick={onDone}>

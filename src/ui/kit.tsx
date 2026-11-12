@@ -316,7 +316,8 @@ export function Sheet({
   children,
   footer,
   dismissible = true,
-  initialFocus = 'panel'
+  initialFocus = 'panel',
+  arming = false
 }: {
   title: string;
   subtitle?: string;
@@ -336,6 +337,20 @@ export function Sheet({
    *   所以策略写在默认值上；以后新增弹层除非真的要打字，否则什么都别传。
    */
   initialFocus?: 'first' | 'panel';
+  /**
+   * 入场锁定（P1 连点穿透）：自动弹出的弹层（例如连续开单时保存后自己开的选商品层）
+   * 在开出来的头几百毫秒里不响应触摸 —— 手指还停在上一屏的按钮上，连点会落到
+   * 刚出现的商品卡 / 关闭按钮上，于是「一键卖一样货」变成「记三单 + 多卖两样」。
+   *
+   * 实现是两层，缺一层都不够：
+   * 1) 面板 `pointer-events: none`（CSS `.glass-sheet-overlay[data-arming='1'] .glass-sheet`），
+   *    卡片、完成键都点不动；
+   * 2) 遮罩这时**不挂关闭回调**（见下方 onClick），否则点空的遮罩会把刚开的层关掉。
+   * 遮罩本身仍是 pointer-events:auto，所以这一下点击被吞掉、不会穿透到下面的页面。
+   * 键盘不受影响（pointer-events 只管指针），可访问性不回退。
+   * 手动点「添加商品」打开的层不要传 true：用户是明确要选货，加锁只会觉得卡。
+   */
+  arming?: boolean;
 }) {
   const [active, setActive] = useState(false);
   const panelRef = useRef<HTMLDivElement>(null);
@@ -452,7 +467,10 @@ export function Sheet({
   return (
     <div
       className={`glass-sheet-overlay ${active ? 'is-active' : ''}`}
-      onClick={dismissible ? close : undefined}
+      /* arming 期间不挂关闭：此时面板 pointer-events:none，点空处会落到遮罩上，
+         如果照旧 close()，连点就会把刚弹出来的层立刻关掉（P1）。 */
+      onClick={dismissible && !arming ? close : undefined}
+      data-arming={arming ? '1' : undefined}
     >
       <div
         ref={panelRef}

@@ -3,6 +3,7 @@ import { Gift, Minus, Plus, X } from 'lucide-react';
 import type { Product } from '../db/types';
 import { fenToStr } from '../db/util';
 import { Field } from './kit';
+import { normalizeQtyText, QTY_HINT_DECIMAL, QTY_HINT_TOO_LONG } from './quantityInput';
 import type { RecordLineDraft } from './recordDraft';
 
 /** 单据里的一行商品：单位切换、步进、赠品、成交金额 */
@@ -72,24 +73,14 @@ export default function RecordLineCard({
   const flashQtyHint = (text: string) => {
     setQtyHint(text);
     if (hintTimer.current) window.clearTimeout(hintTimer.current);
-    hintTimer.current = window.setTimeout(() => setQtyHint(''), 2200);
+    // text 为空 = 主动清掉旧提示（输入又合法了，旧红字不能继续挂着）
+    hintTimer.current = text ? window.setTimeout(() => setQtyHint(''), 2200) : undefined;
   };
 
-  /**
-   * 数量文本归一化（M-04）：
-   * - 全角数字先转半角：老人手写/九宫格会打出 ５，老实现被 replace(/\D/g,'')
-   *   直接吞成空串，输入框里的字会自己消失，失焦后还落成 1；
-   * - 出现小数点/逗号 → 返回 null，整次输入作废。老实现会把 3.5 拼成 35，
-   *   数量静默放大十倍，用户完全看不出来；
-   * - 只留数字并截到 4 位，截断时由调用方提示（不再静默）。
-   * 原则：任何非法输入都不能把数量变成用户没打过的值。
+  /*
+   * 数量文本归一化：口径已抽到 quantityInput.ts（进货 / 盘亏共用同一份），
+   * 这里只负责「非法就回退 + 就地提示」，具体规则见该文件头部注释。
    */
-  const normalizeQtyText = (raw: string): { text: string; tooLong: boolean } | null => {
-    const half = raw.replace(/[０-９]/g, (ch) => String.fromCharCode(ch.charCodeAt(0) - 0xfee0));
-    if (/[.,．，]/.test(half)) return null;
-    const digits = half.replace(/\D/g, '');
-    return { text: digits.slice(0, 4), tooLong: digits.length > 4 };
-  };
 
   /**
    * 提交输入框里的数量（M-05）。
@@ -184,15 +175,16 @@ export default function RecordLineCard({
               requestAnimationFrame(() => el.select());
             }}
             onChange={(e) => {
-              /* M-04：全角先转半角、小数整次拒绝、超 4 位给提示（细则见 normalizeQtyText） */
+              /* M-04：全角先转半角、小数整次拒绝、超 4 位给提示（细则见 quantityInput.ts） */
               const parsed = normalizeQtyText(e.target.value);
               if (!parsed) {
                 // 打了小数点：这次输入作废，输入框退回上一次的数字，绝不拼成 35
                 setQtyText(String(display));
-                flashQtyHint('数量填整数');
+                flashQtyHint(QTY_HINT_DECIMAL);
                 return;
               }
-              if (parsed.tooLong) flashQtyHint('最多 4 位（9999）');
+              if (parsed.tooLong) flashQtyHint(QTY_HINT_TOO_LONG);
+              else flashQtyHint('');
               setQtyText(parsed.text);
               // 实时联动：边输边算金额；0 / 空先不写库，等失焦再夹到 1
               const n = Number(parsed.text);

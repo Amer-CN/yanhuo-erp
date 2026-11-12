@@ -564,6 +564,7 @@ export function AppMain({ tab, sub, editor, theme, onToggleTheme }: AppMainProps
     deviceId,
     openSummary,
     editorInitial,
+    sync,
     showToast
   } = useAppData();
   const { setEditor, setSub, setTab, onSaved } = useAppActions();
@@ -619,6 +620,8 @@ export function AppMain({ tab, sub, editor, theme, onToggleTheme }: AppMainProps
                 ? data.orders.filter((o) => o.sessionId === editor.sessionId && !o.voided).length
                 : openSummary.orderCount
             }
+            /* P4：开单页没有顶栏（整页编辑），离线状态要靠这一页自己显示 */
+            online={sync.online}
             onSaved={onSaved}
             onCancel={() => setEditor(null)}
             onCreateProduct={() => {

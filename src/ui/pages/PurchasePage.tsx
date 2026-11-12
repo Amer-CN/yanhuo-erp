@@ -1,8 +1,13 @@
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { Plus, Trash2, PackagePlus } from 'lucide-react';
 import type { Batch, Product } from '../../db/types';
 import { createBatch, createProduct, deleteBatch, RecordError } from '../../db/repo';
 import { DELETED_PRODUCT, fenToStr, localDate, qtyToStr, strToFen } from '../../db/util';
+import {
+  normalizeQtyText,
+  QTY_HINT_DECIMAL,
+  QTY_HINT_TOO_LONG
+} from '../quantityInput';
 import { Btn, Card, ConfirmSheet, Empty, Field, ProductFormModal, Sheet, rowProps, type Done } from '../kit';
 
 /** 「今天已录」抽屉只显示最近这么多条；条数统计仍按全量算 */
@@ -55,6 +60,12 @@ export default function PurchasePage({
   // 必须带上出错的批次 id：提示渲染在 Sheet 内部的失败条目下方，避免被模态遮罩盖住
   const [delError, setDelError] = useState<{ batchId: string; message: string } | null>(null);
   const [errors, setErrors] = useState<{ product?: string; qty?: string; cost?: string }>({});
+  /**
+   * 数量框的即时提示（P2）：小数 / 超 4 位时在框下说一句，而不是把 1.5 吞成 15。
+   * 与 errors.qty（提交时的「数量要大于 0」）分开存，否则打字过程中提示会被提交校验覆盖。
+   */
+  const [qtyHint, setQtyHint] = useState('');
+  const hintTimer = useRef<number | undefined>(undefined);
   // 写库中禁止再点：同一批货录两遍会直接改写 FIFO 成本
   const [saving, setSaving] = useState(false);
   const [delConfirmError, setDelConfirmError] = useState('');
@@ -65,8 +76,13 @@ export default function PurchasePage({
 
   const qtyNum = Number(qty) || 0;
   const qtyBase = Math.round(qtyNum * factor);
+  /*
+   * costFen 只有「显示折算」会用兜底 0（填了 - 或空就是没填）；
+   * 但兜底值绝不能当成进价写库 —— P6：负数原来被 Math.max(0, …) 静默存成 0 成本，
+   * 毛利被虚高却看不出来。现在负价在 save() 里直接拦截，这里不再夹。
+   */
   const costFen = strToFen(cost) ?? 0;
-  const unitCostFen = Math.max(0, Math.round(costFen / factor));
+  const unitCostFen = Math.round(costFen / factor);
   const totalCost = qtyBase * unitCostFen;
 
   const today = localDate();
@@ -86,6 +102,21 @@ export default function PurchasePage({
 
   const pname = (id: string) => products.find((p) => p.id === id)?.name ?? DELETED_PRODUCT;
 
+  const flashQtyHint = (text: string) => {
+    setQtyHint(text);
+    if (hintTimer.current) window.clearTimeout(hintTimer.current);
+    // text 为空 = 主动清掉上一次的提示（输入又合法了，不能让旧红字继续挂着）
+    hintTimer.current = text ? window.setTimeout(() => setQtyHint(''), 2200) : undefined;
+  };
+
+  // 卸载时清掉计时器：离开进货页后不该再 setState
+  useEffect(
+    () => () => {
+      if (hintTimer.current) window.clearTimeout(hintTimer.current);
+    },
+    []
+  );
+
   const resetForm = () => {
     patchForm({ qty: '1', cost: '', batchNo: '', produceDate: '', expiryDate: '' });
     setErrors({});
@@ -96,7 +127,14 @@ export default function PurchasePage({
     const next: typeof errors = {};
     if (!product) next.product = '先选一个商品';
     if (qtyBase <= 0) next.qty = '数量要大于 0';
-    if (strToFen(cost) === null) next.cost = '进价填个数字，比如 120 或 12.5';
+    const rawCost = strToFen(cost);
+    if (rawCost === null) next.cost = '进价填个数字，比如 120 或 12.5';
+    /*
+     * P6：负进价直接拦住，不再 Math.max(0, …) 静默存成 0 成本。
+     * repo.createBatch 侧也用同一个错误码（INVALID_AMOUNT）兜同步/合并这条旁路，
+     * 这里只是把话说在用户看得见的地方。strToFen 已返回「分」，-5 元 → -500 分。
+     */
+    else if (rawCost < 0) next.cost = '进价不能是负数';
     setErrors(next);
     if (Object.keys(next).length > 0) return;
 
@@ -210,19 +248,30 @@ export default function PurchasePage({
           ) : null}
 
           <div className="form-row">
-            <Field label={`数量（${unit === 'box' ? '箱' : product?.unitBase ?? '个'}）`} error={errors.qty}>
+            <Field
+              label={`数量（${unit === 'box' ? '箱' : product?.unitBase ?? '个'}）`}
+              /* 即时提示优先于提交校验：打字当下就要说清，别等点保存才知道 */
+              error={qtyHint || errors.qty}
+            >
               <input
                 className="glass-input"
                 inputMode="numeric"
                 value={qty}
                 onChange={(e) => {
                   /*
-                   * L-09：只收数字。
-                   * 原来 inputMode="decimal" 并且原样存字符串，于是「1.5 个」能填进去，
-                   * 提交时 qtyBase = Math.round(1.5 * factor) 被静默取整成 2 ——
-                   * 账面凭空多出一件，摊主完全看不出是哪一步改的。
+                   * P2：数量口径与开单行一致（quantityInput.ts）。
+                   * 老实现 `replace(/\D/g,'')` 逐字过滤，1.5 会先变 1 再变 15，
+                   * 记账放大十倍且没有任何提示。现在小数点整次拒绝：
+                   * 不写 state → 输入框回退原值，并在框下说「数量填整数」。
                    */
-                  patchForm({ qty: e.target.value.replace(/\D/g, '') });
+                  const parsed = normalizeQtyText(e.target.value);
+                  if (!parsed) {
+                    flashQtyHint(QTY_HINT_DECIMAL);
+                    return;
+                  }
+                  if (parsed.tooLong) flashQtyHint(QTY_HINT_TOO_LONG);
+                  else flashQtyHint('');
+                  patchForm({ qty: parsed.text });
                   setErrors((p) => ({ ...p, qty: undefined }));
                 }}
               />

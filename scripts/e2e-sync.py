@@ -22,7 +22,7 @@ sys.stdout.reconfigure(encoding="utf-8", errors="replace", line_buffering=True)
 
 from playwright.sync_api import sync_playwright
 
-from e2e_util import wait_for_toast
+from e2e_util import wait_for_save_receipt
 
 ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
 BASE = os.environ.get("SYNC_TEST_BASE", "http://127.0.0.1:5173/")
@@ -154,9 +154,13 @@ def sell(page, product: str) -> None:
     page.get_by_role("button", name=product, exact=False).first.click()
     page.get_by_role("button", name="完成（回单据）").click()
     page.get_by_role("button", name="保存并记下一单").click()
-    if wait_for_toast(page, "已记", timeout=8000) is None:
-        raise AssertionError("保存后没有出现「已记」提示")
-    page.wait_for_timeout(400)
+    # 2026-11-12（P3）：连续开单的回执改到底栏内联（.record-receipt），
+    # 不再是浮层 Toast（Toast 会压住自动弹开的选商品层标题）；文案仍是「已记 1 单」。
+    if wait_for_save_receipt(page, "已记") is None:
+        raise AssertionError("保存后底栏没有出现「已记」回执")
+    # 自动重开的选商品层 600ms 后才弹（P1），等它真的出现再关
+    page.wait_for_selector(".glass-sheet", timeout=5000)
+    page.wait_for_timeout(500)
     # 「保存并记下一单」会顺带重开选商品弹层（连续开单设计，RecordEditor.tsx
     # 里 setPickOpen(true)），弹层遮罩会挡住开单页的「返回」，先关掉再返回。
     # 用「存在且可见才点」而不是固定等待，避免以后 UI 再变就误报超时。

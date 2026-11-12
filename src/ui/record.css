@@ -457,6 +457,136 @@
   text-overflow: ellipsis;
 }
 
+/* ----------------------------------------------- 开单页的「添加商品」入口 */
+/*
+ * 标题行右侧的「N 行 + 添加商品」：给商品行很多的单子留一个不用滚到底的入口。
+ * 盒子按 44 触控下限给，再用负外边距压回行高 —— 标题行仍然是 24 左右，
+ * 不会因为多了一个入口把整页往下顶（下面就是合计与固定底栏，挤出 1px 都是净损失）。
+ */
+.form-head__aside {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--yh-space-2);
+  flex: none;
+}
+
+.record-add-link {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  min-height: var(--yh-touch-min, 44px);
+  margin-block: -10px;
+  padding: 0 var(--yh-space-1);
+  background: none;
+  border: 0;
+  border-radius: var(--yh-radius-sm);
+  color: var(--gl-color-primary-on-glass, var(--gl-color-primary));
+  font: inherit;
+  font-size: var(--yh-text-xs);
+  font-weight: var(--yh-weight-semibold);
+  white-space: nowrap;
+  cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+}
+
+.record-add-link:focus-visible {
+  outline: var(--yh-focus-width) solid var(--yh-focus-ring);
+  outline-offset: 2px;
+}
+
+/* ------------------------------------------- 底栏回执（P3）/ 离线徽标（P4） */
+/*
+ * 连续开单的回执从浮层 Toast 搬到这里（.record-receipt）。
+ * 为什么必须换位置：Toast 固定置顶 72–150，保存后自动弹开的选商品层顶边在 84，
+ * 「选商品 / 本单已加 N 种」正好被整条盖住，用户会以为「没开新单」。
+ *
+ * 独占一整行（flex 1 1 100%）：底栏是 flex-wrap 的两行结构（合计一行、按钮一行），
+ * 回执插在合计上面，按钮位置不变，不会因为一句回执把「保存并记下一单」挤小。
+ */
+.record-receipt {
+  flex: 1 1 100%;
+  display: flex;
+  align-items: center;
+  gap: var(--yh-space-1);
+  min-width: 0;
+  font-size: var(--yh-text-xs);
+  line-height: var(--yh-leading-tight);
+  color: var(--gl-color-text);
+  font-variant-numeric: tabular-nums;
+  /* 6 秒到期前 260ms 由 .is-leaving 淡出，与弹层关闭时长同值 */
+  transition: opacity var(--yh-dur-sheet) ease;
+}
+
+.record-receipt.is-leaving {
+  opacity: 0;
+}
+
+.record-receipt__text {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.record-receipt__dot {
+  color: var(--gl-color-text-muted);
+}
+
+/*
+ * 撤销：视觉是文字链，但盒子按 44 触控下限给（a11y 脚本量的是盒子，不是 ::after），
+ * 再用负外边距把多出来的 12px 抵消掉，底栏高度不变。
+ */
+.record-receipt__undo {
+  position: relative;
+  flex: none;
+  min-height: var(--yh-touch-min, 44px);
+  margin-block: -6px;
+  padding: 0 var(--yh-space-1);
+  background: none;
+  border: 0;
+  border-radius: var(--yh-radius-sm);
+  color: var(--gl-color-primary-on-glass, var(--gl-color-primary));
+  font: inherit;
+  font-weight: var(--yh-weight-semibold);
+  text-decoration: underline;
+  cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+}
+
+.record-receipt__undo::after {
+  content: '';
+  position: absolute;
+  inset: -6px -4px;
+}
+
+.record-receipt__undo:disabled {
+  color: var(--gl-color-text-muted);
+  text-decoration: none;
+  cursor: default;
+}
+
+/*
+ * P4：离线徽标。断网时开单页一个状态都没有（这一页把顶栏整个隐藏了），
+ * 摊主看不出「这单到底存没存上云」。橙色 pill 贴合计右侧，
+ * 在线时完全不渲染，不占位。
+ */
+.record-offline {
+  margin-inline-start: auto;
+  align-self: center;
+  display: inline-flex;
+  align-items: center;
+  min-height: 22px;
+  padding: 0 var(--yh-space-2);
+  border-radius: var(--yh-radius-pill);
+  font-size: var(--yh-text-xs);
+  font-weight: var(--yh-weight-semibold);
+  line-height: 1;
+  white-space: nowrap;
+  color: var(--gl-color-warning-on-surface, var(--gl-color-warning));
+  background: color-mix(in srgb, var(--gl-color-warning) 16%, transparent);
+  border: 1px solid color-mix(in srgb, var(--gl-color-warning) 42%, transparent);
+}
+
 /*
  * 进货页的保存底栏（三.8）：那页有浮动 Tab Bar，底栏不能直接 bottom:0 盖住它。
  * 偏移量照抄 .checkout-dock 那一套（浮起 16px + Tab Bar 74px + 安全区），
