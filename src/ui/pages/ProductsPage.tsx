@@ -1,9 +1,17 @@
 import { useMemo, useState } from 'react';
-import { Search, Plus, Package, ChevronRight, Power, Trash2 } from 'lucide-react';
+import { Plus, Package, ChevronRight, Power, Trash2 } from 'lucide-react';
 import type { Product } from '../../db/types';
 import { createProduct, deleteProduct, updateProduct, type ProductInput } from '../../db/repo';
 import { fenToStr, qtyToStr } from '../../db/util';
-import { Btn, ConfirmSheet, Empty, ProductFormModal, rowProps, type Done } from '../kit';
+import {
+  Btn,
+  ConfirmSheet,
+  Empty,
+  ProductFormModal,
+  SearchField,
+  rowProps,
+  type Done
+} from '../kit';
 
 export default function ProductsPage({
   products,
@@ -83,16 +91,13 @@ export default function ProductsPage({
   return (
     <div className="page-stack">
       <div className="row-between">
-        <div className="glass-search grow">
-          <Search className="glass-search__icon" size={18} aria-hidden="true" />
-          <input
-            className="glass-input"
-            type="search"
-            placeholder="搜商品"
-            value={q}
-            onChange={(e) => setQ(e.target.value)}
-          />
-        </div>
+        <SearchField
+          className="grow"
+          value={q}
+          onChange={setQ}
+          placeholder="搜商品"
+          label="搜商品"
+        />
         <Btn block={false} onClick={() => setEditing('new')}>
           <span className="icon-text">
             <Plus size={18} aria-hidden="true" /> 新建
@@ -144,6 +149,7 @@ export default function ProductsPage({
                   </div>
                 </div>
                 <div className="glass-list__trailing">
+                  <span className="list-edit-hint">编辑</span>
                   <ChevronRight size={18} aria-hidden="true" />
                 </div>
               </li>

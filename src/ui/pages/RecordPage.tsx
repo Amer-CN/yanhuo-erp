@@ -75,11 +75,13 @@ export default function RecordPage({
   const [crossDayOpen, setCrossDayOpen] = useState(false);
   const [crossDayHint, setCrossDayHint] = useState<string | null>(null);
   /*
-   * 「这一场还没记单 / 账面没货可能是漏记进货」的引导。
+   * 「这一场还空着 / 账面没货可能是漏记进货」的引导。
    * 原来是一条常驻 .link-btn（高约 44px，天天占一屏），但它只是低频排查线索：
    * (a) 进页面首次弹一次 Toast，按**场次 id** 用 sessionStorage 去重（同一场只提醒一次，
    *     换了场次再提醒——文案说的是「这一场」，按日期去重会串场）；
    * (b) 本场卡片的 0 单区域里留一个 12px 文字链当常驻入口，不占独立一行、不压结算浮条。
+   * 注意：Toast 文案不要和下面卡片里的空态标题写成同一句，否则同一句话会同时
+   * 出现在卡片里和浮层里，看起来像重复提示。
    */
   const [stockHint, setStockHint] = useState<string | null>(null);
   /**
@@ -157,7 +159,7 @@ export default function RecordPage({
     } catch {
       /* 隐私模式：只靠本页 state 去重 */
     }
-    setStockHint('这一场还没记单。如果账面没货，可能是漏记进货了');
+    setStockHint('这一场还空着。如果账面没货，可能是漏记进货了');
   }, [sessionId, empty]);
 
   useEffect(() => {
@@ -250,18 +252,19 @@ export default function RecordPage({
             {empty ? (
               /*
                * 本场 0 单区域。原来是三行支付方式、全是 ¥0，等于白占半张卡。
-               * 这里换成一句状态 + 12px 文字链：常驻入口还在，但不占独立一行，
-               * 也不像原来那样悬在结算浮条上方 44px。
+               * 现在统一用 <Empty>（紧凑档）：图标 / 标题 / 行动按钮的结构
+               * 与全站 19 处空态一致，「去库存看看」仍作为 action 传入。
                */
-              <div className="session-empty">
-                <Clock size={22} aria-hidden="true" />
-                <div>
-                  <div className="tiny-text">这一场还没记单</div>
+              <Empty
+                compact
+                icon={<Clock size={24} aria-hidden="true" />}
+                text="这一场还没记单"
+                action={
                   <button type="button" className="link-btn link-btn--xs" onClick={onGoStock}>
                     去库存看看
                   </button>
-                </div>
-              </div>
+                }
+              />
             ) : (
               <div className="pay-rows">
                 <div className="pay-row">
@@ -280,13 +283,13 @@ export default function RecordPage({
             )}
           </>
         ) : (
-          <div className="session-empty">
-            <Clock size={22} aria-hidden="true" />
-            <div>
-              <div className="first-run-card__title">还没开张</div>
-              <div className="tiny-text">记一笔就开始这一场；第一单会自动开场</div>
-            </div>
-          </div>
+          /* 还没开场：与上面那条（已开场但 0 单）用同一个 Empty，只是文案不同 */
+          <Empty
+            compact
+            icon={<Clock size={24} aria-hidden="true" />}
+            text="还没开张"
+            hint="记一笔就开始这一场；第一单会自动开场"
+          />
         )}
       </Card>
 
@@ -330,7 +333,8 @@ export default function RecordPage({
         {recent.length === 0 ? (
           <Empty
             icon={<Receipt size={24} />}
-            text="这一场还没记单"
+            /* 与顶部汇总卡同一句话改成「还没记单」会两处重复，这里只描述列表 */
+            text="这一场还没有单据"
             action={
               <Btn block={false} size="sm" onClick={onNewRecord}>
                 记一笔

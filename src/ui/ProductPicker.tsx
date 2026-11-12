@@ -3,7 +3,7 @@ import { Search, Package, Sparkles } from 'lucide-react';
 import type { Category, Product } from '../db/types';
 import { CATEGORIES } from '../db/types';
 import { fenToStr, qtyToStr } from '../db/util';
-import { Btn, Empty, Sheet } from './kit';
+import { Btn, Empty, SearchField, Sheet } from './kit';
 
 /** 空角标：'pick' 模式（进货选商品）没有「本单已加」概念，用同一个常量省一次 new Map */
 const EMPTY_QTY = new Map<string, number>();
@@ -114,17 +114,12 @@ export default function ProductPicker({
        */}
       <div className={`picker ${fullHeight ? 'picker--full' : ''}`}>
         <div className="picker__filters">
-          <div className="glass-search">
-            <Search className="glass-search__icon" size={18} aria-hidden="true" />
-            <input
-              className="glass-input"
-              type="search"
-              placeholder="搜商品名"
-              aria-label="搜商品名"
-              value={q}
-              onChange={(e) => setQ(e.target.value)}
-            />
-          </div>
+          <SearchField
+            value={q}
+            onChange={setQ}
+            placeholder="搜商品名"
+            label="搜商品名"
+          />
 
           <div className="chip-row">
             {(['全部', ...CATEGORIES] as const).map((c) => (

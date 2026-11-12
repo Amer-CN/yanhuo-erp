@@ -230,63 +230,27 @@ function SyncDot({ sync, showToast }: { sync: SyncApi; showToast: Done }) {
   return (
     <button
       type="button"
-      className="glass-pill"
+      className="glass-pill sync-pill"
       onClick={showDetail}
       aria-label={label}
       title={label}
-      style={{
-        position: 'relative',
-        minWidth: 44,
-        height: 44,
-        display: 'inline-flex',
-        alignItems: 'center',
-        justifyContent: 'center',
-        gap: 4,
-        padding: '0 8px'
-      }}
     >
       {changeCount > 0 ? (
         /* H3 角标：橙色数字（不只靠颜色；真实条数在 aria-label / 详情里给全） */
-        <span
-          aria-hidden="true"
-          style={{
-            position: 'absolute',
-            top: 2,
-            right: 1,
-            minWidth: 14,
-            height: 14,
-            padding: '0 3px',
-            borderRadius: 7,
-            background: 'var(--yh-ink-warn)',
-            color: '#fff',
-            fontSize: 9,
-            fontWeight: 700,
-            lineHeight: '14px',
-            textAlign: 'center',
-            boxSizing: 'border-box',
-            pointerEvents: 'none'
-          }}
-        >
+        <span className="sync-pill__count" aria-hidden="true">
           {changeCount > 99 ? '99+' : changeCount}
         </span>
       ) : null}
       <span
         aria-hidden="true"
-        style={{
-          width: 14,
-          height: 14,
-          borderRadius: '50%',
-          boxSizing: 'border-box',
-          background: filled ? color : 'transparent',
-          /* 形状也要能区分（M-06）：off=虚线环，offline=实线空心环，不能只靠颜色 */
-          border: filled ? 'none' : `2px ${state === 'off' ? 'dashed' : 'solid'} ${color}`
-        }}
+        className="sync-pill__dot"
+        data-filled={filled ? '1' : '0'}
+        /* off = 虚线环，offline = 实线空心环：形状也要能区分，不能只靠颜色（M-06） */
+        data-off={state === 'off' ? '1' : '0'}
+        style={{ color, background: filled ? 'currentColor' : 'transparent' }}
       />
       {mark ? (
-        <span
-          aria-hidden="true"
-          style={{ fontSize: 11, fontWeight: 700, lineHeight: 1, color }}
-        >
+        <span aria-hidden="true" className="sync-pill__mark" style={{ color }}>
           {mark}
         </span>
       ) : null}

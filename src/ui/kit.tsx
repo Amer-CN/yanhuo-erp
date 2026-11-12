@@ -11,7 +11,7 @@ import {
   type ReactElement,
   type ReactNode
 } from 'react';
-import { X, CheckCircle2, TriangleAlert } from 'lucide-react';
+import { X, Search, CheckCircle2, TriangleAlert } from 'lucide-react';
 import type { Category, Product } from '../db/types';
 import { CATEGORIES } from '../db/types';
 import { fenToStr, strToFen } from '../db/util';
@@ -132,17 +132,89 @@ export function Stat({ k, v, tone }: { k: string; v: ReactNode; tone?: 'brand' |
 export function Empty({
   icon,
   text,
-  action
+  hint,
+  action,
+  compact
 }: {
   icon: ReactNode;
   text: string;
+  /** 补充说明（可选）：只有标题说不清「接下来会怎样」时才用 */
+  hint?: string;
   action?: ReactNode;
+  /** 放进已有卡片里时用紧凑档：默认内边距是给整页空态留的 */
+  compact?: boolean;
 }) {
   return (
-    <div className="glass-empty">
+    <div className={`glass-empty${compact ? ' glass-empty--compact' : ''}`}>
       <span className="glass-empty__icon">{icon}</span>
       <p className="glass-empty__title">{text}</p>
+      {hint ? <p className="glass-empty__text">{hint}</p> : null}
       {action ? <div className="glass-empty__action">{action}</div> : null}
+    </div>
+  );
+}
+
+/**
+ * 搜索框：商品管理 / 库存 / 选商品弹层共用。
+ *
+ * 为什么要抽：同一段 JSX 原来抄了三遍，其中两份连 aria-label 都忘了写
+ * （占位符不构成可访问名，读屏只念「搜索」）。收敛后 label 变成必填参数，
+ * 新增入口也不会再漏。
+ *
+ * 为什么自绘清除按钮：WebKit 的 `::-webkit-search-cancel-button` 是系统灰 X，
+ * 在深色玻璃框上颜色不受主题控制；CSS 里已把它关掉，这里换成主题色的 X。
+ */
+export function SearchField({
+  value,
+  onChange,
+  placeholder,
+  label,
+  autoFocus,
+  className = '',
+  children
+}: {
+  value: string;
+  onChange: (v: string) => void;
+  placeholder?: string;
+  /** 可访问名（必填）：视觉上不显示，但读屏与测试都靠它定位 */
+  label: string;
+  autoFocus?: boolean;
+  /** 外层 .glass-search 的附加类（如 `grow`） */
+  className?: string;
+  /** 搜索行里跟在输入框后的额外内容（库存页的「只看缺货」chip） */
+  children?: ReactNode;
+}) {
+  // 清空后把焦点送回输入框：手机上否则会收起键盘，摊主要再点一次才能继续搜
+  const inputRef = useRef<HTMLInputElement>(null);
+  return (
+    <div className={`glass-search ${className}`.trim()}>
+      <Search className="glass-search__icon" size={18} aria-hidden="true" />
+      <span className={`glass-search__field${value ? ' glass-search__field--clear' : ''}`}>
+        <input
+          ref={inputRef}
+          className="glass-input"
+          type="search"
+          placeholder={placeholder}
+          aria-label={label}
+          value={value}
+          autoFocus={autoFocus}
+          onChange={(e) => onChange(e.target.value)}
+        />
+        {value ? (
+          <button
+            type="button"
+            className="glass-search__clear"
+            aria-label={`清空${label}`}
+            onClick={() => {
+              onChange('');
+              inputRef.current?.focus();
+            }}
+          >
+            <X size={16} aria-hidden="true" />
+          </button>
+        ) : null}
+      </span>
+      {children}
     </div>
   );
 }
@@ -825,7 +897,16 @@ export function ProductFormModal({
           允许现场砍价改价
         </label>
 
-        {err ? <div className="glass-status">{err}</div> : null}
+        {/*
+          * 校验失败统一走 glass-hint--error（与 Field 的错误提示同一套视觉）：
+          原来装进 .glass-status 的玻璃卡片里，和表单里 13px 的小红字是两种语气。
+          这里用 role="alert" 是因为它是提交后新出现的文本，读屏要念出来。
+        */}
+        {err ? (
+          <div className="glass-hint glass-hint--error" role="alert">
+            {err}
+          </div>
+        ) : null}
       </div>
     </Sheet>
   );

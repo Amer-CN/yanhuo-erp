@@ -362,9 +362,16 @@ body {
   gap: var(--yh-gap-card);
 }
 
+/*
+ * 勾选行（商品表单「允许砍价」、设置页「合并前先备份」）。
+ * 实测原来只有 30px 高：文字与 24px 方框都够小，但整行是可点区域，
+ * 30px 落在 WCAG 2.5.5 的 44px 下限外，摊位上单手拇指容易点空。
+ * 用 min-height 而不是写死 height —— 文案换行时仍然能长。
+ */
 .check-row {
   display: flex;
   align-items: center;
+  min-height: var(--yh-touch-min, 44px);
   gap: var(--yh-gap-card);
   font-size: var(--yh-text-md);
   color: var(--gl-color-text);
@@ -940,16 +947,22 @@ body {
   padding-bottom: var(--yh-space-1);
 }
 
-/* ------------------------------------------------------------ 进货页：商品触发按钮 + 兼容值通道 */
+/* ------------------------------------------------------------ 进货页：商品触发按钮 */
 /*
  * 触发按钮沿用 .glass-select 的外观（含右侧 chevron），
  * 但它是按钮而不是原生下拉：点击打开 ProductPicker（有搜索和分类）。
+ *
+ * 为什么显式写字号：老规则是 `font: inherit`，它连字号一起继承成页面根的
+ * 16px，而 .glass-select / .glass-input 用的是 --gl-font-size-base(15px)，
+ * 于是「选择商品…」比旁边所有输入框都大 1px。字体族与行高仍继承，字号单列。
  */
 .picker-trigger {
   display: flex;
   align-items: center;
   text-align: left;
-  font: inherit;
+  font-family: inherit;
+  font-size: var(--gl-font-size-base, var(--yh-text-base));
+  line-height: inherit;
   color: var(--gl-color-text);
 }
 
@@ -974,24 +987,6 @@ body {
   border-color: var(--gl-border-focus);
   box-shadow: var(--gl-shadow-focus), var(--gl-inset-medium);
   outline: none;
-}
-
-/*
- * 视觉隐藏的原生 select（值通道）：保留标准表单元素供外部脚本写值，
- * 但用户摸不到、键盘 Tab 不到、读屏也读不到，手机上不会弹系统白底列表。
- * 不写 display:none / visibility:hidden —— 那样脚本的 select_option 也点不到。
- */
-.picker-compat {
-  position: absolute;
-  width: 1px;
-  height: 1px;
-  margin: -1px;
-  padding: 0;
-  border: 0;
-  overflow: hidden;
-  clip: rect(0 0 0 0);
-  clip-path: inset(50%);
-  white-space: nowrap;
 }
 
 /*
@@ -1525,6 +1520,154 @@ body {
   min-width: var(--yh-touch-min, 44px);
   min-height: var(--yh-touch-min, 44px);
   margin-inline: 0;
+}
+
+/* --------------------------------------------------- 统一搜索框（SearchField） */
+/*
+ * 为什么收敛到 kit：商品管理 / 库存 / 选商品弹层原来各抄了一遍同一段 JSX，
+ * 其中两份还没有可访问名（占位符不构成名字）。抽成一个组件后，这里只补
+ * 组件级的统一行为：
+ *
+ * 1) 干掉 WebKit 的原生清除按钮。实测 `::-webkit-search-cancel-button`
+ *    display 是 block：深色玻璃框里会出现一枚系统灰 X，颜色不受主题控制，
+ *    和旁边的橙色 / 白色细节完全不是一套。
+ * 2) 自绘一枚清除按钮（44px 触控区），因为输入框里本来就有内容时才出现，
+ *    比系统 X 更晚露出，也不会挡住「搜商品」占位符。
+ */
+.glass-search input[type='search']::-webkit-search-cancel-button,
+.glass-search input[type='search']::-webkit-search-decoration {
+  -webkit-appearance: none;
+  appearance: none;
+}
+
+/* 输入框 + 清除按钮的定位壳：flex 撑满剩余宽度，按钮绝对定位在右内侧 */
+.glass-search__field {
+  position: relative;
+  display: flex;
+  flex: 1 1 auto;
+  min-width: 0;
+}
+
+/* 有清除按钮时给输入框右侧让位，长商品名不会压到 X 上 */
+.glass-search__field--clear .glass-input {
+  padding-inline-end: var(--yh-space-10);
+}
+
+.glass-search__clear {
+  position: absolute;
+  inset-inline-end: 0;
+  top: 50%;
+  transform: translateY(-50%);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: var(--yh-touch-min);
+  height: var(--yh-touch-min);
+  padding: 0;
+  border: 0;
+  border-radius: var(--yh-radius-pill);
+  background: transparent;
+  color: var(--gl-color-text-muted);
+  -webkit-tap-highlight-color: transparent;
+}
+
+.glass-search__clear:hover,
+.glass-search__clear:active {
+  color: var(--gl-color-text);
+}
+
+/* --------------------------------------------------- 顶栏同步徽标（SyncDot） */
+/*
+ * 为什么抽成类：这枚按钮原来是 12 个裸值的内联 style（C6/C7），
+ * 其中 fontSize:9 落在字号阶梯外、fontWeight:700 落在字重阶梯外。
+ * 抽出来后尺寸全部走令牌 —— 角标的 min-width / 圆角 / 行高都是
+ * 「状态点直径」的派生值，写成 --yh-sync-dot-size 后三者不会各自漂移。
+ * 字号 9 → --yh-text-2xs(11px)：14px 高的角标仍放得下两位数字。
+ */
+.sync-pill {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--yh-space-1);
+  min-width: var(--yh-touch-min);
+  height: var(--yh-touch-min);
+  padding: 0 var(--yh-space-2);
+}
+
+/* 未同步条数角标：只是「有改动」的提示，真实条数在 aria-label 与详情里给全 */
+.sync-pill__count {
+  position: absolute;
+  top: var(--yh-space-0-5);
+  inset-inline-end: var(--yh-space-0-5);
+  box-sizing: border-box;
+  min-width: var(--yh-sync-dot-size);
+  height: var(--yh-sync-dot-size);
+  padding: 0 var(--yh-space-0-5);
+  border-radius: var(--yh-radius-pill);
+  background: var(--yh-ink-warn);
+  color: #fff;
+  font-size: var(--yh-text-2xs);
+  font-weight: var(--yh-weight-semibold);
+  line-height: var(--yh-sync-dot-size);
+  text-align: center;
+  pointer-events: none;
+}
+
+/*
+ * 状态点：形状也要能区分（不全靠颜色，M-06）——
+ * 实心=已连通，空心实线=离线，空心虚线=未配置。
+ */
+.sync-pill__dot {
+  box-sizing: border-box;
+  flex: 0 0 auto;
+  width: var(--yh-sync-dot-size);
+  height: var(--yh-sync-dot-size);
+  border-radius: 50%;
+}
+
+.sync-pill__dot[data-filled='0'] {
+  border: var(--yh-sync-dot-border) solid currentColor;
+}
+
+.sync-pill__dot[data-filled='0'][data-off='1'] {
+  border-style: dashed;
+}
+
+/* 状态字标（在线 / 断网 / 关）：11px 小字，跟着点的颜色走 */
+.sync-pill__mark {
+  font-size: var(--yh-text-2xs);
+  font-weight: var(--yh-weight-semibold);
+  line-height: 1;
+}
+
+/* --------------------------------------------------- 列表行「编辑」提示 */
+/*
+ * 商品管理点整行直接进编辑表单，其它列表点行是「看详情」（D1）。
+ * 交互这轮不动，只在行尾补两个字，让「点开能改」变得可预期。
+ */
+.list-edit-hint {
+  font-size: var(--yh-text-xs);
+  font-weight: var(--yh-weight-regular);
+}
+
+/* --------------------------------------------------- 卡片内的紧凑空态 */
+/*
+ * .glass-empty 默认 28px 上下内边距是给「整页空态」用的；
+ * 记账页把它放进已有的汇总卡里，会凭空多出 60px 空白，把「记一笔」挤出首屏。
+ */
+.glass-empty--compact {
+  padding: var(--yh-space-3) var(--yh-space-2);
+  gap: var(--yh-space-1);
+}
+
+.glass-empty--compact .glass-empty__icon {
+  width: var(--yh-space-8);
+  height: var(--yh-space-8);
+}
+
+.glass-empty--compact .glass-empty__title {
+  font-size: var(--yh-text-sm);
 }
 
 /* --------------------------------------------------- 弹层入场锁（P1 连点穿透） */

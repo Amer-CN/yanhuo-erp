@@ -6,7 +6,7 @@ import { batchStock } from '../../db/calc';
 import { createAdjustment } from '../../db/repo';
 import { fenToStr, localDate, MS_PER_DAY, qtyToStr } from '../../db/util';
 import { normalizeQtyText, QTY_HINT_DECIMAL, QTY_HINT_TOO_LONG } from '../quantityInput';
-import { Btn, Empty, Field, Sheet, Stat, rowProps, type Done } from '../kit';
+import { Btn, Empty, Field, SearchField, Sheet, Stat, rowProps, type Done } from '../kit';
 
 /** 设置里没配置时的默认临期预警天数（与 App 的默认值保持一致） */
 const DEFAULT_EXPIRY_WARN_DAYS = 30;
@@ -208,15 +208,7 @@ export default function StockPage({
         <Stat k="库存成本" v={<span>¥{fenToStr(totalValue)}</span>} tone="brand" />
       </div>
 
-      <div className="glass-search">
-        <Search className="glass-search__icon" size={18} aria-hidden="true" />
-        <input
-          className="glass-input"
-          type="search"
-          placeholder="搜商品"
-          value={q}
-          onChange={(e) => setQ(e.target.value)}
-        />
+      <SearchField value={q} onChange={setQ} placeholder="搜商品" label="搜商品">
         {/*
          * 筛选中的「退出」入口。放在搜索行里而不是另起一行：
          * 标题旁角标是「进入」，这里负责「出来」，两者都零占位。
@@ -232,7 +224,7 @@ export default function StockPage({
             <X size={14} aria-hidden="true" />
           </button>
         ) : null}
-      </div>
+      </SearchField>
 
       {/*
         列表区：唯一可滚的一层。min-height:0 + flex:1 由 .stock-page__scroll 提供，

@@ -248,28 +248,7 @@ export default function PurchasePage({
             </button>
           </Field>
 
-          {/*
-           * 兼容值通道（视觉隐藏，不可聚焦、不进无障碍树）：
-           * 旧版这里就是用户直接操作的原生 <select>，部分外部脚本 / 旧自动化仍按
-           * `select_option` 写值。保留一个标准 select 承接这类写入，触摸与键盘
-           * 都走上面的按钮 + ProductPicker，手机上不会再弹出系统白底列表。
-           */}
-          <select
-            className="picker-compat"
-            tabIndex={-1}
-            aria-hidden="true"
-            value={productId}
-            onChange={(e) => changeProduct(e.target.value)}
-          >
-            <option value="" disabled hidden>
-              选择商品…
-            </option>
-            {active.map((p) => (
-              <option key={p.id} value={p.id}>
-                {p.name}
-              </option>
-            ))}
-          </select>
+          {/* 选商品只走上面的按钮 + ProductPicker；旧的 1×1 原生 select 兼容通道已删。 */}
 
           {product && product.boxQty > 1 ? (
             <div className="glass-segmented glass-segmented--full" role="group" aria-label="进货单位">

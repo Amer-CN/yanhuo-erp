@@ -204,7 +204,8 @@ export default function SyncPanel({ sync, onDone }: { sync: SyncApi; onDone: Don
               <span>{sync.pending} 条</span>
             </div>
           </div>
-          {sync.error ? <div className="glass-status"><p>{sync.error}</p></div> : null}
+          {/* 错误文本统一走 glass-hint--error；.glass-status 只留给中性说明 */}
+          {sync.error ? <div className="glass-hint glass-hint--error">{sync.error}</div> : null}
           <div className="stack-sm">
             <Btn block disabled={sync.syncing} onClick={() => sync.syncNow()}>
               <span className="icon-text">

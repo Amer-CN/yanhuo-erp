@@ -102,13 +102,11 @@
   color: var(--gl-color-text-muted);
 }
 
-.session-empty {
-  display: flex;
-  align-items: center;
-  gap: var(--yh-space-3);
-  padding: var(--yh-space-2) 0;
-  color: var(--gl-color-text-muted);
-}
+/*
+ * 记账页本场卡片的旧空态样式已删除（2026-11-12）：两处手写空态统一改用
+ * kit 的 <Empty compact>，同一屏不会再出现「图标 22px + tiny-text」和
+ * 「图标 24px + Empty」两套排版。类名与规则一并移除，避免后人以为还在用。
+ */
 
 /* ------------------------------------------------- 上一场汇总条（P5 撤销结账） */
 /*
@@ -345,9 +343,17 @@
   flex-wrap: wrap;
 }
 
+/*
+ * 记账行内的错误提示。
+ * 视觉与 `glass-hint glass-hint--error`（kit.tsx 的 Field）逐项对齐：
+ * 同一个变量取色取字号、同样的起始内边距 —— 原来这里是 --yh-ink-bad + 12px，
+ * 与表单错误 (#ff3b30 / 13px) 差一档，同一屏出现两种「错误红」。
+ * 保留类名而不改组件：RecordLineCard 的误触范围要小，样式对齐即可。
+ */
 .record-line__error {
-  color: var(--yh-ink-bad);
-  font-size: var(--yh-text-xs);
+  color: var(--gl-color-error);
+  font-size: var(--gl-font-size-xs);
+  padding-inline-start: var(--gl-space-2xs);
 }
 
 /*

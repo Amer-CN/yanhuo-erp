@@ -101,8 +101,13 @@ def main() -> int:
         page.mouse.move(4, 4)
         page.wait_for_selector(".toast", state="detached", timeout=12000)
         page.get_by_role("button", name="进货").click()
-        page.wait_for_selector("select", timeout=5000)
-        page.locator("select").first.select_option(index=1)
+        # 2026-11-12：进货页的 1×1 隐藏 <select> 兼容通道已删除（技术债）。
+        # 选商品改走真实交互路径：点「选择商品…」触发按钮 → 在弹出的
+        # ProductPicker 里点第一个商品（pick 模式点一下就回填并关闭）。
+        page.locator(".picker-trigger").first.click()
+        page.wait_for_selector(".picker .prod-btn", timeout=5000)
+        page.locator(".picker .prod-btn").first.click()
+        page.wait_for_selector(".picker", state="detached", timeout=5000)
         page.get_by_label("数量", exact=False).fill("3")
         page.get_by_label("进价", exact=False).fill("12")
         shot(page, "04-进货.png")
