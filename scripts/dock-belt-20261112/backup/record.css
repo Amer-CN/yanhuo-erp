@@ -1,0 +1,1084 @@
+/* =====================================================================
+   2026-11-08 v2 场次记账：记账页 / 单据编辑 / 结账
+   ===================================================================== */
+
+/* ------------------------------------------------------------ 记账首页 */
+
+.offline-note {
+  display: flex;
+  align-items: center;
+  gap: var(--yh-gap-tight);
+  padding: var(--yh-space-2) var(--yh-space-3);
+  border-radius: var(--yh-radius-md);
+  background: var(--gl-surface-2);
+  border: 1px solid var(--gl-border-subtle);
+  color: var(--gl-color-text-muted);
+  font-size: var(--yh-text-xs);
+}
+
+/*
+ * 2026-11-11：.first-run-card--warn（跨天未结那张 72px 警示卡）已删除。
+ * 现在跨天只用「标题旁的小徽标 + 一次性 Toast + Sheet」表达，样式见下面的 .crossday-pill。
+ */
+
+/* ------------------------------------------------- 跨天未结：本场标题行徽标 */
+/*
+ * 徽标本体撑到 44×44（触控下限，也是 a11y 脚本 getBoundingClientRect 量到的盒子），
+ * 再用负的纵向 margin 把多出来的高度在版面上「收」回去 —— 行高保持约 20px，
+ * 卡片不会被一个小标记顶高。视觉上的胶囊是里面的 .crossday-pill__text（20px）。
+ */
+.session-head__line {
+  display: flex;
+  align-items: center;
+  gap: var(--yh-space-2);
+  min-width: 0;
+}
+
+.crossday-pill {
+  flex: 0 0 auto;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: var(--yh-touch-min, 44px);
+  min-height: var(--yh-touch-min, 44px);
+  margin-block: calc((var(--yh-touch-min, 44px) - 20px) / -2);
+  padding: 0 var(--yh-space-1);
+  background: none;
+  border: 0;
+  cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+}
+
+.crossday-pill__text {
+  display: inline-flex;
+  align-items: center;
+  height: 20px;
+  padding: 0 var(--yh-space-2);
+  border-radius: var(--yh-radius-pill);
+  font-size: var(--yh-text-xs);
+  font-weight: var(--yh-weight-semibold);
+  line-height: 1;
+  white-space: nowrap;
+  color: var(--gl-color-warning-on-surface, var(--gl-color-warning));
+  background: color-mix(in srgb, var(--gl-color-warning) 18%, transparent);
+  border: 1px solid color-mix(in srgb, var(--gl-color-warning) 45%, transparent);
+}
+
+.crossday-pill:focus-visible {
+  outline: var(--yh-focus-width) solid var(--yh-focus-ring);
+  outline-offset: var(--yh-space-0-5);
+  border-radius: var(--yh-radius-sm);
+}
+
+/*
+ * 场次汇总卡头部：左列（本场开始时间 / 金额 / 单数）+ 右侧「收摊结账」。
+ * 左列必须允许收缩（min-width: 0），否则金额把按钮挤窄，四个字会折成两行。
+ * 按钮本身 flex: 0 0 auto + nowrap，宽度只由文案决定（全局 .glass-btn 已 nowrap，
+ * 这里再显式写一遍，防止将来有人给 .session-close-btn 单独覆写 padding 时回退）。
+ */
+.session-summary {
+  flex: 1 1 auto;
+  min-width: 0;
+}
+
+.session-close-btn {
+  flex: 0 0 auto;
+  width: auto;
+  min-width: fit-content;
+  white-space: nowrap;
+}
+
+.session-summary__revenue {
+  font-size: var(--yh-text-2xl);
+  font-weight: var(--yh-weight-semibold);
+  color: var(--yh-ink-price);
+  font-variant-numeric: tabular-nums;
+  line-height: var(--yh-leading-tight);
+}
+
+.session-summary__meta {
+  margin-top: var(--yh-space-0-5);
+  font-size: var(--yh-text-xs);
+  color: var(--gl-color-text-muted);
+}
+
+/*
+ * 记账页本场卡片的旧空态样式已删除（2026-11-12）：两处手写空态统一改用
+ * kit 的 <Empty compact>，同一屏不会再出现「图标 22px + tiny-text」和
+ * 「图标 24px + Empty」两套排版。类名与规则一并移除，避免后人以为还在用。
+ */
+
+/* ------------------------------------------------- 上一场汇总条（P5 撤销结账） */
+/*
+ * 为什么是一行而不是卡片：它只在「今天刚结完账、还没开下一场」的几分钟里有用，
+ * 常驻大卡会把「记一笔」挤出首屏。高度按住 ≤56px（44 的按钮 + 上下 6px），
+ * 文字超长时省略而不是换行（换行就把这条变成两行了）。
+ */
+.last-session-bar {
+  display: flex;
+  align-items: center;
+  gap: var(--yh-space-2);
+  min-height: 44px;
+  padding: var(--yh-space-1) var(--yh-space-3);
+  border-radius: var(--yh-radius-lg);
+  background: var(--gl-surface-2);
+  border: 1px solid var(--gl-border-subtle);
+  font-variant-numeric: tabular-nums;
+}
+
+.last-session-bar__text {
+  flex: 1 1 auto;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: var(--yh-text-xs);
+  color: var(--gl-color-text-muted);
+}
+
+/* 「看本场」比正文更轻：它只是看一眼，不是要改账 */
+.last-session-bar__more {
+  flex: 0 0 auto;
+  font-size: var(--yh-text-xs);
+  font-weight: var(--yh-weight-medium);
+}
+
+/* 撤销结账是小号按钮，但触控高度仍按 44 兜住 */
+.last-session-bar .glass-btn--sm {
+  flex: 0 0 auto;
+  min-height: var(--yh-touch-min, 44px);
+}
+
+/*
+ * 记账页的结算浮条（.checkout-dock record-dock）。它现在是 .app-main 里
+ * `position: sticky; bottom: 0` 的流内元素：
+ * 内容比一屏短时（0 单 / 1 单）没有可吸的距离，会停在最后一张卡下面、
+ * 悬在屏幕中间 —— margin-top:auto 把它压到页面根（.page-stack）的底部，
+ * 配合 `.app-main--dock > .page-stack { flex: 1 1 auto }` 就还是「贴底常驻」。
+ */
+.record-dock {
+  margin-top: auto;
+  gap: var(--yh-space-3);
+}
+
+.record-dock .glass-btn {
+  flex: 0 0 auto;
+}
+
+.link-btn {
+  align-self: flex-start;
+  min-height: var(--yh-touch-min);
+  /*
+   * L-01：只写 min-height 时，「撤销」两个字 + 8px 内边距只有约 40px 宽，
+   * 低于 44px 触控下限（销售记录行内的撤销、报表的补记都用这个类）。
+   */
+  min-width: var(--yh-touch-min);
+  justify-content: center;
+  padding: 0 var(--yh-space-1);
+  display: inline-flex;
+  align-items: center;
+  gap: var(--yh-gap-tight);
+  background: none;
+  border: 0;
+  color: var(--yh-ink-accent);
+  font-size: var(--yh-text-sm);
+  font-weight: var(--yh-weight-medium);
+  cursor: pointer;
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
+
+.link-btn:focus-visible {
+  outline: var(--yh-focus-width) solid var(--yh-focus-ring);
+  outline-offset: var(--yh-focus-offset);
+  border-radius: var(--yh-radius-xs);
+}
+
+/*
+ * 卡片内嵌的小号文字链（记账页 0 单区域的「去库存看看」）。
+ * 视觉上只有 12px 一行、不单独占一行 44px 的按钮位；但命中区仍要 ≥44px
+ * （无障碍脚本量的是盒子），所以用上下各 -10px 的负外边距把 44px 的盒子
+ * 压回 24px 的视觉高度 —— 卡片高度不变，手指照样好点。
+ */
+.link-btn--xs {
+  min-height: var(--yh-touch-min);
+  min-width: 0;
+  padding: 0;
+  margin-block: calc(-1 * (var(--yh-touch-min) - 24px) / 2);
+  font-size: var(--yh-text-xs);
+}
+
+/* ------------------------------------------------------------ 单据编辑 */
+
+/*
+ * 开单页例外：**保持文档滚动**，不参与「锁一屏高 + 内部滚动区」。
+ * 原因：iOS 弹软键盘会改变 100dvh；锁高的布局会跟着重排，
+ * 正在填的单据会整体跳一下，光标所在行也可能被甩到视口外。这是硬约束。
+ * 标记用 JS 拼 class（AppShell 的 app-shell--editor / app-main--editor），
+ * 不用 :has()：老 WebView 上 :has() 不生效等于例外失效，风险更大。
+ * 用双类提高权重，避免 CSS 文件顺序变化后被打回 grid。
+ */
+.app-shell.app-shell--editor {
+  height: auto;
+  min-height: 100dvh;
+  display: flex;
+  flex-direction: column;
+  overflow: visible;
+}
+
+.app-main.app-main--editor {
+  padding-top: 0;
+  padding-bottom: 0;
+  /* 覆盖 .app-main 的 overflow-y:auto / min-height:0：这一页由文档滚 */
+  overflow: visible;
+  height: auto;
+  min-height: 0;
+}
+
+.record-page {
+  display: flex;
+  flex-direction: column;
+  gap: var(--yh-page-gap);
+  /* 底栏现在合计 + 按钮两行（实测 97px），留白从 96 提到 130，
+     否则滚到底时「备注」那一栏会被底栏压住 */
+  padding-bottom: calc(130px + env(safe-area-inset-bottom, 0px));
+}
+
+.record-top {
+  position: sticky;
+  top: 0;
+  z-index: var(--yh-z-nav);
+  display: flex;
+  align-items: center;
+  gap: var(--yh-space-2);
+  margin: 0 calc(var(--yh-page-pad) * -1);
+  /*
+   * M-03：开单页的顶栏是自己画的（不走 .app-nav），必须自己补一次安全区，
+   * 否则刘海机 PWA 全屏（index.html 的 viewport-fit=cover）下返回键会贴在
+   * 状态栏/刘海下面，点不到。数值写法与 .app-nav（styles.css:99）保持一致。
+   */
+  padding: calc(var(--yh-space-2) + env(safe-area-inset-top, 0px)) var(--yh-page-pad)
+    var(--yh-space-2);
+  background: linear-gradient(
+    to bottom,
+    color-mix(in srgb, var(--yh-canvas) 94%, transparent),
+    color-mix(in srgb, var(--yh-canvas) 70%, transparent)
+  );
+  backdrop-filter: blur(var(--gl-blur));
+  -webkit-backdrop-filter: blur(var(--gl-blur));
+}
+
+.record-top__title {
+  flex: 1;
+  min-width: 0;
+  text-align: center;
+  line-height: var(--yh-leading-tight);
+}
+
+.record-top__title h1 {
+  margin: 0;
+  font-size: var(--yh-nav-title-size);
+  font-weight: var(--yh-weight-semibold);
+  color: var(--gl-color-text-heading);
+}
+
+.record-top__spacer {
+  width: var(--yh-touch-min);
+}
+
+.record-page__body {
+  display: flex;
+  flex-direction: column;
+  gap: var(--yh-page-gap);
+}
+
+.record-bar {
+  display: flex;
+  align-items: center;
+  gap: var(--yh-space-2);
+}
+
+.record-bar__label {
+  flex: 0 0 auto;
+  font-size: var(--yh-text-sm);
+  color: var(--gl-color-text-muted);
+}
+
+.record-bar__seg {
+  flex: 1;
+  min-width: 0;
+}
+
+.record-bar__seg .glass-segmented__item {
+  flex: 1;
+  justify-content: center;
+}
+
+.record-line {
+  display: flex;
+  flex-direction: column;
+  gap: var(--yh-gap-card);
+  padding: var(--yh-space-3) calc(var(--yh-space-3) + 2px);
+  border-radius: var(--yh-cart-radius);
+  background: var(--gl-surface-2);
+  border: 1px solid var(--gl-border-subtle);
+}
+
+.record-line__head {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--yh-space-2);
+}
+
+.record-line__name {
+  font-weight: var(--yh-weight-semibold);
+  font-size: var(--yh-text-base);
+  color: var(--gl-color-text-heading);
+}
+
+.record-line__meta {
+  margin-top: var(--yh-space-0-5);
+  font-size: var(--yh-text-xs);
+  color: var(--gl-color-text-muted);
+  font-variant-numeric: tabular-nums;
+}
+
+.record-line__controls {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--yh-space-2);
+  flex-wrap: wrap;
+}
+
+/*
+ * 记账行内的错误提示。
+ * 视觉与 `glass-hint glass-hint--error`（kit.tsx 的 Field）逐项对齐：
+ * 同一个变量取色取字号、同样的起始内边距 —— 原来这里是 --yh-ink-bad + 12px，
+ * 与表单错误 (#ff3b30 / 13px) 差一档，同一屏出现两种「错误红」。
+ * 保留类名而不改组件：RecordLineCard 的误触范围要小，样式对齐即可。
+ */
+.record-line__error {
+  color: var(--gl-color-error);
+  font-size: var(--gl-font-size-xs);
+  padding-inline-start: var(--gl-space-2xs);
+}
+
+/*
+ * 数量槽改可输入（摊主要一次买 50 挂，连点 49 次步进不现实）。
+ * .stepper 本体在 styles.css，这里只补它内部的输入框；旧的 .stepper .val 样式保留，
+ * 别的地方若还在用 span 版数量槽不受影响。
+ * 56px 宽 + 44px 高：够 4 位数字，也够 44px 触控目标；等宽数字让 ± 按钮不跟着位移。
+ */
+.stepper__input {
+  width: 56px;
+  min-width: var(--yh-touch-min);
+  height: var(--yh-touch-min);
+  padding: 0;
+  border: 0;
+  border-radius: var(--yh-radius-sm);
+  background: transparent;
+  color: var(--gl-color-text-heading);
+  font-family: inherit;
+  font-size: var(--yh-text-lg);
+  font-weight: var(--yh-weight-semibold);
+  text-align: center;
+  font-variant-numeric: tabular-nums;
+  -webkit-tap-highlight-color: transparent;
+}
+
+/* 焦点环照抄项目既有写法（.prod-btn / .glass-checkbox 同一套令牌） */
+.stepper__input:focus,
+.stepper__input:focus-visible {
+  outline: var(--yh-focus-width) solid var(--yh-focus-ring);
+  outline-offset: var(--yh-space-0-5);
+}
+
+.gift-toggle {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--yh-gap-tight);
+  min-height: var(--yh-touch-min);
+  padding: 0 var(--yh-space-2);
+  border-radius: var(--yh-radius-pill);
+  border: 1px solid var(--gl-border-subtle);
+  background: var(--gl-surface-2);
+  font-size: var(--yh-text-sm);
+  color: var(--gl-color-text);
+  cursor: pointer;
+  user-select: none;
+}
+
+.gift-toggle.is-on {
+  border-color: var(--yh-border-accent);
+  background: var(--yh-accent-soft);
+  color: var(--yh-ink-accent);
+}
+
+.gift-toggle:focus-within {
+  outline: var(--yh-focus-width) solid var(--yh-focus-ring);
+  outline-offset: var(--yh-focus-offset);
+}
+
+.gift-cost {
+  font-size: var(--yh-text-xs);
+  color: var(--yh-ink-warn);
+}
+
+.record-total {
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: var(--yh-space-3);
+  padding: var(--yh-space-3) calc(var(--yh-space-3) + 2px);
+  border-radius: var(--yh-radius-lg);
+  background: var(--gl-surface-2);
+  border: var(--yh-border-width) solid var(--gl-border-medium);
+  font-variant-numeric: tabular-nums;
+}
+
+.record-total__main {
+  display: flex;
+  flex-direction: column;
+  gap: var(--yh-space-0-5);
+}
+
+.record-total__main .k {
+  font-size: var(--yh-text-xs);
+  color: var(--gl-color-text-muted);
+}
+
+.record-total__main .v {
+  font-size: var(--yh-text-2xl);
+  font-weight: var(--yh-weight-semibold);
+  color: var(--yh-ink-price);
+  line-height: var(--yh-leading-tight);
+}
+
+.record-total__meta {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: var(--yh-space-0-5);
+  font-size: var(--yh-text-xs);
+  color: var(--gl-color-text-muted);
+}
+
+.record-actions {
+  position: fixed;
+  left: 50%;
+  transform: translateX(-50%);
+  bottom: 0;
+  z-index: var(--yh-z-dock);
+  width: 100%;
+  max-width: var(--yh-page-max);
+  display: flex;
+  /* 允许换行：合计独占一行（见 .record-actions__total），按钮在第二行并排 */
+  flex-wrap: wrap;
+  gap: var(--yh-space-2);
+  padding: var(--yh-space-3) var(--yh-page-pad)
+    calc(var(--yh-space-3) + env(safe-area-inset-bottom, 0px));
+  background: linear-gradient(
+    to top,
+    color-mix(in srgb, var(--yh-canvas) 96%, transparent),
+    color-mix(in srgb, var(--yh-canvas) 78%, transparent)
+  );
+  backdrop-filter: blur(var(--gl-blur));
+  -webkit-backdrop-filter: blur(var(--gl-blur));
+  border-top: 1px solid var(--gl-border-subtle);
+}
+
+.record-actions .glass-btn {
+  flex: 1 1 0;
+  /* 竖排 / 换行时 flex:1 的 basis 是 0，高度会被压到文字高度（实测只剩 25px），
+     补这条保证任何时候都够 44px 触控目标 */
+  min-height: var(--yh-touch-min);
+  /* 「保存并记下一单」7 个字 + 24px 内边距在 360 宽的手机上放不进半个底栏，
+     所以左右内边距收到 12px，并禁止换行（换行会让底栏忽然长高一截）*/
+  padding-inline: var(--yh-space-3);
+  white-space: nowrap;
+}
+
+/*
+ * 左侧的常驻合计（三.1「滚到中部看不见这单多少钱」）。
+ * 独占一整行而不是跟按钮并排：实测 360px 宽下并排会把「保存并记下一单」
+ * 挤成 3 行（scrollH 59 > clientH 54），只能牺牲这一行的纵向空间。
+ * min-width:0 + 单行省略 = 窄屏先压缩合计，不挤按钮。
+ */
+.record-actions__total {
+  flex: 1 1 100%;
+  min-width: 0;
+  display: flex;
+  flex-direction: row;
+  align-items: baseline;
+  gap: var(--yh-space-1);
+  line-height: var(--yh-leading-tight);
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
+.record-actions__total .k {
+  font-size: var(--yh-text-xs);
+  color: var(--gl-color-text-muted);
+}
+
+.record-actions__total .v {
+  font-size: var(--yh-text-lg);
+  font-weight: var(--yh-weight-semibold);
+  color: var(--yh-ink-price);
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+/* ----------------------------------------------- 开单页的「添加商品」入口 */
+/*
+ * 标题行右侧的「N 行 + 添加商品」：给商品行很多的单子留一个不用滚到底的入口。
+ * 盒子按 44 触控下限给，再用负外边距压回行高 —— 标题行仍然是 24 左右，
+ * 不会因为多了一个入口把整页往下顶（下面就是合计与固定底栏，挤出 1px 都是净损失）。
+ */
+.form-head__aside {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--yh-space-2);
+  flex: none;
+}
+
+.record-add-link {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  min-height: var(--yh-touch-min, 44px);
+  margin-block: -10px;
+  padding: 0 var(--yh-space-1);
+  background: none;
+  border: 0;
+  border-radius: var(--yh-radius-sm);
+  color: var(--gl-color-primary-on-glass, var(--gl-color-primary));
+  font: inherit;
+  font-size: var(--yh-text-xs);
+  font-weight: var(--yh-weight-semibold);
+  white-space: nowrap;
+  cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+}
+
+.record-add-link:focus-visible {
+  outline: var(--yh-focus-width) solid var(--yh-focus-ring);
+  outline-offset: 2px;
+}
+
+/* ------------------------------------------- 底栏回执（P3）/ 离线徽标（P4） */
+/*
+ * 连续开单的回执从浮层 Toast 搬到这里（.record-receipt）。
+ * 为什么必须换位置：Toast 固定置顶 72–150，保存后自动弹开的选商品层顶边在 84，
+ * 「选商品 / 本单已加 N 种」正好被整条盖住，用户会以为「没开新单」。
+ *
+ * 独占一整行（flex 1 1 100%）：底栏是 flex-wrap 的两行结构（合计一行、按钮一行），
+ * 回执插在合计上面，按钮位置不变，不会因为一句回执把「保存并记下一单」挤小。
+ */
+.record-receipt {
+  flex: 1 1 100%;
+  display: flex;
+  align-items: center;
+  gap: var(--yh-space-1);
+  min-width: 0;
+  font-size: var(--yh-text-xs);
+  line-height: var(--yh-leading-tight);
+  color: var(--gl-color-text);
+  font-variant-numeric: tabular-nums;
+  /* 6 秒到期前 260ms 由 .is-leaving 淡出，与弹层关闭时长同值 */
+  transition: opacity var(--yh-dur-sheet) ease;
+}
+
+.record-receipt.is-leaving {
+  opacity: 0;
+}
+
+.record-receipt__text {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.record-receipt__dot {
+  color: var(--gl-color-text-muted);
+}
+
+/*
+ * 撤销：视觉是文字链，但盒子按 44 触控下限给（a11y 脚本量的是盒子，不是 ::after），
+ * 再用负外边距把多出来的 12px 抵消掉，底栏高度不变。
+ */
+.record-receipt__undo {
+  position: relative;
+  flex: none;
+  min-height: var(--yh-touch-min, 44px);
+  margin-block: -6px;
+  padding: 0 var(--yh-space-1);
+  background: none;
+  border: 0;
+  border-radius: var(--yh-radius-sm);
+  color: var(--gl-color-primary-on-glass, var(--gl-color-primary));
+  font: inherit;
+  font-weight: var(--yh-weight-semibold);
+  text-decoration: underline;
+  cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+}
+
+.record-receipt__undo::after {
+  content: '';
+  position: absolute;
+  inset: -6px -4px;
+}
+
+.record-receipt__undo:disabled {
+  color: var(--gl-color-text-muted);
+  text-decoration: none;
+  cursor: default;
+}
+
+/*
+ * P4：离线徽标。断网时开单页一个状态都没有（这一页把顶栏整个隐藏了），
+ * 摊主看不出「这单到底存没存上云」。橙色 pill 贴合计右侧，
+ * 在线时完全不渲染，不占位。
+ */
+.record-offline {
+  margin-inline-start: auto;
+  align-self: center;
+  display: inline-flex;
+  align-items: center;
+  min-height: 22px;
+  padding: 0 var(--yh-space-2);
+  border-radius: var(--yh-radius-pill);
+  font-size: var(--yh-text-xs);
+  font-weight: var(--yh-weight-semibold);
+  line-height: 1;
+  white-space: nowrap;
+  color: var(--gl-color-warning-on-surface, var(--gl-color-warning));
+  background: color-mix(in srgb, var(--gl-color-warning) 16%, transparent);
+  border: 1px solid color-mix(in srgb, var(--gl-color-warning) 42%, transparent);
+}
+
+/*
+ * 进货页的保存底栏。2026-11-12：fixed → sticky，与记账页的结算浮条同一套
+ * 做法（原因：底栏已改成 .app-shell 的第 4 行，fixed 的「bottom = 16 + 74 +
+ * 安全区」这套硬算出来的数值全部作废；而且 fixed 期间它会盖住表单最后一行）。
+ * 现在它是 .app-main 里的最后一个流内元素：滚到底就落在自然位置，中间吸在
+ * 滚动视口底边（= 底栏带的上沿），既不压底栏也不被底栏压。
+ */
+.record-actions--above-dock {
+  position: sticky;
+  left: auto;
+  transform: none;
+  bottom: 0;
+  /*
+   * 全幅出血：.record-actions 原本 width:100% 量的是视口（390），左右再留
+   * 16px 内边距；进了 .app-main 的内容盒（358）之后，用负外边距换回 390，
+   * 分隔线和渐变底的左右边缘才和改前一致，按钮的横向位置也才不变。
+   */
+  width: calc(100% + 2 * var(--yh-page-pad));
+  max-width: none;
+  margin-inline: calc(var(--yh-page-pad) * -1);
+  /* 内容比一屏短时把底栏压到底（.page-stack--fixed-bar 会 flex-grow 吃掉余高） */
+  margin-top: auto;
+  /* 安全区由底栏那一行承担，这里不再加第二次 */
+  padding-bottom: var(--yh-space-3);
+  border-radius: var(--yh-radius-lg) var(--yh-radius-lg) 0 0;
+}
+
+/*
+ * 进货页的页面根：底栏现在是流内 sticky（见下一条），最后一行滚到底时就在
+ * 它上面，所以**不再需要**原来那 80px 的硬留白。
+ * 改成 flex-grow 吃掉剩余高度：内容比一屏短时底栏仍贴着底边，
+ * 不会悬在屏幕中间。
+ */
+.page-stack--fixed-bar {
+  flex: 1 1 auto;
+}
+
+/*
+ * 「已加 N」从「左侧绝对定位角标」改成元信息行里的行内小胶囊（2026-11-11）：
+ * 绝对定位必须给**所有行**预留 44px 左边距，名称被白白挤窄；而且加了货的行与
+ * 没加的行文字起始位置不一致，看着像两份列表。现在它只是 meta 行的一段行内元素，
+ * 不参与定位，选中态由 .prod-btn.is-added 的淡底说明（见 styles.css）。
+ */
+.prod-btn__added {
+  display: inline-block;
+  margin-left: var(--yh-space-2);
+  padding: 0 var(--yh-space-1);
+  border-radius: var(--yh-radius-pill);
+  background: var(--yh-accent);
+  color: var(--yh-on-accent);
+  font-size: var(--yh-text-2xs);
+  font-weight: var(--yh-weight-semibold);
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+  vertical-align: 1px; /* 胶囊比 12px 的行盒略高，抬 1px 让基线不歪 */
+}
+
+/* 结账检查项 */
+.check-list {
+  display: flex;
+  flex-direction: column;
+  gap: var(--yh-space-2);
+}
+
+.check-list .check-row {
+  justify-content: flex-start;
+  padding: var(--yh-space-2) var(--yh-space-3);
+  border-radius: var(--yh-radius-md);
+  background: var(--gl-surface-2);
+  border: 1px solid var(--gl-border-subtle);
+  font-size: var(--yh-text-sm);
+}
+
+.check-list .link-btn {
+  align-self: center;
+  flex: 0 0 auto;
+}
+
+/*
+ * Toast 统一停在顶部（导航栏下方），不再按页面分位置。
+ * 2026-11-11 的问题：底部版会压住设置页的按钮 / Tab Bar / 结算浮条 —— 而「设置 → 外观」
+ * 这类操作正好在底部，提示条就盖在刚点的按钮上。
+ * 位置只取 styles.css 的 --gl-toast-top（= safe-area + 顶栏 66px + 8px），
+ * 开单页（.app-shell--editor）与列表页因此是同一个 top，不再有 per-page 覆盖。
+ */
+.glass-toast.toast {
+  top: var(--gl-toast-top);
+  bottom: auto;
+  width: calc(100vw - var(--yh-space-8));
+  max-width: var(--yh-page-max);
+  /*
+   * 提示条再大也不许挡住下面的按钮：本体完全透传指针，只有两个按钮恢复可点。
+   * GlassKit 的 .glass-toast.is-visible 会把 pointer-events 设回 auto，所以要连
+   * .is-visible 一起压（否则提示条显示期间仍然吃点击）。
+   * 代价：hover 不再触发 Toast 的「悬停暂停」，提示条按 6 秒自走 —— 可接受。
+   */
+  pointer-events: none;
+}
+
+.glass-toast.toast.is-visible {
+  pointer-events: none;
+}
+
+.glass-toast .glass-toast__action,
+.glass-toast .glass-toast__close {
+  pointer-events: auto;
+}
+
+/*
+ * 窄屏隐藏次要列（≤520 / 390 常见宽度）。
+ * 报表单品表只留核心列：商品 / 数量 / 销售额 / 成本 / 毛利 ——
+ * 「让利」总额在汇总卡里、「赠品」写在商品名下，而成本与毛利必须同屏可见。
+ */
+@media (max-width: 520px) {
+  .hide-narrow {
+    display: none;
+  }
+}
+
+/* 示例商品横幅的样式已随 L-10 一起删除：那条提示改成一次性 Toast 后
+   .sample-note 没有任何引用，留着只会让后人以为还有这么个组件。 */
+
+/* 报表：本场状态胶囊 / 排序表头 / 本场卡操作条 */
+
+/*
+ * 本场「状态 + 切换场次」胶囊（P0-2 / D / E）。
+ *
+ * 位置：本场卡的卡头 —— 不是审计第十节第 6 条否掉的「页面顶端横条」：
+ * 卡头实测 y≈581，在首屏可视区与拇指区之内，而且紧贴它控制的金额；
+ * 顶端 y≈87 才是收摊时单手够不到的那个位置。
+ *
+ * 44px 触控下限 + pill 圆角；视觉上像一颗可点的玻璃胶囊，内容里带状态徽标，
+ * 所以「现在看的是哪一场」和「怎么切换」是同一个控件，且不遮挡任何内容。
+ */
+.report-session-switch {
+  min-height: var(--yh-touch-min);
+  padding: 0 var(--yh-space-3);
+  display: inline-flex;
+  align-items: center;
+  gap: var(--yh-gap-tight);
+  border-radius: var(--yh-radius-pill);
+  border: var(--yh-border-width) solid var(--gl-border-subtle);
+  background: var(--gl-surface-2);
+  color: var(--gl-color-text-heading);
+  /* 原生 button 不继承字体；不写这条会掉回 Arial，和卡片里的系统字体不一致 */
+  font-family: inherit;
+  font-size: var(--yh-text-sm);
+  font-weight: var(--yh-weight-medium);
+  white-space: nowrap;
+  cursor: pointer;
+}
+
+.report-session-switch svg {
+  flex: 0 0 auto;
+}
+
+.report-session-switch:focus-visible {
+  outline: var(--yh-focus-width) solid var(--yh-focus-ring);
+  outline-offset: var(--yh-focus-offset);
+}
+
+/* 无场次时的状态标签只展示不可点：没有可切换的对象，不做假入口 */
+.report-session-switch--static {
+  cursor: default;
+}
+
+/* 卡头一行：390 宽下胶囊 + 「补过 N 单」+「补记」可能挤不下时整体换行，不压缩胶囊 */
+.report-session-head {
+  flex-wrap: wrap;
+  align-items: center;
+  row-gap: var(--yh-space-1);
+}
+
+/* 时间范围：状态已由徽标承担，这行只补具体起止时间 */
+.report-session-range {
+  margin-bottom: var(--yh-gap-tight);
+}
+
+/* 单品表脚注（P0-3）：解释「— = 成本待补」，只有表里真有「—」时才渲染 */
+.report-table-footnote {
+  margin: 0;
+  /* 与表格单元格的 10px 文字内边距对齐（--yh-gap-card 恰好是 10px） */
+  padding: var(--yh-space-2) var(--yh-gap-card) var(--yh-space-3);
+}
+
+.th-btn {
+  min-width: var(--yh-touch-min);
+  min-height: var(--yh-touch-min);
+  padding: 0 var(--yh-space-1);
+  background: none;
+  border: 0;
+  color: inherit;
+  font: inherit;
+  font-weight: inherit;
+  cursor: pointer;
+  white-space: nowrap;
+}
+
+.th-btn:focus-visible {
+  outline: var(--yh-focus-width) solid var(--yh-focus-ring);
+  outline-offset: var(--yh-focus-offset);
+  border-radius: var(--yh-radius-xs);
+}
+
+/* 只剩异常（脏数据）时用的红字；正常状态不再有「合计校验 ✓」这一行（P1-8） */
+.pay-row--check .bad {
+  color: var(--yh-ink-bad);
+  font-weight: var(--yh-weight-semibold);
+}
+
+/*
+ * 本场汇总卡里的操作条（A）。
+ * 它以前挂在单品表底部，离本场毛利值 1223px；现在紧贴三行收款，
+ * 所以只保留一条上分隔线，表达「下面是对上面这组数字的操作」，
+ * 不再是表格页脚。
+ */
+.report-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--yh-space-2);
+  padding: var(--yh-space-3) 0 0;
+  border-top: 1px solid var(--gl-border-subtle);
+  margin-top: var(--yh-space-3);
+}
+
+/* --------------------------------------------------- 报表：今天卡（P1-7 / P2-8） */
+
+/* 「含另一台手机 N 场」：跟标题同一块，但不抢 18px 标题的层级 */
+.report-day-external {
+  margin-top: var(--yh-space-0-5);
+}
+
+/*
+ * P2-8：三行收款（各约 36px）压成一行三列 —— 标签在上、金额在下。
+ * 不删任何一项，只改排布；金额用 15px（--yh-text-base）保证可读。
+ * 每格 minmax(0,1fr) 是让「¥1234.56」在 390 宽也不会把格子撑出卡片。
+ * 上下留 4px（--yh-space-1）而不是 8px：光靠三列只省 59px（480.5 → 421.5），
+ * 离 ≤400 还差 21.5px，所以今天卡内部间距统一收一档（只动间距，不动内容）。
+ */
+.report-pay-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: var(--yh-space-2);
+  padding: var(--yh-space-1) 0;
+  border-top: 1px solid var(--gl-border-subtle);
+  margin-bottom: var(--yh-space-2);
+}
+
+.report-pay-cell {
+  display: flex;
+  flex-direction: column;
+  gap: var(--yh-space-0-5);
+  min-width: 0;
+}
+
+.report-pay-cell .k {
+  font-size: var(--yh-text-xs);
+  color: var(--gl-color-text-muted);
+  line-height: var(--yh-leading-tight);
+}
+
+.report-pay-cell .v {
+  font-size: var(--yh-text-base);
+  font-weight: var(--yh-weight-semibold);
+  font-variant-numeric: tabular-nums;
+  line-height: var(--yh-leading-tight);
+  white-space: nowrap;
+}
+
+/*
+ * 光靠三列收款只省 59px（480.5 → 421.5），离 ≤400 还差 21.5px。
+ * 这里只收今天卡内部的**间距**（不删任何一项、不动卡片顺序）：
+ *   卡头 10→8、hero 10→8、hero 自身上下 12→8、收款格上下 8→4、
+ *   收款块下 10→8、已排除行上 12→8，合计 -26px。
+ * 作用域限定在 .report-day-card，本场卡的节奏不受影响。
+ */
+.report-day-card .report-day-head {
+  margin-bottom: var(--yh-space-2);
+}
+
+.report-day-card .hero-stats {
+  margin-bottom: var(--yh-space-2);
+}
+
+.report-day-card .stat--hero {
+  padding-top: var(--yh-space-2);
+  padding-bottom: var(--yh-space-2);
+}
+
+.report-day-card .report-excluded {
+  margin-top: var(--yh-space-2);
+}
+
+/*
+ * P2-7：「补过 N 单」徽标可点。徽标本身只有 27px 高（GlassKit 规格），
+ * 用 44px 的透明按钮包一层做命中区，视觉尺寸不变、也不会撑高卡头那一行
+ * （同一行的「补记」本来就是 44px）。
+ */
+.report-patch-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: var(--yh-touch-min);
+  padding: 0;
+  background: none;
+  border: 0;
+  font: inherit;
+  cursor: pointer;
+}
+
+.report-patch-btn:focus-visible {
+  outline: var(--yh-focus-width) solid var(--yh-focus-ring);
+  outline-offset: var(--yh-focus-offset);
+  border-radius: var(--yh-radius-pill);
+}
+
+/* 补记明细里的金额：与删除单金额同级的次要强调，但不加删除线 */
+.report-patched-amount {
+  font-variant-numeric: tabular-nums;
+  font-weight: var(--yh-weight-semibold);
+}
+
+/* P1-7：另一台手机的场次用中性徽标，不暗示异常 */
+.report-foreign-badge {
+  white-space: nowrap;
+  flex: 0 0 auto;
+}
+
+/* ------------------------------------------------------------ 报表：今天合计卡（H1） */
+
+/* 「今天 · 已结账 2 场 · ¥405.50」这一行是收摊后的第一眼，字号比表头大一档 */
+.report-day-head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: var(--yh-space-2);
+  margin-bottom: var(--yh-gap-card);
+}
+
+.report-day-head__title {
+  font-size: var(--yh-text-lg);
+  font-weight: var(--yh-weight-semibold);
+  color: var(--gl-color-text-heading);
+  font-variant-numeric: tabular-nums;
+}
+
+/* 「还有 1 场进行中 · ¥16.00（不计入今天）」这类补充说明 */
+.report-note {
+  margin: var(--yh-space-2) 0 0;
+  font-size: var(--yh-text-xs);
+  color: var(--gl-color-text-muted);
+  font-variant-numeric: tabular-nums;
+}
+
+/* 「已排除 2 笔删除（¥83.00）· 看今天的 2 笔」：灰色小字，但可点 */
+.report-excluded {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--yh-space-2);
+  margin-top: var(--yh-space-3);
+  padding-top: var(--yh-space-2);
+  border-top: 1px solid var(--gl-border-subtle);
+  font-size: var(--yh-text-xs);
+  color: var(--gl-color-text-muted);
+  font-variant-numeric: tabular-nums;
+}
+
+/* 单品行下的标记区（赠品 / 成本待补），与「赠 1」同一位置 */
+.margin-flags {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--yh-space-1);
+  margin-top: 2px;
+}
+
+/*
+ * P2-4：商品列只有 64.9px，徽标文字被挤成「成本」/「待补」两行（实测 44.9×78），
+ * 整行被撑到 117.5–137px。徽标改成单行（11px 是角标档 `--yh-text-2xs`，
+ * 不是把正文缩小），并允许它整体换到商品名下一行（flex 不压缩）。
+ */
+.margin-flags .glass-badge {
+  white-space: nowrap;
+  flex: 0 0 auto;
+  font-size: var(--yh-text-2xs);
+  padding: 0 var(--yh-space-1);
+}
+
+/*
+ * 徽标单行后商品列的 min-content 会变宽，而表格在 390 宽只有 328px 可放。
+ * 把单元格左右内边距从 10px 收到 8px（5 列省 20px）换给商品列，
+ * 表格仍是 328px、不给 `.glass-table-wrap` 加任何 overflow（审计第十节第 5 条）。
+ */
+.report-table th,
+.report-table td {
+  padding-left: var(--yh-space-2);
+  padding-right: var(--yh-space-2);
+}
+
+/* 删除单弹层里的金额：灰 + 删除线，别让它看着像有效收入 */
+.voided-amount {
+  color: var(--gl-color-text-muted);
+  text-decoration: line-through;
+  font-variant-numeric: tabular-nums;
+}
+
+/*
+ * 底栏不再在窄屏改竖排：竖排会让 flex:1 的按钮被压到文字高度（实测 25px），
+ * 而且底栏涨到 163px。现在合计独占一行、按钮并排，320px 宽也放得下，
+ * 所以只需要处理支付方式那条窄屏换行。
+ */
+@media (max-width: 380px) {
+  .record-bar {
+    align-items: flex-start;
+    flex-direction: column;
+  }
+
+  .record-bar__seg {
+    width: 100%;
+  }
+}

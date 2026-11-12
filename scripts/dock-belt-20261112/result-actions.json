@@ -1,0 +1,328 @@
+{
+  "editor": {
+    "recordActionsCount": 1,
+    "actions": [
+      {
+        "cls": "record-actions",
+        "rect": {
+          "x": 0,
+          "y": 734.3,
+          "w": 390,
+          "h": 109.7,
+          "top": 734.3,
+          "bottom": 844,
+          "left": 0,
+          "right": 390
+        },
+        "position": "fixed",
+        "bottom": "0px",
+        "zIndex": "900",
+        "width": "390px",
+        "transform": "matrix(1, 0, 0, 1, -195, 0)",
+        "left": "195px",
+        "parentCls": "record-page",
+        "scroller": {
+          "cls": "document",
+          "rect": null,
+          "sh": 844,
+          "ch": 844,
+          "oy": "visible"
+        },
+        "docScrollTop": 0,
+        "hits": [
+          {
+            "x": 39,
+            "y": 789,
+            "hit": "glass-btn glass-btn--secondary",
+            "inside": true
+          },
+          {
+            "x": 195,
+            "y": 789,
+            "hit": "record-actions",
+            "inside": true
+          },
+          {
+            "x": 351,
+            "y": 789,
+            "hit": "glass-btn glass-btn--primary",
+            "inside": true
+          }
+        ],
+        "vsBar": null,
+        "vsDock": null
+      }
+    ],
+    "hasBar": false,
+    "hasDock": false,
+    "bar": null,
+    "dock": null,
+    "dockPos": null,
+    "shellCls": "app-shell app-shell--editor",
+    "shellRows": "auto auto minmax(0px, 1fr) auto",
+    "mainCls": "app-main app-main--editor",
+    "mainOverflowY": "visible",
+    "doc": {
+      "scrollY": 0,
+      "sh": 844,
+      "ih": 844,
+      "sw": 390,
+      "cw": 390
+    },
+    "recordPagePad": {
+      "padBottom": "130px",
+      "rect": {
+        "x": 16,
+        "y": 0,
+        "w": 358,
+        "h": 728.6,
+        "top": 0,
+        "bottom": 728.6,
+        "left": 16,
+        "right": 374
+      }
+    },
+    "tabBarItems": 0
+  },
+  "sheetPicker": {
+    "sheets": 0,
+    "sheetRecordsActions": 0,
+    "sheetCls": []
+  },
+  "purchase": {
+    "recordActionsCount": 1,
+    "actions": [
+      {
+        "cls": "record-actions record-actions--above-dock",
+        "rect": {
+          "x": 0,
+          "y": 660,
+          "w": 390,
+          "h": 81,
+          "top": 660,
+          "bottom": 741,
+          "left": 0,
+          "right": 390
+        },
+        "position": "sticky",
+        "bottom": "0px",
+        "zIndex": "900",
+        "width": "390px",
+        "transform": "none",
+        "left": "auto",
+        "parentCls": "page-stack page-stack--fixed-bar",
+        "scroller": {
+          "cls": "app-main",
+          "rect": {
+            "x": 0,
+            "y": 64,
+            "w": 390,
+            "h": 691,
+            "top": 64,
+            "bottom": 755,
+            "left": 0,
+            "right": 390
+          },
+          "sh": 691,
+          "ch": 691,
+          "oy": "auto"
+        },
+        "docScrollTop": 0,
+        "hits": [
+          {
+            "x": 39,
+            "y": 701,
+            "hit": "glass-btn glass-btn--primary",
+            "inside": true
+          },
+          {
+            "x": 195,
+            "y": 701,
+            "hit": "glass-btn glass-btn--primary",
+            "inside": true
+          },
+          {
+            "x": 351,
+            "y": 701,
+            "hit": "glass-btn glass-btn--primary",
+            "inside": true
+          }
+        ],
+        "vsBar": 0,
+        "vsDock": 0
+      }
+    ],
+    "hasBar": true,
+    "hasDock": true,
+    "bar": {
+      "x": 56,
+      "y": 763,
+      "w": 278,
+      "h": 65,
+      "top": 763,
+      "bottom": 828,
+      "left": 56,
+      "right": 334
+    },
+    "dock": {
+      "x": 0,
+      "y": 755,
+      "w": 390,
+      "h": 89,
+      "top": 755,
+      "bottom": 844,
+      "left": 0,
+      "right": 390
+    },
+    "dockPos": "static",
+    "shellCls": "app-shell",
+    "shellRows": "64px 0px 691px 89px",
+    "mainCls": "app-main",
+    "mainOverflowY": "auto",
+    "doc": {
+      "scrollY": 0,
+      "sh": 844,
+      "ih": 844,
+      "sw": 390,
+      "cw": 390
+    },
+    "recordPagePad": null,
+    "tabBarItems": 5
+  },
+  "purchaseBottom": {
+    "recordActionsCount": 1,
+    "actions": [
+      {
+        "cls": "record-actions record-actions--above-dock",
+        "rect": {
+          "x": 0,
+          "y": 660,
+          "w": 390,
+          "h": 81,
+          "top": 660,
+          "bottom": 741,
+          "left": 0,
+          "right": 390
+        },
+        "position": "sticky",
+        "bottom": "0px",
+        "zIndex": "900",
+        "width": "390px",
+        "transform": "none",
+        "left": "auto",
+        "parentCls": "page-stack page-stack--fixed-bar",
+        "scroller": {
+          "cls": "app-main",
+          "rect": {
+            "x": 0,
+            "y": 64,
+            "w": 390,
+            "h": 691,
+            "top": 64,
+            "bottom": 755,
+            "left": 0,
+            "right": 390
+          },
+          "sh": 691,
+          "ch": 691,
+          "oy": "auto"
+        },
+        "docScrollTop": 0,
+        "hits": [
+          {
+            "x": 39,
+            "y": 701,
+            "hit": "glass-btn glass-btn--primary",
+            "inside": true
+          },
+          {
+            "x": 195,
+            "y": 701,
+            "hit": "glass-btn glass-btn--primary",
+            "inside": true
+          },
+          {
+            "x": 351,
+            "y": 701,
+            "hit": "glass-btn glass-btn--primary",
+            "inside": true
+          }
+        ],
+        "vsBar": 0,
+        "vsDock": 0
+      }
+    ],
+    "hasBar": true,
+    "hasDock": true,
+    "bar": {
+      "x": 56,
+      "y": 763,
+      "w": 278,
+      "h": 65,
+      "top": 763,
+      "bottom": 828,
+      "left": 56,
+      "right": 334
+    },
+    "dock": {
+      "x": 0,
+      "y": 755,
+      "w": 390,
+      "h": 89,
+      "top": 755,
+      "bottom": 844,
+      "left": 0,
+      "right": 390
+    },
+    "dockPos": "static",
+    "shellCls": "app-shell",
+    "shellRows": "64px 0px 691px 89px",
+    "mainCls": "app-main",
+    "mainOverflowY": "auto",
+    "doc": {
+      "scrollY": 0,
+      "sh": 844,
+      "ih": 844,
+      "sw": 390,
+      "cw": 390
+    },
+    "recordPagePad": null,
+    "tabBarItems": 5
+  },
+  "sheet": {
+    "overlayZ": [
+      {
+        "cls": "glass-sheet-overlay is-active",
+        "z": "1000",
+        "pos": "fixed"
+      }
+    ],
+    "dockZ": [],
+    "overlayRect": {
+      "x": 0,
+      "y": 0,
+      "w": 390,
+      "h": 844
+    },
+    "panelRect": {
+      "x": 0,
+      "y": 596.8,
+      "w": 390,
+      "h": 247.3
+    },
+    "dockRect": {
+      "x": 0,
+      "y": 755,
+      "w": 390,
+      "h": 89
+    },
+    "barRect": {
+      "x": 56,
+      "y": 763,
+      "w": 278,
+      "h": 65
+    },
+    "recordActionsInSheet": 0,
+    "coversBar": true
+  }
+}

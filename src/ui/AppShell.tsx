@@ -297,6 +297,14 @@ function AppHeader({
   );
 }
 
+/**
+ * 底部导航。**必须渲染在 `.app-shell` 内部**（见下面的调用处）：
+ * 2026-11-12 之前它是 `.glass-bg` 的兄弟、靠 GlassKit 的 `position: fixed`
+ * 浮在视口上，滚动中间会用 44px 高的条带盖住列表最后两列（报表页 50%/75%
+ * 实测 1623/10798px²）。改成 `.app-shell` 网格的第 4 行之后，底栏占位、
+ * 内容区滚到底就结束，结构上不可能再相交。
+ * 组件本身不变，只保证它是 shell 的最后一个子元素（grid-row: 4）。
+ */
 function TabBar({ tab, onSelect }: { tab: Tab; onSelect: (t: Tab) => void }) {
   return (
     <div className="glass-tab-bar-dock">
@@ -993,8 +1001,9 @@ export function AppShell({
               <PageLoading />
             )}
           </main>
+          {/* 与正式渲染保持一致：底栏是 shell 的第 4 行，不是浮层 */}
+          <TabBar tab={tab} onSelect={onSelectTab} />
         </div>
-        <TabBar tab={tab} onSelect={onSelectTab} />
       </div>
     );
   }
@@ -1064,9 +1073,14 @@ export function AppShell({
 
           {children}
         </main>
-      </div>
 
-      {!sub && !editor ? <TabBar tab={tab} onSelect={onSelectTab} /> : null}
+        {/*
+         * 底栏在 shell 里（不是玻璃背景的兄弟）：它是网格第 4 行的真实占位，
+         * 内容区滚到底就结束。`.app-shell--editor` 与 `sub` 页没有底栏，
+         * 第 4 行没有子元素、高度为 0，不会多出一条空白。
+         */}
+        {!sub && !editor ? <TabBar tab={tab} onSelect={onSelectTab} /> : null}
+      </div>
 
       <ToastHost api={toastApi} hidden={toastHidden} />
     </div>

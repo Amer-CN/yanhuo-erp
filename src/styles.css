@@ -68,9 +68,10 @@ body {
 }
 
 /*
- * 底栏浮在视口上（.glass-tab-bar-dock 是 fixed），
- * 外壳自己已经锁成一屏高，再给 .glass-bg 留这条 padding 只会凭空多出一条
- * 「滚不动的空白」，把整页顶出视口。改由 .app-main 的 padding-bottom 统一预留。
+ * 底栏已经是 .app-shell 网格的第 4 行（2026-11-12 起，见下面 .app-shell），
+ * 不再浮在视口上，所以 .glass-bg 这一层一条 padding 都不需要 —— 给多少都会
+ * 变成「滚不动的空白」，把整页顶出视口。GlassKit 这条规则原本是为了给 fixed
+ * 底栏让位，现在由网格行占位，故置 0。
  */
 .glass-bg.glass-bg--has-tab-bar-floating {
   padding-bottom: 0;
@@ -78,16 +79,23 @@ body {
 
 /*
  * 外壳 = 「固定视口 + 内容区自己滚」。
- * 第三行写 minmax(0, 1fr)：把 min-height:0 直接写进轨道定义里，
+ * 第 3 行写 minmax(0, 1fr)：把 min-height:0 直接写进轨道定义里，
  * 比 flex 版本更不会被后来者误删（删了列表就永远不滚，而且不会报错）。
  * 第 2 行留给 UpdateBar；它是条件渲染，不出现时该行高度为 0，
  * 所以头部 / 主体用显式 grid-row 定位，不依赖 DOM 顺序里有没有更新条。
+ *
+ * 第 4 行给底栏（2026-11-12）：原来 .glass-tab-bar-dock 是 position:fixed 的
+ * 浮动胶囊，内容在它底下穿过，只有滚到底时才靠 .app-main 的 padding-bottom
+ * 兜住最后一行；滚动中间没有任何保护，390×844 实测报表页 50%/75% 处会盖住
+ * 「毛利/成本」两列（1623.2 / 10798px²）。改成 auto 的第 4 行后，底栏是真实
+ * 占位：内容区的滚动视口到第 4 行上沿为止，**结构上不可能相交**，也不再有
+ * 「留白够不够」这种要靠 padding 猜的事。
  */
 .app-shell {
   height: 100vh; /* 老浏览器兜底 */
   height: 100dvh;
   display: grid;
-  grid-template-rows: auto auto minmax(0, 1fr);
+  grid-template-rows: auto auto minmax(0, 1fr) auto;
   overflow: hidden; /* 整页不再跟着内容长，滚动只发生在 .app-main 里 */
 }
 
@@ -126,8 +134,10 @@ body {
  * - overscroll-behavior-y:contain（不是 none）：滚到顶继续拉时不再把滚动链
  *   冒泡给 body —— 否则 iOS 会「整页回弹 + 露出地址栏」，PWA 里表现为黑边闪一下；
  *   用 none 会连橡皮筋手感一起关掉，太硬
- * - padding-bottom：给底部浮动 tab 栏让位（96px 已够；带结算浮条的记账页
- *   另有 .app-main--dock 覆盖成 172px，见下）
+ * - padding-bottom：只留常规页面间距。底栏已经是第 4 行的真实占位，
+ *   「给浮动 tab 留 96px」这条**不再需要**（2026-11-12）：那 96px 是
+ *   fixed 底栏时代的补偿，它只能保证「滚到底」那一帧不被盖，滚动中间照样穿过。
+ *   现在滚到底时最后一张卡的底边离底栏顶边正好是一个 --yh-page-gap。
  */
 .app-main {
   grid-row: 3;
@@ -138,21 +148,70 @@ body {
   overflow-y: auto;
   overscroll-behavior-y: contain;
   -webkit-overflow-scrolling: touch;
-  padding: var(--yh-space-1) var(--yh-page-pad) calc(96px + env(safe-area-inset-bottom, 0px));
+  padding: var(--yh-space-1) var(--yh-page-pad) var(--yh-page-gap);
   display: flex;
   flex-direction: column;
   gap: var(--yh-page-gap);
 }
 
 /*
- * 记账页底部有 fixed 的 .checkout-dock。实测（390×844）：
- *   底部安全区 0 → 浮条 bottom = 16(tab 栏浮起) + 74(--yh-dock-bottom-gap) = 90px 离底，
- *   浮条自身 74px 高 → 浮条顶边离底 164px。
- * 所以留 172px（164 + 8 呼吸位），否则滚到底时最后一条会被浮条压住 10~20px，
- * 而且再怎么滚也露不出来。其余 tab 用 96px 就够（实测间距 15px）。
+ * 记账页：结算浮条（.checkout-dock）2026-11-12 起是 .app-main 里的
+ * `position: sticky; bottom: 0`，它自己就是滚动内容的最后一个流内元素，
+ * 所以：
+ *   - 滚到底时它落在自然位置，最后一张卡与它之间是 .app-main 的 gap（14px），
+ *     一定会露出来，**不再需要 172px 的硬留白**（172 = 浮条顶边离底 164 + 8）；
+ *   - 滚动中间它吸在滚动视口底边，而滚动视口底边就是底栏顶边，
+ *     两者永不重叠（记 0px²）；
+ *   - safe-area 由底栏那一行承担，这里不再重复加一次，否则会平白空出一块。
  */
 .app-main--dock {
-  padding-bottom: calc(172px + env(safe-area-inset-bottom, 0px));
+  padding-bottom: var(--yh-page-gap);
+}
+
+/* 页面根吃掉剩余高度：浮条（.record-dock）靠 margin-top:auto 贴到它底部，
+   所以「内容比一屏短」时浮条仍在屏幕底部常驻，而不是跟着内容跑到半屏处。
+   内容比一屏长时 min-height:auto 让它自然长高，滚动照常发生。 */
+.app-main--dock > .page-stack {
+  flex: 1 1 auto;
+}
+
+/* --------------------------------------------- 底部导航带（网格第 4 行） */
+/*
+ * 覆盖 GlassKit 的 .glass-tab-bar-dock（glasskit.css 18b 节实测值：
+ *   position: fixed; left: 50%; bottom: calc(16px + safe-area);
+ *   transform: translateX(-50%); display:flex; align-items:center;
+ *   gap: --gl-tab-bar-floating-gap; z-index: 900;
+ *   max-width: calc(100vw - 2 * --gl-space-md)
+ * ）
+ * 这里只换「定位」，不碰外观：胶囊本身（278×65、--gl-radius-full、渐变背板、
+ * backdrop-filter、双层投影、active 光斑）都还由 .glass-tab-bar--floating 画，
+ * 所以改完必须和改前逐像素对得上。
+ *
+ * 为什么必须是网格行而不是「fixed + 更大的 padding-bottom」：padding 只保证
+ * 滚到底那一帧不被盖，滚动中间内容照样从胶囊底下穿过 —— 这正是本次要消掉的
+ * 相交（报表页 50% / 75% 处 1623.2 / 10798px²）。真实占位才是恒 0 的解。
+ */
+.glass-tab-bar-dock {
+  grid-row: 4;
+  position: static;
+  left: auto;
+  bottom: auto;
+  transform: none;
+  z-index: auto;
+  width: 100%;
+  max-width: none;
+  /* 胶囊仍是 278 宽居中：靠 flex 居中对齐，不再靠 left:50% + translateX */
+  justify-content: center;
+  /*
+   * 上 8px 与内容区隔开，左右 16px 与页面栅格同宽（胶囊因此仍在 x=56–334）。
+   * 下 16px 直接沿用 GlassKit 的 --gl-tab-bar-floating-bottom：fixed 时代胶囊
+   * 离底就是 16px，改网格行后必须保持同一个数，否则外观会「往下沉」16px。
+   * safe-area 只在这一层记一次（全站唯一）：.app-main 与结算浮条都已去掉它，
+   * 刘海机上才不会出现「底栏下面再空一截」的双倍留白。
+   */
+  padding: var(--yh-space-2) var(--yh-page-pad)
+    calc(var(--gl-tab-bar-floating-bottom) + env(safe-area-inset-bottom, 0px));
+  background: none;
 }
 
 /* 弹层打开时的滚动锁（kit.tsx 的 lockBodyScroll 会打这个标记）：
@@ -703,14 +762,30 @@ body {
 }
 
 /* ------------------------------------------------------------ 结算浮条 */
-
+/*
+ * 2026-11-12：fixed → sticky（任务里「二选一」，这里选 sticky，理由见下）。
+ * 原写法 fixed + bottom: 16 + 74 + safe-area，只能靠 .app-main--dock 的
+ * 172px 硬留白让「滚到底」时最后一条露出来；滚动中间它一直悬在内容上。
+ * 现在它是滚动内容的最后一个流内元素：
+ *   1) 滚到底 → 落在自然位置，最后一张卡与它之间只有 .app-main 的 gap(14px)，
+ *      最后一行一定露得出来，「172px 是多少」这类机型相关的魔法数全部消失；
+ *   2) 滚动中 → 吸在滚动视口底边，而滚动视口底边**就是底栏胶囊带的上沿**，
+ *      所以它既压不到底栏、也不会被底栏压；
+ *   3) safe-area 交给底栏那一行，这里不再重复加（fixed 时代加的是视口底部，
+ *      现在它离视口底部还有一整条底栏带）。
+ * 为什么不用 sticky 之外的第二种（保持 fixed + bottom = 底栏高度）：那仍然要
+ * 手算「胶囊 65 + 上 8 + 下 16 + safe-area」，换主题 / 换机型就会偏，而且
+ * 滚动中间照样盖住内容 —— 与这次要解决的问题是同一类。
+ */
 .checkout-dock {
-  position: fixed;
-  left: 50%;
-  transform: translateX(-50%);
-  bottom: calc(var(--gl-tab-bar-floating-bottom) + var(--yh-dock-bottom-gap) + env(safe-area-inset-bottom, 0px));
+  position: sticky;
+  left: auto;
+  transform: none;
+  bottom: 0;
   z-index: var(--yh-z-dock);
-  width: calc(100% - var(--yh-space-8));
+  /* 之前是 100% - 32px（视口 390 → 358）；.app-main 的内容盒已经是 390-32，
+     这里写 100% 才是同一个 358，胶囊左右仍各留 16px */
+  width: 100%;
   max-width: var(--yh-dock-max);
   display: flex;
   align-items: center;
@@ -725,9 +800,11 @@ body {
   animation: dock-in var(--yh-dur-base) var(--yh-ease-standard);
 }
 
+/* 入场位移：原来带着 translateX(-50%)（fixed + left:50% 的居中手法）。
+   现在不再用 translateX 居中，动画里也不能留，否则会从左侧 179px 处滑进来。 */
 @keyframes dock-in {
   from {
-    transform: translateX(-50%) translateY(14px);
+    transform: translateY(14px);
     opacity: 0;
   }
 }

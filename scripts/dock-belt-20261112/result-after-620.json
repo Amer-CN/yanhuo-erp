@@ -1,0 +1,2402 @@
+{
+  "phase": "after",
+  "h": 620,
+  "pages": {
+    "记账": [
+      {
+        "ratio": 0,
+        "hasBar": true,
+        "bar": {
+          "x": 56,
+          "y": 539,
+          "w": 278,
+          "h": 65,
+          "top": 539,
+          "bottom": 604,
+          "left": 56,
+          "right": 334
+        },
+        "dock": {
+          "x": 0,
+          "y": 531,
+          "w": 390,
+          "h": 89,
+          "top": 531,
+          "bottom": 620,
+          "left": 0,
+          "right": 390
+        },
+        "shell": {
+          "x": 0,
+          "y": 0,
+          "w": 390,
+          "h": 620,
+          "top": 0,
+          "bottom": 620,
+          "left": 0,
+          "right": 390
+        },
+        "shellRows": "64px 0px 467px 89px",
+        "scroller": {
+          "cls": "app-main",
+          "rect": {
+            "x": 0,
+            "y": 64,
+            "w": 390,
+            "h": 467,
+            "top": 64,
+            "bottom": 531,
+            "left": 0,
+            "right": 390
+          },
+          "scrollTop": 0,
+          "max": 399
+        },
+        "doc": {
+          "scrollWidth": 390,
+          "clientWidth": 390,
+          "bodyScrollWidth": 390,
+          "bodyClientWidth": 390
+        },
+        "checkoutDock": {
+          "x": 16,
+          "y": 443,
+          "w": 358,
+          "h": 74,
+          "top": 443,
+          "bottom": 517,
+          "left": 16,
+          "right": 374
+        },
+        "count": 0,
+        "area": 0,
+        "maxArea": 0,
+        "worst": null,
+        "samples": [],
+        "hitBad": [],
+        "lastBlock": {
+          "cls": "page-stack>glass-card card-pad card-tight",
+          "bottom": 531,
+          "dockGap": -88
+        },
+        "barGap": 8,
+        "dockVsBar": 0,
+        "dockCover": {
+          "count": 4,
+          "area": 7898.6,
+          "worst": {
+            "cls": "glass-list__subtitle",
+            "a": 4864
+          }
+        }
+      },
+      {
+        "ratio": 0.25,
+        "hasBar": true,
+        "bar": {
+          "x": 56,
+          "y": 539,
+          "w": 278,
+          "h": 65,
+          "top": 539,
+          "bottom": 604,
+          "left": 56,
+          "right": 334
+        },
+        "dock": {
+          "x": 0,
+          "y": 531,
+          "w": 390,
+          "h": 89,
+          "top": 531,
+          "bottom": 620,
+          "left": 0,
+          "right": 390
+        },
+        "shell": {
+          "x": 0,
+          "y": 0,
+          "w": 390,
+          "h": 620,
+          "top": 0,
+          "bottom": 620,
+          "left": 0,
+          "right": 390
+        },
+        "shellRows": "64px 0px 467px 89px",
+        "scroller": {
+          "cls": "app-main",
+          "rect": {
+            "x": 0,
+            "y": 64,
+            "w": 390,
+            "h": 467,
+            "top": 64,
+            "bottom": 531,
+            "left": 0,
+            "right": 390
+          },
+          "scrollTop": 100,
+          "max": 399
+        },
+        "doc": {
+          "scrollWidth": 390,
+          "clientWidth": 390,
+          "bodyScrollWidth": 390,
+          "bodyClientWidth": 390
+        },
+        "checkoutDock": {
+          "x": 16,
+          "y": 443,
+          "w": 358,
+          "h": 74,
+          "top": 443,
+          "bottom": 517,
+          "left": 16,
+          "right": 374
+        },
+        "count": 0,
+        "area": 0,
+        "maxArea": 0,
+        "worst": null,
+        "samples": [],
+        "hitBad": [],
+        "lastBlock": {
+          "cls": "page-stack>glass-card card-pad card-tight",
+          "bottom": 531,
+          "dockGap": -88
+        },
+        "barGap": 8,
+        "dockVsBar": 0,
+        "dockCover": {
+          "count": 6,
+          "area": 8048.3,
+          "worst": {
+            "cls": "glass-list__subtitle",
+            "a": 4864
+          }
+        }
+      },
+      {
+        "ratio": 0.5,
+        "hasBar": true,
+        "bar": {
+          "x": 56,
+          "y": 539,
+          "w": 278,
+          "h": 65,
+          "top": 539,
+          "bottom": 604,
+          "left": 56,
+          "right": 334
+        },
+        "dock": {
+          "x": 0,
+          "y": 531,
+          "w": 390,
+          "h": 89,
+          "top": 531,
+          "bottom": 620,
+          "left": 0,
+          "right": 390
+        },
+        "shell": {
+          "x": 0,
+          "y": 0,
+          "w": 390,
+          "h": 620,
+          "top": 0,
+          "bottom": 620,
+          "left": 0,
+          "right": 390
+        },
+        "shellRows": "64px 0px 467px 89px",
+        "scroller": {
+          "cls": "app-main",
+          "rect": {
+            "x": 0,
+            "y": 64,
+            "w": 390,
+            "h": 467,
+            "top": 64,
+            "bottom": 531,
+            "left": 0,
+            "right": 390
+          },
+          "scrollTop": 200,
+          "max": 399
+        },
+        "doc": {
+          "scrollWidth": 390,
+          "clientWidth": 390,
+          "bodyScrollWidth": 390,
+          "bodyClientWidth": 390
+        },
+        "checkoutDock": {
+          "x": 16,
+          "y": 443,
+          "w": 358,
+          "h": 74,
+          "top": 443,
+          "bottom": 517,
+          "left": 16,
+          "right": 374
+        },
+        "count": 0,
+        "area": 0,
+        "maxArea": 0,
+        "worst": null,
+        "samples": [],
+        "hitBad": [],
+        "lastBlock": {
+          "cls": "page-stack>glass-card card-pad card-tight",
+          "bottom": 531,
+          "dockGap": -88
+        },
+        "barGap": 8,
+        "dockVsBar": 0,
+        "dockCover": {
+          "count": 5,
+          "area": 8154.6,
+          "worst": {
+            "cls": "glass-list__subtitle",
+            "a": 3332
+          }
+        }
+      },
+      {
+        "ratio": 0.75,
+        "hasBar": true,
+        "bar": {
+          "x": 56,
+          "y": 539,
+          "w": 278,
+          "h": 65,
+          "top": 539,
+          "bottom": 604,
+          "left": 56,
+          "right": 334
+        },
+        "dock": {
+          "x": 0,
+          "y": 531,
+          "w": 390,
+          "h": 89,
+          "top": 531,
+          "bottom": 620,
+          "left": 0,
+          "right": 390
+        },
+        "shell": {
+          "x": 0,
+          "y": 0,
+          "w": 390,
+          "h": 620,
+          "top": 0,
+          "bottom": 620,
+          "left": 0,
+          "right": 390
+        },
+        "shellRows": "64px 0px 467px 89px",
+        "scroller": {
+          "cls": "app-main",
+          "rect": {
+            "x": 0,
+            "y": 64,
+            "w": 390,
+            "h": 467,
+            "top": 64,
+            "bottom": 531,
+            "left": 0,
+            "right": 390
+          },
+          "scrollTop": 299,
+          "max": 399
+        },
+        "doc": {
+          "scrollWidth": 390,
+          "clientWidth": 390,
+          "bodyScrollWidth": 390,
+          "bodyClientWidth": 390
+        },
+        "checkoutDock": {
+          "x": 16,
+          "y": 443,
+          "w": 358,
+          "h": 74,
+          "top": 443,
+          "bottom": 517,
+          "left": 16,
+          "right": 374
+        },
+        "count": 0,
+        "area": 0,
+        "maxArea": 0,
+        "worst": null,
+        "samples": [],
+        "hitBad": [],
+        "lastBlock": {
+          "cls": "page-stack>glass-card card-pad card-tight",
+          "bottom": 529,
+          "dockGap": -86
+        },
+        "barGap": 10,
+        "dockVsBar": 0,
+        "dockCover": {
+          "count": 4,
+          "area": 7898.6,
+          "worst": {
+            "cls": "glass-list__subtitle",
+            "a": 4864
+          }
+        }
+      },
+      {
+        "ratio": 1,
+        "hasBar": true,
+        "bar": {
+          "x": 56,
+          "y": 539,
+          "w": 278,
+          "h": 65,
+          "top": 539,
+          "bottom": 604,
+          "left": 56,
+          "right": 334
+        },
+        "dock": {
+          "x": 0,
+          "y": 531,
+          "w": 390,
+          "h": 89,
+          "top": 531,
+          "bottom": 620,
+          "left": 0,
+          "right": 390
+        },
+        "shell": {
+          "x": 0,
+          "y": 0,
+          "w": 390,
+          "h": 620,
+          "top": 0,
+          "bottom": 620,
+          "left": 0,
+          "right": 390
+        },
+        "shellRows": "64px 0px 467px 89px",
+        "scroller": {
+          "cls": "app-main",
+          "rect": {
+            "x": 0,
+            "y": 64,
+            "w": 390,
+            "h": 467,
+            "top": 64,
+            "bottom": 531,
+            "left": 0,
+            "right": 390
+          },
+          "scrollTop": 399,
+          "max": 399
+        },
+        "doc": {
+          "scrollWidth": 390,
+          "clientWidth": 390,
+          "bodyScrollWidth": 390,
+          "bodyClientWidth": 390
+        },
+        "checkoutDock": {
+          "x": 16,
+          "y": 443,
+          "w": 358,
+          "h": 74,
+          "top": 442.984375,
+          "bottom": 516.984375,
+          "left": 16,
+          "right": 374
+        },
+        "count": 0,
+        "area": 0,
+        "maxArea": 0,
+        "worst": null,
+        "samples": [],
+        "hitBad": [],
+        "lastBlock": {
+          "cls": "page-stack>glass-card card-pad card-tight",
+          "bottom": 429,
+          "dockGap": 14
+        },
+        "barGap": 110,
+        "dockVsBar": 0,
+        "dockCover": {
+          "count": 0,
+          "area": 0,
+          "worst": null
+        }
+      }
+    ],
+    "进货": [
+      {
+        "ratio": 0,
+        "hasBar": true,
+        "bar": {
+          "x": 56,
+          "y": 539,
+          "w": 278,
+          "h": 65,
+          "top": 539,
+          "bottom": 604,
+          "left": 56,
+          "right": 334
+        },
+        "dock": {
+          "x": 0,
+          "y": 531,
+          "w": 390,
+          "h": 89,
+          "top": 531,
+          "bottom": 620,
+          "left": 0,
+          "right": 390
+        },
+        "shell": {
+          "x": 0,
+          "y": 0,
+          "w": 390,
+          "h": 620,
+          "top": 0,
+          "bottom": 620,
+          "left": 0,
+          "right": 390
+        },
+        "shellRows": "64px 0px 467px 89px",
+        "scroller": {
+          "cls": "app-main",
+          "rect": {
+            "x": 0,
+            "y": 64,
+            "w": 390,
+            "h": 467,
+            "top": 64,
+            "bottom": 531,
+            "left": 0,
+            "right": 390
+          },
+          "scrollTop": 0,
+          "max": 119
+        },
+        "doc": {
+          "scrollWidth": 390,
+          "clientWidth": 390,
+          "bodyScrollWidth": 390,
+          "bodyClientWidth": 390
+        },
+        "checkoutDock": null,
+        "count": 0,
+        "area": 0,
+        "maxArea": 0,
+        "worst": null,
+        "samples": [],
+        "hitBad": [],
+        "lastBlock": {
+          "cls": "page-stack>glass-list",
+          "bottom": 531
+        },
+        "barGap": 8,
+        "dockVsBar": null,
+        "dockCover": null
+      },
+      {
+        "ratio": 0.25,
+        "hasBar": true,
+        "bar": {
+          "x": 56,
+          "y": 539,
+          "w": 278,
+          "h": 65,
+          "top": 539,
+          "bottom": 604,
+          "left": 56,
+          "right": 334
+        },
+        "dock": {
+          "x": 0,
+          "y": 531,
+          "w": 390,
+          "h": 89,
+          "top": 531,
+          "bottom": 620,
+          "left": 0,
+          "right": 390
+        },
+        "shell": {
+          "x": 0,
+          "y": 0,
+          "w": 390,
+          "h": 620,
+          "top": 0,
+          "bottom": 620,
+          "left": 0,
+          "right": 390
+        },
+        "shellRows": "64px 0px 467px 89px",
+        "scroller": {
+          "cls": "app-main",
+          "rect": {
+            "x": 0,
+            "y": 64,
+            "w": 390,
+            "h": 467,
+            "top": 64,
+            "bottom": 531,
+            "left": 0,
+            "right": 390
+          },
+          "scrollTop": 30,
+          "max": 119
+        },
+        "doc": {
+          "scrollWidth": 390,
+          "clientWidth": 390,
+          "bodyScrollWidth": 390,
+          "bodyClientWidth": 390
+        },
+        "checkoutDock": null,
+        "count": 0,
+        "area": 0,
+        "maxArea": 0,
+        "worst": null,
+        "samples": [],
+        "hitBad": [],
+        "lastBlock": {
+          "cls": "page-stack>glass-list",
+          "bottom": 531
+        },
+        "barGap": 8,
+        "dockVsBar": null,
+        "dockCover": null
+      },
+      {
+        "ratio": 0.5,
+        "hasBar": true,
+        "bar": {
+          "x": 56,
+          "y": 539,
+          "w": 278,
+          "h": 65,
+          "top": 539,
+          "bottom": 604,
+          "left": 56,
+          "right": 334
+        },
+        "dock": {
+          "x": 0,
+          "y": 531,
+          "w": 390,
+          "h": 89,
+          "top": 531,
+          "bottom": 620,
+          "left": 0,
+          "right": 390
+        },
+        "shell": {
+          "x": 0,
+          "y": 0,
+          "w": 390,
+          "h": 620,
+          "top": 0,
+          "bottom": 620,
+          "left": 0,
+          "right": 390
+        },
+        "shellRows": "64px 0px 467px 89px",
+        "scroller": {
+          "cls": "app-main",
+          "rect": {
+            "x": 0,
+            "y": 64,
+            "w": 390,
+            "h": 467,
+            "top": 64,
+            "bottom": 531,
+            "left": 0,
+            "right": 390
+          },
+          "scrollTop": 60,
+          "max": 119
+        },
+        "doc": {
+          "scrollWidth": 390,
+          "clientWidth": 390,
+          "bodyScrollWidth": 390,
+          "bodyClientWidth": 390
+        },
+        "checkoutDock": null,
+        "count": 0,
+        "area": 0,
+        "maxArea": 0,
+        "worst": null,
+        "samples": [],
+        "hitBad": [],
+        "lastBlock": {
+          "cls": "page-stack>glass-list",
+          "bottom": 531
+        },
+        "barGap": 8,
+        "dockVsBar": null,
+        "dockCover": null
+      },
+      {
+        "ratio": 0.75,
+        "hasBar": true,
+        "bar": {
+          "x": 56,
+          "y": 539,
+          "w": 278,
+          "h": 65,
+          "top": 539,
+          "bottom": 604,
+          "left": 56,
+          "right": 334
+        },
+        "dock": {
+          "x": 0,
+          "y": 531,
+          "w": 390,
+          "h": 89,
+          "top": 531,
+          "bottom": 620,
+          "left": 0,
+          "right": 390
+        },
+        "shell": {
+          "x": 0,
+          "y": 0,
+          "w": 390,
+          "h": 620,
+          "top": 0,
+          "bottom": 620,
+          "left": 0,
+          "right": 390
+        },
+        "shellRows": "64px 0px 467px 89px",
+        "scroller": {
+          "cls": "app-main",
+          "rect": {
+            "x": 0,
+            "y": 64,
+            "w": 390,
+            "h": 467,
+            "top": 64,
+            "bottom": 531,
+            "left": 0,
+            "right": 390
+          },
+          "scrollTop": 89,
+          "max": 119
+        },
+        "doc": {
+          "scrollWidth": 390,
+          "clientWidth": 390,
+          "bodyScrollWidth": 390,
+          "bodyClientWidth": 390
+        },
+        "checkoutDock": null,
+        "count": 0,
+        "area": 0,
+        "maxArea": 0,
+        "worst": null,
+        "samples": [],
+        "hitBad": [],
+        "lastBlock": {
+          "cls": "page-stack>glass-list",
+          "bottom": 531
+        },
+        "barGap": 8,
+        "dockVsBar": null,
+        "dockCover": null
+      },
+      {
+        "ratio": 1,
+        "hasBar": true,
+        "bar": {
+          "x": 56,
+          "y": 539,
+          "w": 278,
+          "h": 65,
+          "top": 539,
+          "bottom": 604,
+          "left": 56,
+          "right": 334
+        },
+        "dock": {
+          "x": 0,
+          "y": 531,
+          "w": 390,
+          "h": 89,
+          "top": 531,
+          "bottom": 620,
+          "left": 0,
+          "right": 390
+        },
+        "shell": {
+          "x": 0,
+          "y": 0,
+          "w": 390,
+          "h": 620,
+          "top": 0,
+          "bottom": 620,
+          "left": 0,
+          "right": 390
+        },
+        "shellRows": "64px 0px 467px 89px",
+        "scroller": {
+          "cls": "app-main",
+          "rect": {
+            "x": 0,
+            "y": 64,
+            "w": 390,
+            "h": 467,
+            "top": 64,
+            "bottom": 531,
+            "left": 0,
+            "right": 390
+          },
+          "scrollTop": 119,
+          "max": 119
+        },
+        "doc": {
+          "scrollWidth": 390,
+          "clientWidth": 390,
+          "bodyScrollWidth": 390,
+          "bodyClientWidth": 390
+        },
+        "checkoutDock": null,
+        "count": 0,
+        "area": 0,
+        "maxArea": 0,
+        "worst": null,
+        "samples": [],
+        "hitBad": [],
+        "lastBlock": {
+          "cls": "page-stack>glass-list",
+          "bottom": 516.8
+        },
+        "barGap": 22.2,
+        "dockVsBar": null,
+        "dockCover": null
+      }
+    ],
+    "库存": [
+      {
+        "ratio": 0,
+        "hasBar": true,
+        "bar": {
+          "x": 56,
+          "y": 539,
+          "w": 278,
+          "h": 65,
+          "top": 539,
+          "bottom": 604,
+          "left": 56,
+          "right": 334
+        },
+        "dock": {
+          "x": 0,
+          "y": 531,
+          "w": 390,
+          "h": 89,
+          "top": 531,
+          "bottom": 620,
+          "left": 0,
+          "right": 390
+        },
+        "shell": {
+          "x": 0,
+          "y": 0,
+          "w": 390,
+          "h": 620,
+          "top": 0,
+          "bottom": 620,
+          "left": 0,
+          "right": 390
+        },
+        "shellRows": "64px 0px 467px 89px",
+        "scroller": {
+          "cls": "stock-page__scroll",
+          "rect": {
+            "x": 16,
+            "y": 225,
+            "w": 358,
+            "h": 292,
+            "top": 225,
+            "bottom": 517,
+            "left": 16,
+            "right": 374
+          },
+          "scrollTop": 0,
+          "max": 290
+        },
+        "doc": {
+          "scrollWidth": 390,
+          "clientWidth": 390,
+          "bodyScrollWidth": 390,
+          "bodyClientWidth": 390
+        },
+        "checkoutDock": null,
+        "count": 0,
+        "area": 0,
+        "maxArea": 0,
+        "worst": null,
+        "samples": [],
+        "hitBad": [],
+        "lastBlock": {
+          "cls": "glass-list",
+          "bottom": 517
+        },
+        "barGap": 22,
+        "dockVsBar": null,
+        "dockCover": null
+      },
+      {
+        "ratio": 0.25,
+        "hasBar": true,
+        "bar": {
+          "x": 56,
+          "y": 539,
+          "w": 278,
+          "h": 65,
+          "top": 539,
+          "bottom": 604,
+          "left": 56,
+          "right": 334
+        },
+        "dock": {
+          "x": 0,
+          "y": 531,
+          "w": 390,
+          "h": 89,
+          "top": 531,
+          "bottom": 620,
+          "left": 0,
+          "right": 390
+        },
+        "shell": {
+          "x": 0,
+          "y": 0,
+          "w": 390,
+          "h": 620,
+          "top": 0,
+          "bottom": 620,
+          "left": 0,
+          "right": 390
+        },
+        "shellRows": "64px 0px 467px 89px",
+        "scroller": {
+          "cls": "stock-page__scroll",
+          "rect": {
+            "x": 16,
+            "y": 225,
+            "w": 358,
+            "h": 292,
+            "top": 225,
+            "bottom": 517,
+            "left": 16,
+            "right": 374
+          },
+          "scrollTop": 73,
+          "max": 290
+        },
+        "doc": {
+          "scrollWidth": 390,
+          "clientWidth": 390,
+          "bodyScrollWidth": 390,
+          "bodyClientWidth": 390
+        },
+        "checkoutDock": null,
+        "count": 0,
+        "area": 0,
+        "maxArea": 0,
+        "worst": null,
+        "samples": [],
+        "hitBad": [],
+        "lastBlock": {
+          "cls": "glass-list",
+          "bottom": 517
+        },
+        "barGap": 22,
+        "dockVsBar": null,
+        "dockCover": null
+      },
+      {
+        "ratio": 0.5,
+        "hasBar": true,
+        "bar": {
+          "x": 56,
+          "y": 539,
+          "w": 278,
+          "h": 65,
+          "top": 539,
+          "bottom": 604,
+          "left": 56,
+          "right": 334
+        },
+        "dock": {
+          "x": 0,
+          "y": 531,
+          "w": 390,
+          "h": 89,
+          "top": 531,
+          "bottom": 620,
+          "left": 0,
+          "right": 390
+        },
+        "shell": {
+          "x": 0,
+          "y": 0,
+          "w": 390,
+          "h": 620,
+          "top": 0,
+          "bottom": 620,
+          "left": 0,
+          "right": 390
+        },
+        "shellRows": "64px 0px 467px 89px",
+        "scroller": {
+          "cls": "stock-page__scroll",
+          "rect": {
+            "x": 16,
+            "y": 225,
+            "w": 358,
+            "h": 292,
+            "top": 225,
+            "bottom": 517,
+            "left": 16,
+            "right": 374
+          },
+          "scrollTop": 145,
+          "max": 290
+        },
+        "doc": {
+          "scrollWidth": 390,
+          "clientWidth": 390,
+          "bodyScrollWidth": 390,
+          "bodyClientWidth": 390
+        },
+        "checkoutDock": null,
+        "count": 0,
+        "area": 0,
+        "maxArea": 0,
+        "worst": null,
+        "samples": [],
+        "hitBad": [],
+        "lastBlock": {
+          "cls": "glass-list",
+          "bottom": 517
+        },
+        "barGap": 22,
+        "dockVsBar": null,
+        "dockCover": null
+      },
+      {
+        "ratio": 0.75,
+        "hasBar": true,
+        "bar": {
+          "x": 56,
+          "y": 539,
+          "w": 278,
+          "h": 65,
+          "top": 539,
+          "bottom": 604,
+          "left": 56,
+          "right": 334
+        },
+        "dock": {
+          "x": 0,
+          "y": 531,
+          "w": 390,
+          "h": 89,
+          "top": 531,
+          "bottom": 620,
+          "left": 0,
+          "right": 390
+        },
+        "shell": {
+          "x": 0,
+          "y": 0,
+          "w": 390,
+          "h": 620,
+          "top": 0,
+          "bottom": 620,
+          "left": 0,
+          "right": 390
+        },
+        "shellRows": "64px 0px 467px 89px",
+        "scroller": {
+          "cls": "stock-page__scroll",
+          "rect": {
+            "x": 16,
+            "y": 225,
+            "w": 358,
+            "h": 292,
+            "top": 225,
+            "bottom": 517,
+            "left": 16,
+            "right": 374
+          },
+          "scrollTop": 218,
+          "max": 290
+        },
+        "doc": {
+          "scrollWidth": 390,
+          "clientWidth": 390,
+          "bodyScrollWidth": 390,
+          "bodyClientWidth": 390
+        },
+        "checkoutDock": null,
+        "count": 0,
+        "area": 0,
+        "maxArea": 0,
+        "worst": null,
+        "samples": [],
+        "hitBad": [],
+        "lastBlock": {
+          "cls": "glass-list",
+          "bottom": 517
+        },
+        "barGap": 22,
+        "dockVsBar": null,
+        "dockCover": null
+      },
+      {
+        "ratio": 1,
+        "hasBar": true,
+        "bar": {
+          "x": 56,
+          "y": 539,
+          "w": 278,
+          "h": 65,
+          "top": 539,
+          "bottom": 604,
+          "left": 56,
+          "right": 334
+        },
+        "dock": {
+          "x": 0,
+          "y": 531,
+          "w": 390,
+          "h": 89,
+          "top": 531,
+          "bottom": 620,
+          "left": 0,
+          "right": 390
+        },
+        "shell": {
+          "x": 0,
+          "y": 0,
+          "w": 390,
+          "h": 620,
+          "top": 0,
+          "bottom": 620,
+          "left": 0,
+          "right": 390
+        },
+        "shellRows": "64px 0px 467px 89px",
+        "scroller": {
+          "cls": "stock-page__scroll",
+          "rect": {
+            "x": 16,
+            "y": 225,
+            "w": 358,
+            "h": 292,
+            "top": 225,
+            "bottom": 517,
+            "left": 16,
+            "right": 374
+          },
+          "scrollTop": 290,
+          "max": 290
+        },
+        "doc": {
+          "scrollWidth": 390,
+          "clientWidth": 390,
+          "bodyScrollWidth": 390,
+          "bodyClientWidth": 390
+        },
+        "checkoutDock": null,
+        "count": 0,
+        "area": 0,
+        "maxArea": 0,
+        "worst": null,
+        "samples": [],
+        "hitBad": [],
+        "lastBlock": {
+          "cls": "glass-list",
+          "bottom": 512
+        },
+        "barGap": 27,
+        "dockVsBar": null,
+        "dockCover": null
+      }
+    ],
+    "报表": [
+      {
+        "ratio": 0,
+        "hasBar": true,
+        "bar": {
+          "x": 56,
+          "y": 539,
+          "w": 278,
+          "h": 65,
+          "top": 539,
+          "bottom": 604,
+          "left": 56,
+          "right": 334
+        },
+        "dock": {
+          "x": 0,
+          "y": 531,
+          "w": 390,
+          "h": 89,
+          "top": 531,
+          "bottom": 620,
+          "left": 0,
+          "right": 390
+        },
+        "shell": {
+          "x": 0,
+          "y": 0,
+          "w": 390,
+          "h": 620,
+          "top": 0,
+          "bottom": 620,
+          "left": 0,
+          "right": 390
+        },
+        "shellRows": "64px 0px 467px 89px",
+        "scroller": {
+          "cls": "app-main",
+          "rect": {
+            "x": 0,
+            "y": 64,
+            "w": 390,
+            "h": 467,
+            "top": 64,
+            "bottom": 531,
+            "left": 0,
+            "right": 390
+          },
+          "scrollTop": 0,
+          "max": 1025
+        },
+        "doc": {
+          "scrollWidth": 390,
+          "clientWidth": 390,
+          "bodyScrollWidth": 390,
+          "bodyClientWidth": 390
+        },
+        "checkoutDock": null,
+        "count": 0,
+        "area": 0,
+        "maxArea": 0,
+        "worst": null,
+        "samples": [],
+        "hitBad": [],
+        "lastBlock": {
+          "cls": "page-stack>glass-card card-pad card-tight",
+          "bottom": 531
+        },
+        "barGap": 8,
+        "dockVsBar": null,
+        "dockCover": null
+      },
+      {
+        "ratio": 0.25,
+        "hasBar": true,
+        "bar": {
+          "x": 56,
+          "y": 539,
+          "w": 278,
+          "h": 65,
+          "top": 539,
+          "bottom": 604,
+          "left": 56,
+          "right": 334
+        },
+        "dock": {
+          "x": 0,
+          "y": 531,
+          "w": 390,
+          "h": 89,
+          "top": 531,
+          "bottom": 620,
+          "left": 0,
+          "right": 390
+        },
+        "shell": {
+          "x": 0,
+          "y": 0,
+          "w": 390,
+          "h": 620,
+          "top": 0,
+          "bottom": 620,
+          "left": 0,
+          "right": 390
+        },
+        "shellRows": "64px 0px 467px 89px",
+        "scroller": {
+          "cls": "app-main",
+          "rect": {
+            "x": 0,
+            "y": 64,
+            "w": 390,
+            "h": 467,
+            "top": 64,
+            "bottom": 531,
+            "left": 0,
+            "right": 390
+          },
+          "scrollTop": 256,
+          "max": 1025
+        },
+        "doc": {
+          "scrollWidth": 390,
+          "clientWidth": 390,
+          "bodyScrollWidth": 390,
+          "bodyClientWidth": 390
+        },
+        "checkoutDock": null,
+        "count": 0,
+        "area": 0,
+        "maxArea": 0,
+        "worst": null,
+        "samples": [],
+        "hitBad": [],
+        "lastBlock": {
+          "cls": "page-stack>glass-card card-pad card-tight",
+          "bottom": 531
+        },
+        "barGap": 8,
+        "dockVsBar": null,
+        "dockCover": null
+      },
+      {
+        "ratio": 0.5,
+        "hasBar": true,
+        "bar": {
+          "x": 56,
+          "y": 539,
+          "w": 278,
+          "h": 65,
+          "top": 539,
+          "bottom": 604,
+          "left": 56,
+          "right": 334
+        },
+        "dock": {
+          "x": 0,
+          "y": 531,
+          "w": 390,
+          "h": 89,
+          "top": 531,
+          "bottom": 620,
+          "left": 0,
+          "right": 390
+        },
+        "shell": {
+          "x": 0,
+          "y": 0,
+          "w": 390,
+          "h": 620,
+          "top": 0,
+          "bottom": 620,
+          "left": 0,
+          "right": 390
+        },
+        "shellRows": "64px 0px 467px 89px",
+        "scroller": {
+          "cls": "app-main",
+          "rect": {
+            "x": 0,
+            "y": 64,
+            "w": 390,
+            "h": 467,
+            "top": 64,
+            "bottom": 531,
+            "left": 0,
+            "right": 390
+          },
+          "scrollTop": 513,
+          "max": 1025
+        },
+        "doc": {
+          "scrollWidth": 390,
+          "clientWidth": 390,
+          "bodyScrollWidth": 390,
+          "bodyClientWidth": 390
+        },
+        "checkoutDock": null,
+        "count": 0,
+        "area": 0,
+        "maxArea": 0,
+        "worst": null,
+        "samples": [],
+        "hitBad": [],
+        "lastBlock": {
+          "cls": "page-stack>glass-card card-pad card-tight",
+          "bottom": 531
+        },
+        "barGap": 8,
+        "dockVsBar": null,
+        "dockCover": null
+      },
+      {
+        "ratio": 0.75,
+        "hasBar": true,
+        "bar": {
+          "x": 56,
+          "y": 539,
+          "w": 278,
+          "h": 65,
+          "top": 539,
+          "bottom": 604,
+          "left": 56,
+          "right": 334
+        },
+        "dock": {
+          "x": 0,
+          "y": 531,
+          "w": 390,
+          "h": 89,
+          "top": 531,
+          "bottom": 620,
+          "left": 0,
+          "right": 390
+        },
+        "shell": {
+          "x": 0,
+          "y": 0,
+          "w": 390,
+          "h": 620,
+          "top": 0,
+          "bottom": 620,
+          "left": 0,
+          "right": 390
+        },
+        "shellRows": "64px 0px 467px 89px",
+        "scroller": {
+          "cls": "app-main",
+          "rect": {
+            "x": 0,
+            "y": 64,
+            "w": 390,
+            "h": 467,
+            "top": 64,
+            "bottom": 531,
+            "left": 0,
+            "right": 390
+          },
+          "scrollTop": 769,
+          "max": 1025
+        },
+        "doc": {
+          "scrollWidth": 390,
+          "clientWidth": 390,
+          "bodyScrollWidth": 390,
+          "bodyClientWidth": 390
+        },
+        "checkoutDock": null,
+        "count": 0,
+        "area": 0,
+        "maxArea": 0,
+        "worst": null,
+        "samples": [],
+        "hitBad": [],
+        "lastBlock": {
+          "cls": "page-stack>glass-card card-pad card-tight",
+          "bottom": 531
+        },
+        "barGap": 8,
+        "dockVsBar": null,
+        "dockCover": null
+      },
+      {
+        "ratio": 1,
+        "hasBar": true,
+        "bar": {
+          "x": 56,
+          "y": 539,
+          "w": 278,
+          "h": 65,
+          "top": 539,
+          "bottom": 604,
+          "left": 56,
+          "right": 334
+        },
+        "dock": {
+          "x": 0,
+          "y": 531,
+          "w": 390,
+          "h": 89,
+          "top": 531,
+          "bottom": 620,
+          "left": 0,
+          "right": 390
+        },
+        "shell": {
+          "x": 0,
+          "y": 0,
+          "w": 390,
+          "h": 620,
+          "top": 0,
+          "bottom": 620,
+          "left": 0,
+          "right": 390
+        },
+        "shellRows": "64px 0px 467px 89px",
+        "scroller": {
+          "cls": "app-main",
+          "rect": {
+            "x": 0,
+            "y": 64,
+            "w": 390,
+            "h": 467,
+            "top": 64,
+            "bottom": 531,
+            "left": 0,
+            "right": 390
+          },
+          "scrollTop": 1025,
+          "max": 1025
+        },
+        "doc": {
+          "scrollWidth": 390,
+          "clientWidth": 390,
+          "bodyScrollWidth": 390,
+          "bodyClientWidth": 390
+        },
+        "checkoutDock": null,
+        "count": 0,
+        "area": 0,
+        "maxArea": 0,
+        "worst": null,
+        "samples": [],
+        "hitBad": [],
+        "lastBlock": {
+          "cls": "page-stack>glass-card card-pad card-tight",
+          "bottom": 516.6
+        },
+        "barGap": 22.4,
+        "dockVsBar": null,
+        "dockCover": null
+      }
+    ],
+    "更多": [
+      {
+        "ratio": 0,
+        "hasBar": true,
+        "bar": {
+          "x": 56,
+          "y": 539,
+          "w": 278,
+          "h": 65,
+          "top": 539,
+          "bottom": 604,
+          "left": 56,
+          "right": 334
+        },
+        "dock": {
+          "x": 0,
+          "y": 531,
+          "w": 390,
+          "h": 89,
+          "top": 531,
+          "bottom": 620,
+          "left": 0,
+          "right": 390
+        },
+        "shell": {
+          "x": 0,
+          "y": 0,
+          "w": 390,
+          "h": 620,
+          "top": 0,
+          "bottom": 620,
+          "left": 0,
+          "right": 390
+        },
+        "shellRows": "64px 0px 467px 89px",
+        "scroller": {
+          "cls": "app-main",
+          "rect": {
+            "x": 0,
+            "y": 64,
+            "w": 390,
+            "h": 467,
+            "top": 64,
+            "bottom": 531,
+            "left": 0,
+            "right": 390
+          },
+          "scrollTop": 0,
+          "max": 27
+        },
+        "doc": {
+          "scrollWidth": 390,
+          "clientWidth": 390,
+          "bodyScrollWidth": 390,
+          "bodyClientWidth": 390
+        },
+        "checkoutDock": null,
+        "count": 0,
+        "area": 0,
+        "maxArea": 0,
+        "worst": null,
+        "samples": [],
+        "hitBad": [],
+        "lastBlock": {
+          "cls": "page-stack>glass-card card-pad",
+          "bottom": 531
+        },
+        "barGap": 8,
+        "dockVsBar": null,
+        "dockCover": null
+      },
+      {
+        "ratio": 0.25,
+        "hasBar": true,
+        "bar": {
+          "x": 56,
+          "y": 539,
+          "w": 278,
+          "h": 65,
+          "top": 539,
+          "bottom": 604,
+          "left": 56,
+          "right": 334
+        },
+        "dock": {
+          "x": 0,
+          "y": 531,
+          "w": 390,
+          "h": 89,
+          "top": 531,
+          "bottom": 620,
+          "left": 0,
+          "right": 390
+        },
+        "shell": {
+          "x": 0,
+          "y": 0,
+          "w": 390,
+          "h": 620,
+          "top": 0,
+          "bottom": 620,
+          "left": 0,
+          "right": 390
+        },
+        "shellRows": "64px 0px 467px 89px",
+        "scroller": {
+          "cls": "app-main",
+          "rect": {
+            "x": 0,
+            "y": 64,
+            "w": 390,
+            "h": 467,
+            "top": 64,
+            "bottom": 531,
+            "left": 0,
+            "right": 390
+          },
+          "scrollTop": 7,
+          "max": 27
+        },
+        "doc": {
+          "scrollWidth": 390,
+          "clientWidth": 390,
+          "bodyScrollWidth": 390,
+          "bodyClientWidth": 390
+        },
+        "checkoutDock": null,
+        "count": 0,
+        "area": 0,
+        "maxArea": 0,
+        "worst": null,
+        "samples": [],
+        "hitBad": [],
+        "lastBlock": {
+          "cls": "page-stack>glass-card card-pad",
+          "bottom": 531
+        },
+        "barGap": 8,
+        "dockVsBar": null,
+        "dockCover": null
+      },
+      {
+        "ratio": 0.5,
+        "hasBar": true,
+        "bar": {
+          "x": 56,
+          "y": 539,
+          "w": 278,
+          "h": 65,
+          "top": 539,
+          "bottom": 604,
+          "left": 56,
+          "right": 334
+        },
+        "dock": {
+          "x": 0,
+          "y": 531,
+          "w": 390,
+          "h": 89,
+          "top": 531,
+          "bottom": 620,
+          "left": 0,
+          "right": 390
+        },
+        "shell": {
+          "x": 0,
+          "y": 0,
+          "w": 390,
+          "h": 620,
+          "top": 0,
+          "bottom": 620,
+          "left": 0,
+          "right": 390
+        },
+        "shellRows": "64px 0px 467px 89px",
+        "scroller": {
+          "cls": "app-main",
+          "rect": {
+            "x": 0,
+            "y": 64,
+            "w": 390,
+            "h": 467,
+            "top": 64,
+            "bottom": 531,
+            "left": 0,
+            "right": 390
+          },
+          "scrollTop": 14,
+          "max": 27
+        },
+        "doc": {
+          "scrollWidth": 390,
+          "clientWidth": 390,
+          "bodyScrollWidth": 390,
+          "bodyClientWidth": 390
+        },
+        "checkoutDock": null,
+        "count": 0,
+        "area": 0,
+        "maxArea": 0,
+        "worst": null,
+        "samples": [],
+        "hitBad": [],
+        "lastBlock": {
+          "cls": "page-stack>glass-card card-pad",
+          "bottom": 530.2
+        },
+        "barGap": 8.8,
+        "dockVsBar": null,
+        "dockCover": null
+      },
+      {
+        "ratio": 0.75,
+        "hasBar": true,
+        "bar": {
+          "x": 56,
+          "y": 539,
+          "w": 278,
+          "h": 65,
+          "top": 539,
+          "bottom": 604,
+          "left": 56,
+          "right": 334
+        },
+        "dock": {
+          "x": 0,
+          "y": 531,
+          "w": 390,
+          "h": 89,
+          "top": 531,
+          "bottom": 620,
+          "left": 0,
+          "right": 390
+        },
+        "shell": {
+          "x": 0,
+          "y": 0,
+          "w": 390,
+          "h": 620,
+          "top": 0,
+          "bottom": 620,
+          "left": 0,
+          "right": 390
+        },
+        "shellRows": "64px 0px 467px 89px",
+        "scroller": {
+          "cls": "app-main",
+          "rect": {
+            "x": 0,
+            "y": 64,
+            "w": 390,
+            "h": 467,
+            "top": 64,
+            "bottom": 531,
+            "left": 0,
+            "right": 390
+          },
+          "scrollTop": 20,
+          "max": 27
+        },
+        "doc": {
+          "scrollWidth": 390,
+          "clientWidth": 390,
+          "bodyScrollWidth": 390,
+          "bodyClientWidth": 390
+        },
+        "checkoutDock": null,
+        "count": 0,
+        "area": 0,
+        "maxArea": 0,
+        "worst": null,
+        "samples": [],
+        "hitBad": [],
+        "lastBlock": {
+          "cls": "page-stack>glass-card card-pad",
+          "bottom": 524.2
+        },
+        "barGap": 14.8,
+        "dockVsBar": null,
+        "dockCover": null
+      },
+      {
+        "ratio": 1,
+        "hasBar": true,
+        "bar": {
+          "x": 56,
+          "y": 539,
+          "w": 278,
+          "h": 65,
+          "top": 539,
+          "bottom": 604,
+          "left": 56,
+          "right": 334
+        },
+        "dock": {
+          "x": 0,
+          "y": 531,
+          "w": 390,
+          "h": 89,
+          "top": 531,
+          "bottom": 620,
+          "left": 0,
+          "right": 390
+        },
+        "shell": {
+          "x": 0,
+          "y": 0,
+          "w": 390,
+          "h": 620,
+          "top": 0,
+          "bottom": 620,
+          "left": 0,
+          "right": 390
+        },
+        "shellRows": "64px 0px 467px 89px",
+        "scroller": {
+          "cls": "app-main",
+          "rect": {
+            "x": 0,
+            "y": 64,
+            "w": 390,
+            "h": 467,
+            "top": 64,
+            "bottom": 531,
+            "left": 0,
+            "right": 390
+          },
+          "scrollTop": 27,
+          "max": 27
+        },
+        "doc": {
+          "scrollWidth": 390,
+          "clientWidth": 390,
+          "bodyScrollWidth": 390,
+          "bodyClientWidth": 390
+        },
+        "checkoutDock": null,
+        "count": 0,
+        "area": 0,
+        "maxArea": 0,
+        "worst": null,
+        "samples": [],
+        "hitBad": [],
+        "lastBlock": {
+          "cls": "page-stack>glass-card card-pad",
+          "bottom": 517.2
+        },
+        "barGap": 21.8,
+        "dockVsBar": null,
+        "dockCover": null
+      }
+    ],
+    "商品管理": [
+      {
+        "ratio": 0,
+        "hasBar": false,
+        "bar": null,
+        "dock": null,
+        "shell": {
+          "x": 0,
+          "y": 0,
+          "w": 390,
+          "h": 620,
+          "top": 0,
+          "bottom": 620,
+          "left": 0,
+          "right": 390
+        },
+        "shellRows": "66px 0px 554px 0px",
+        "scroller": {
+          "cls": "app-main",
+          "rect": {
+            "x": 0,
+            "y": 66,
+            "w": 390,
+            "h": 554,
+            "top": 66,
+            "bottom": 620,
+            "left": 0,
+            "right": 390
+          },
+          "scrollTop": 0,
+          "max": 375
+        },
+        "doc": {
+          "scrollWidth": 390,
+          "clientWidth": 390,
+          "bodyScrollWidth": 390,
+          "bodyClientWidth": 390
+        },
+        "checkoutDock": null,
+        "count": 0,
+        "area": 0,
+        "maxArea": 0,
+        "samples": [],
+        "hitBad": []
+      },
+      {
+        "ratio": 0.25,
+        "hasBar": false,
+        "bar": null,
+        "dock": null,
+        "shell": {
+          "x": 0,
+          "y": 0,
+          "w": 390,
+          "h": 620,
+          "top": 0,
+          "bottom": 620,
+          "left": 0,
+          "right": 390
+        },
+        "shellRows": "66px 0px 554px 0px",
+        "scroller": {
+          "cls": "app-main",
+          "rect": {
+            "x": 0,
+            "y": 66,
+            "w": 390,
+            "h": 554,
+            "top": 66,
+            "bottom": 620,
+            "left": 0,
+            "right": 390
+          },
+          "scrollTop": 94,
+          "max": 375
+        },
+        "doc": {
+          "scrollWidth": 390,
+          "clientWidth": 390,
+          "bodyScrollWidth": 390,
+          "bodyClientWidth": 390
+        },
+        "checkoutDock": null,
+        "count": 0,
+        "area": 0,
+        "maxArea": 0,
+        "samples": [],
+        "hitBad": []
+      },
+      {
+        "ratio": 0.5,
+        "hasBar": false,
+        "bar": null,
+        "dock": null,
+        "shell": {
+          "x": 0,
+          "y": 0,
+          "w": 390,
+          "h": 620,
+          "top": 0,
+          "bottom": 620,
+          "left": 0,
+          "right": 390
+        },
+        "shellRows": "66px 0px 554px 0px",
+        "scroller": {
+          "cls": "app-main",
+          "rect": {
+            "x": 0,
+            "y": 66,
+            "w": 390,
+            "h": 554,
+            "top": 66,
+            "bottom": 620,
+            "left": 0,
+            "right": 390
+          },
+          "scrollTop": 188,
+          "max": 375
+        },
+        "doc": {
+          "scrollWidth": 390,
+          "clientWidth": 390,
+          "bodyScrollWidth": 390,
+          "bodyClientWidth": 390
+        },
+        "checkoutDock": null,
+        "count": 0,
+        "area": 0,
+        "maxArea": 0,
+        "samples": [],
+        "hitBad": []
+      },
+      {
+        "ratio": 0.75,
+        "hasBar": false,
+        "bar": null,
+        "dock": null,
+        "shell": {
+          "x": 0,
+          "y": 0,
+          "w": 390,
+          "h": 620,
+          "top": 0,
+          "bottom": 620,
+          "left": 0,
+          "right": 390
+        },
+        "shellRows": "66px 0px 554px 0px",
+        "scroller": {
+          "cls": "app-main",
+          "rect": {
+            "x": 0,
+            "y": 66,
+            "w": 390,
+            "h": 554,
+            "top": 66,
+            "bottom": 620,
+            "left": 0,
+            "right": 390
+          },
+          "scrollTop": 281,
+          "max": 375
+        },
+        "doc": {
+          "scrollWidth": 390,
+          "clientWidth": 390,
+          "bodyScrollWidth": 390,
+          "bodyClientWidth": 390
+        },
+        "checkoutDock": null,
+        "count": 0,
+        "area": 0,
+        "maxArea": 0,
+        "samples": [],
+        "hitBad": []
+      },
+      {
+        "ratio": 1,
+        "hasBar": false,
+        "bar": null,
+        "dock": null,
+        "shell": {
+          "x": 0,
+          "y": 0,
+          "w": 390,
+          "h": 620,
+          "top": 0,
+          "bottom": 620,
+          "left": 0,
+          "right": 390
+        },
+        "shellRows": "66px 0px 554px 0px",
+        "scroller": {
+          "cls": "app-main",
+          "rect": {
+            "x": 0,
+            "y": 66,
+            "w": 390,
+            "h": 554,
+            "top": 66,
+            "bottom": 620,
+            "left": 0,
+            "right": 390
+          },
+          "scrollTop": 375,
+          "max": 375
+        },
+        "doc": {
+          "scrollWidth": 390,
+          "clientWidth": 390,
+          "bodyScrollWidth": 390,
+          "bodyClientWidth": 390
+        },
+        "checkoutDock": null,
+        "count": 0,
+        "area": 0,
+        "maxArea": 0,
+        "samples": [],
+        "hitBad": []
+      }
+    ],
+    "设置": [
+      {
+        "ratio": 0,
+        "hasBar": false,
+        "bar": null,
+        "dock": null,
+        "shell": {
+          "x": 0,
+          "y": 0,
+          "w": 390,
+          "h": 620,
+          "top": 0,
+          "bottom": 620,
+          "left": 0,
+          "right": 390
+        },
+        "shellRows": "66px 0px 554px 0px",
+        "scroller": {
+          "cls": "app-main",
+          "rect": {
+            "x": 0,
+            "y": 66,
+            "w": 390,
+            "h": 554,
+            "top": 66,
+            "bottom": 620,
+            "left": 0,
+            "right": 390
+          },
+          "scrollTop": 0,
+          "max": 1982
+        },
+        "doc": {
+          "scrollWidth": 390,
+          "clientWidth": 390,
+          "bodyScrollWidth": 390,
+          "bodyClientWidth": 390
+        },
+        "checkoutDock": null,
+        "count": 0,
+        "area": 0,
+        "maxArea": 0,
+        "samples": [],
+        "hitBad": []
+      },
+      {
+        "ratio": 0.25,
+        "hasBar": false,
+        "bar": null,
+        "dock": null,
+        "shell": {
+          "x": 0,
+          "y": 0,
+          "w": 390,
+          "h": 620,
+          "top": 0,
+          "bottom": 620,
+          "left": 0,
+          "right": 390
+        },
+        "shellRows": "66px 0px 554px 0px",
+        "scroller": {
+          "cls": "app-main",
+          "rect": {
+            "x": 0,
+            "y": 66,
+            "w": 390,
+            "h": 554,
+            "top": 66,
+            "bottom": 620,
+            "left": 0,
+            "right": 390
+          },
+          "scrollTop": 496,
+          "max": 1982
+        },
+        "doc": {
+          "scrollWidth": 390,
+          "clientWidth": 390,
+          "bodyScrollWidth": 390,
+          "bodyClientWidth": 390
+        },
+        "checkoutDock": null,
+        "count": 0,
+        "area": 0,
+        "maxArea": 0,
+        "samples": [],
+        "hitBad": []
+      },
+      {
+        "ratio": 0.5,
+        "hasBar": false,
+        "bar": null,
+        "dock": null,
+        "shell": {
+          "x": 0,
+          "y": 0,
+          "w": 390,
+          "h": 620,
+          "top": 0,
+          "bottom": 620,
+          "left": 0,
+          "right": 390
+        },
+        "shellRows": "66px 0px 554px 0px",
+        "scroller": {
+          "cls": "app-main",
+          "rect": {
+            "x": 0,
+            "y": 66,
+            "w": 390,
+            "h": 554,
+            "top": 66,
+            "bottom": 620,
+            "left": 0,
+            "right": 390
+          },
+          "scrollTop": 991,
+          "max": 1982
+        },
+        "doc": {
+          "scrollWidth": 390,
+          "clientWidth": 390,
+          "bodyScrollWidth": 390,
+          "bodyClientWidth": 390
+        },
+        "checkoutDock": null,
+        "count": 0,
+        "area": 0,
+        "maxArea": 0,
+        "samples": [],
+        "hitBad": []
+      },
+      {
+        "ratio": 0.75,
+        "hasBar": false,
+        "bar": null,
+        "dock": null,
+        "shell": {
+          "x": 0,
+          "y": 0,
+          "w": 390,
+          "h": 620,
+          "top": 0,
+          "bottom": 620,
+          "left": 0,
+          "right": 390
+        },
+        "shellRows": "66px 0px 554px 0px",
+        "scroller": {
+          "cls": "app-main",
+          "rect": {
+            "x": 0,
+            "y": 66,
+            "w": 390,
+            "h": 554,
+            "top": 66,
+            "bottom": 620,
+            "left": 0,
+            "right": 390
+          },
+          "scrollTop": 1487,
+          "max": 1982
+        },
+        "doc": {
+          "scrollWidth": 390,
+          "clientWidth": 390,
+          "bodyScrollWidth": 390,
+          "bodyClientWidth": 390
+        },
+        "checkoutDock": null,
+        "count": 0,
+        "area": 0,
+        "maxArea": 0,
+        "samples": [],
+        "hitBad": []
+      },
+      {
+        "ratio": 1,
+        "hasBar": false,
+        "bar": null,
+        "dock": null,
+        "shell": {
+          "x": 0,
+          "y": 0,
+          "w": 390,
+          "h": 620,
+          "top": 0,
+          "bottom": 620,
+          "left": 0,
+          "right": 390
+        },
+        "shellRows": "66px 0px 554px 0px",
+        "scroller": {
+          "cls": "app-main",
+          "rect": {
+            "x": 0,
+            "y": 66,
+            "w": 390,
+            "h": 554,
+            "top": 66,
+            "bottom": 620,
+            "left": 0,
+            "right": 390
+          },
+          "scrollTop": 1982,
+          "max": 1982
+        },
+        "doc": {
+          "scrollWidth": 390,
+          "clientWidth": 390,
+          "bodyScrollWidth": 390,
+          "bodyClientWidth": 390
+        },
+        "checkoutDock": null,
+        "count": 0,
+        "area": 0,
+        "maxArea": 0,
+        "samples": [],
+        "hitBad": []
+      }
+    ]
+  },
+  "styles": {
+    "记账": {
+      "dock": {
+        "rect": {
+          "x": 0,
+          "y": 531,
+          "w": 390,
+          "h": 89
+        },
+        "position": "static",
+        "borderRadius": "0px",
+        "backgroundImage": "none",
+        "backgroundColor": "rgba(0, 0, 0, 0)",
+        "backdropFilter": "none",
+        "boxShadow": "none",
+        "padding": "8px 16px 16px",
+        "transform": "none",
+        "zIndex": "auto"
+      },
+      "capsule": {
+        "rect": {
+          "x": 56,
+          "y": 539,
+          "w": 278,
+          "h": 65
+        },
+        "position": "relative",
+        "borderRadius": "9999px",
+        "backgroundImage": "linear-gradient(rgba(255, 255, 255, 0.14) 0px, rgba(255, 255, 255, 0.08) 100%)",
+        "backgroundColor": "rgba(0, 0, 0, 0)",
+        "backdropFilter": "blur(24px)",
+        "boxShadow": "rgba(0, 0, 0, 0.18) 0px 8px 32px 0px, rgba(0, 0, 0, 0.08) 0px 2px 8px 0px, rgba(255, 255, 255, 0.1) 0px 1px 1px 0px inse",
+        "padding": "6px 10px",
+        "transform": "none",
+        "zIndex": "900"
+      },
+      "appMain": {
+        "paddingBottom": "14px",
+        "paddingTop": "4px"
+      },
+      "shell": {
+        "gridTemplateRows": "64px 0px 467px 89px",
+        "height": "620px"
+      },
+      "rowHeights": "64px 0px 467px 89px",
+      "dockH": 89
+    },
+    "进货": null,
+    "库存": null,
+    "报表": null,
+    "更多": null,
+    "商品管理": null,
+    "设置": null,
+    "record-top": {
+      "dock": {
+        "rect": {
+          "x": 0,
+          "y": 531,
+          "w": 390,
+          "h": 89
+        },
+        "position": "static",
+        "borderRadius": "0px",
+        "backgroundImage": "none",
+        "backgroundColor": "rgba(0, 0, 0, 0)",
+        "backdropFilter": "none",
+        "boxShadow": "none",
+        "padding": "8px 16px 16px",
+        "transform": "none",
+        "zIndex": "auto"
+      },
+      "capsule": {
+        "rect": {
+          "x": 56,
+          "y": 539,
+          "w": 278,
+          "h": 65
+        },
+        "position": "relative",
+        "borderRadius": "9999px",
+        "backgroundImage": "linear-gradient(rgba(255, 255, 255, 0.14) 0px, rgba(255, 255, 255, 0.08) 100%)",
+        "backgroundColor": "rgba(0, 0, 0, 0)",
+        "backdropFilter": "blur(24px)",
+        "boxShadow": "rgba(0, 0, 0, 0.18) 0px 8px 32px 0px, rgba(0, 0, 0, 0.08) 0px 2px 8px 0px, rgba(255, 255, 255, 0.1) 0px 1px 1px 0px inse",
+        "padding": "6px 10px",
+        "transform": "none",
+        "zIndex": "900"
+      },
+      "appMain": {
+        "paddingBottom": "14px",
+        "paddingTop": "4px"
+      },
+      "shell": {
+        "gridTemplateRows": "64px 0px 467px 89px",
+        "height": "620px"
+      },
+      "rowHeights": "64px 0px 467px 89px",
+      "dockH": 89
+    }
+  },
+  "toast": {
+    "rect": {
+      "x": 16,
+      "y": 72,
+      "w": 358,
+      "h": 73.2
+    },
+    "barTop": 539,
+    "coversBar": false
+  }
+}

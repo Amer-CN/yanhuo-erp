@@ -1,0 +1,1764 @@
+/* =====================================================================
+   应用层样式 —— 建立在 GlassKit 之上（玻璃、令牌、组件都来自 GlassKit）
+   ===================================================================== */
+
+/* 颜色、字号、间距、圆角、阴影、动效全部在 tokens.css。
+   这里只保留 GlassKit 的组件级参数与布局微调。 */
+:root {
+  /* 品牌色：烟花橙（GlassKit 的派生令牌会自动跟着变） */
+  --gl-color-primary: var(--yh-orange-500);
+
+  /* 中文标签比苹果英文略大一点 */
+  --gl-tab-bar-label-size: var(--yh-text-2xs);
+  --gl-tab-bar-active-weight: var(--yh-weight-semibold);
+
+  --gl-list-title-white-space: normal;
+  --gl-list-subtitle-white-space: normal;
+
+  /*
+   * 提示条统一落在顶栏下面（2026-11-11 把底部版废掉：底部会压住 Tab Bar、
+   * 结算浮条和设置页的按钮，而且那里正是用户刚点的地方）。
+   * 64px 是顶栏实测高度（Playwright 390×844 量到 .app-nav = 64）：
+   * 上下内边距各 calc(--yh-space-2 8px + 2px) = 10px，内容取 .app-brand /
+   * .glass-pill 的 44px（--yh-touch-min）→ 10 + 44 + 10 = 64；+8px 是与顶栏的呼吸位。
+   * 全站只此一处定义，record.css 直接 top: var(--gl-toast-top)，别再按页面改位置。
+   */
+  --gl-toast-top: calc(env(safe-area-inset-top, 0px) + 64px + var(--yh-space-2));
+}
+
+html {
+  -webkit-text-size-adjust: 100%;
+}
+
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  background: var(--gl-color-bg-dark);
+  overscroll-behavior-y: none;
+}
+
+#root {
+  min-height: 100dvh;
+}
+
+/* ------------------------------------------------------------ 布局 */
+
+/*
+ * GlassKit 的 .glass-bg 带 overflow-x:hidden，那会让它本身变成「滚动容器」：
+ * 里面所有 position:sticky（顶栏、开单页 .record-top）都会以一个不滚动的祖先
+ * 为参照，于是等于失效 —— 这就是「返回键要滑到顶部才点得到」的根因。
+ * clip 只裁剪、不建立滚动容器（且能与 overflow-y:visible 共存），sticky 因此复活。
+ */
+.glass-bg {
+  overflow-x: clip;
+  /* GlassKit 给的是 min-height:100vh；外壳已锁成 100dvh，iOS 地址栏展开时
+     vh > dvh，会多出一截能被拖出来的空白。对齐到 dvh（内容变长时仍会自然长高）。 */
+  min-height: 100dvh;
+}
+
+@supports not (overflow: clip) {
+  .glass-bg {
+    overflow-x: hidden;
+  }
+}
+
+/*
+ * 底栏已经是 .app-shell 网格的第 4 行（2026-11-12 起，见下面 .app-shell），
+ * 不再浮在视口上，所以 .glass-bg 这一层一条 padding 都不需要 —— 给多少都会
+ * 变成「滚不动的空白」，把整页顶出视口。GlassKit 这条规则原本是为了给 fixed
+ * 底栏让位，现在由网格行占位，故置 0。
+ */
+.glass-bg.glass-bg--has-tab-bar-floating {
+  padding-bottom: 0;
+}
+
+/*
+ * 外壳 = 「固定视口 + 内容区自己滚」。
+ * 第 3 行写 minmax(0, 1fr)：把 min-height:0 直接写进轨道定义里，
+ * 比 flex 版本更不会被后来者误删（删了列表就永远不滚，而且不会报错）。
+ * 第 2 行留给 UpdateBar；它是条件渲染，不出现时该行高度为 0，
+ * 所以头部 / 主体用显式 grid-row 定位，不依赖 DOM 顺序里有没有更新条。
+ *
+ * 第 4 行给底栏（2026-11-12）：原来 .glass-tab-bar-dock 是 position:fixed 的
+ * 浮动胶囊，内容在它底下穿过，只有滚到底时才靠 .app-main 的 padding-bottom
+ * 兜住最后一行；滚动中间没有任何保护，390×844 实测报表页 50%/75% 处会盖住
+ * 「毛利/成本」两列（1623.2 / 10798px²）。改成 auto 的第 4 行后，底栏是真实
+ * 占位：内容区的滚动视口到第 4 行上沿为止，**结构上不可能相交**，也不再有
+ * 「留白够不够」这种要靠 padding 猜的事。
+ */
+.app-shell {
+  height: 100vh; /* 老浏览器兜底 */
+  height: 100dvh;
+  display: grid;
+  grid-template-rows: auto auto minmax(0, 1fr) auto;
+  overflow: hidden; /* 整页不再跟着内容长，滚动只发生在 .app-main 里 */
+}
+
+/* 顶栏是网格第 1 行，天然固定：不再靠 sticky（sticky 的祖先只要有一层
+   overflow 就会失效，那正是「返回键滑走」的病根）。 */
+.app-nav {
+  grid-row: 1;
+  position: static;
+  z-index: var(--yh-z-nav);
+  width: 100%;
+  max-width: var(--yh-page-max);
+  margin: 0 auto;
+  display: flex;
+  align-items: center;
+  gap: var(--yh-gap-card);
+  padding: calc(var(--yh-space-2) + 2px + env(safe-area-inset-top, 0px)) var(--yh-page-pad)
+    calc(var(--yh-space-2) + 2px);
+  background: linear-gradient(to bottom, rgba(247, 249, 252, 0.88), rgba(247, 249, 252, 0));
+  backdrop-filter: blur(var(--gl-blur-light));
+  -webkit-backdrop-filter: blur(var(--gl-blur-light));
+}
+
+
+
+.app-nav .glass-title {
+  flex: 1;
+  margin: 0;
+  font-size: var(--yh-nav-title-size);
+  text-align: left;
+  text-shadow: 0 2px 14px rgba(0, 0, 0, 0.35);
+}
+
+/*
+ * 内容区是唯一的滚动容器（滚动条出现在这一层，而不是整页）。
+ * - min-height:0：网格/flex 子项默认 min-height:auto，不写就永远不滚
+ * - overscroll-behavior-y:contain（不是 none）：滚到顶继续拉时不再把滚动链
+ *   冒泡给 body —— 否则 iOS 会「整页回弹 + 露出地址栏」，PWA 里表现为黑边闪一下；
+ *   用 none 会连橡皮筋手感一起关掉，太硬
+ * - padding-bottom：只留常规页面间距。底栏已经是第 4 行的真实占位，
+ *   「给浮动 tab 留 96px」这条**不再需要**（2026-11-12）：那 96px 是
+ *   fixed 底栏时代的补偿，它只能保证「滚到底」那一帧不被盖，滚动中间照样穿过。
+ *   现在滚到底时最后一张卡的底边离底栏顶边正好是一个 --yh-page-gap。
+ */
+.app-main {
+  grid-row: 3;
+  width: 100%;
+  max-width: var(--yh-page-max);
+  margin: 0 auto;
+  min-height: 0;
+  overflow-y: auto;
+  overscroll-behavior-y: contain;
+  -webkit-overflow-scrolling: touch;
+  padding: var(--yh-space-1) var(--yh-page-pad) var(--yh-page-gap);
+  display: flex;
+  flex-direction: column;
+  gap: var(--yh-page-gap);
+}
+
+/*
+ * 记账页：结算浮条（.checkout-dock）2026-11-12 起是 .app-main 里的
+ * `position: sticky; bottom: 0`，它自己就是滚动内容的最后一个流内元素，
+ * 所以：
+ *   - 滚到底时它落在自然位置，最后一张卡与它之间是 .app-main 的 gap（14px），
+ *     一定会露出来，**不再需要 172px 的硬留白**（172 = 浮条顶边离底 164 + 8）；
+ *   - 滚动中间它吸在滚动视口底边，而滚动视口底边就是底栏顶边，
+ *     两者永不重叠（记 0px²）；
+ *   - safe-area 由底栏那一行承担，这里不再重复加一次，否则会平白空出一块。
+ */
+.app-main--dock {
+  padding-bottom: var(--yh-page-gap);
+}
+
+/* 页面根吃掉剩余高度：浮条（.record-dock）靠 margin-top:auto 贴到它底部，
+   所以「内容比一屏短」时浮条仍在屏幕底部常驻，而不是跟着内容跑到半屏处。
+   内容比一屏长时 min-height:auto 让它自然长高，滚动照常发生。 */
+.app-main--dock > .page-stack {
+  flex: 1 1 auto;
+}
+
+/* --------------------------------------------- 底部导航带（网格第 4 行） */
+/*
+ * 覆盖 GlassKit 的 .glass-tab-bar-dock（glasskit.css 18b 节实测值：
+ *   position: fixed; left: 50%; bottom: calc(16px + safe-area);
+ *   transform: translateX(-50%); display:flex; align-items:center;
+ *   gap: --gl-tab-bar-floating-gap; z-index: 900;
+ *   max-width: calc(100vw - 2 * --gl-space-md)
+ * ）
+ * 这里只换「定位」，不碰外观：胶囊本身（278×65、--gl-radius-full、渐变背板、
+ * backdrop-filter、双层投影、active 光斑）都还由 .glass-tab-bar--floating 画，
+ * 所以改完必须和改前逐像素对得上。
+ *
+ * 为什么必须是网格行而不是「fixed + 更大的 padding-bottom」：padding 只保证
+ * 滚到底那一帧不被盖，滚动中间内容照样从胶囊底下穿过 —— 这正是本次要消掉的
+ * 相交（报表页 50% / 75% 处 1623.2 / 10798px²）。真实占位才是恒 0 的解。
+ */
+.glass-tab-bar-dock {
+  grid-row: 4;
+  position: static;
+  left: auto;
+  bottom: auto;
+  transform: none;
+  z-index: auto;
+  width: 100%;
+  max-width: none;
+  /* 胶囊仍是 278 宽居中：靠 flex 居中对齐，不再靠 left:50% + translateX */
+  justify-content: center;
+  /*
+   * 上 8px 与内容区隔开，左右 16px 与页面栅格同宽（胶囊因此仍在 x=56–334）。
+   * 下 16px 直接沿用 GlassKit 的 --gl-tab-bar-floating-bottom：fixed 时代胶囊
+   * 离底就是 16px，改网格行后必须保持同一个数，否则外观会「往下沉」16px。
+   * safe-area 只在这一层记一次（全站唯一）：.app-main 与结算浮条都已去掉它，
+   * 刘海机上才不会出现「底栏下面再空一截」的双倍留白。
+   */
+  padding: var(--yh-space-2) var(--yh-page-pad)
+    calc(var(--gl-tab-bar-floating-bottom) + env(safe-area-inset-bottom, 0px));
+  background: none;
+}
+
+/* 弹层打开时的滚动锁（kit.tsx 的 lockBodyScroll 会打这个标记）：
+   用 overflow:hidden 而不是 display:none —— hidden 仍保留 scrollTop，
+   解锁时能原地还原；display 会把滚动位置清零。
+   第二条对应「页面自己声明了主滚动区」的情况（data-scroll-root，如库存页），
+   这时锁 .app-main 没用（它本来就 overflow:hidden），要锁真正在滚的那一层。 */
+.app-main[data-locked='1'],
+.app-main [data-scroll-root][data-locked='1'] {
+  overflow: hidden;
+}
+
+/* 软键盘弹出时，浏览器按 scroll-margin 把输入框滚到键盘上方，而不是贴着底边 */
+.app-main input,
+.app-main textarea,
+.app-main select {
+  scroll-margin-block: 120px;
+}
+
+.section-title {
+  margin: 0 0 var(--yh-space-1);
+  font-size: var(--yh-section-title-size);
+  font-weight: var(--yh-weight-semibold);
+  line-height: var(--yh-leading-snug);
+  color: var(--gl-color-text-heading);
+  letter-spacing: var(--yh-tracking-tight);
+}
+
+.page-stack {
+  display: flex;
+  flex-direction: column;
+  gap: var(--yh-page-gap);
+}
+
+/* -------------------------------------------------------- 库存页：只让列表滚 */
+
+/*
+ * 诉求：搜索框 / 统计卡这类「操作入口」不该被长列表挤出屏幕。
+ * 做法：整页分成「固定区（统计卡 + 缺货提示 + 搜索框）」和「列表区」，
+ * 只让列表区滚。为避免双层滚动条，这一页的 .app-main 自己不再滚
+ * （.app-main--split 把它的 overflow 关掉），滚动只发生在 .stock-page__scroll。
+ * 为什么不选「.app-main 继续滚 + 固定区 position:sticky」：
+ * 固定区有 250px 上下高（两张统计卡 + 提示 + 搜索框），吸顶后
+ * 640px 高的手机上只剩不到 390px 给列表，比现在更憋屈。
+ */
+.app-main--split {
+  overflow: hidden; /* 唯一滚动容器下移到 .stock-page__scroll，避免双层滚动条 */
+}
+
+/* 页面根：吃掉 .app-main 的剩余高度，自己再分成「不滚的固定区 + 只滚的列表区」 */
+.stock-page {
+  flex: 1 1 auto;
+  min-height: 0; /* 不写的话 flex 子项按内容撑高，列表就压不下去 */
+}
+
+/* 统计卡 / 缺货提示 / 搜索框：一律不参与伸缩，长列表挤不走它们 */
+.stock-page > * {
+  flex: none;
+}
+
+/* 唯一的滚动区：flex:1 + min-height:0 才会真的收缩并长出滚动条 */
+.stock-page > .stock-page__scroll {
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow-y: auto;
+  overscroll-behavior-y: contain;
+  -webkit-overflow-scrolling: touch;
+  padding-bottom: var(--yh-space-1); /* 滚到底时最后一行不贴裁切边 */
+}
+
+/* ---------------------------------------------------------------- 列表圆角 */
+/*
+ * 2026-11-11 手感修复：列表滚到中间时，四个圆角变成直角。
+ *
+ * 根因（不是描边丢了，是圆角根本不在可视窗口上）：
+ * 1) GlassKit 把圆角画在 `.glass-list` 自己身上——`border-radius: var(--gl-radius-btn)`（16px），
+ *    背景 `var(--gl-surface-1)`、1px 描边、`backdrop-filter: blur(...)` 也都在这一个盒子上；
+ * 2) 但我们这块列表的**可视窗口**是外面那层 `.stock-page__scroll`：它是矩形、`overflow-y:auto`。
+ *    列表比窗口高时，列表自己的头尾（含那四个 16px 圆角）被滚出窗口，窗口里剩下的
+ *    只是列表的**中段**——一段四四方方的矩形；容器再按自己的直角边界把溢出部分裁掉，
+ *    于是滚到中部/底部时，四角就是尖的。
+ *
+ * 修法：把「圆角」搬到真正裁切内容的那一层——滚动容器自己变成圆角视口
+ * （`overflow-y:auto` + `border-radius` 时，浏览器会按圆角裁剪滚动内容，这正是我们要的）。
+ * 玻璃质感（半透背景 / 模糊 / 描边 / 投影）一并搬过来，否则会只剩一个圆角的透明框。
+ * 里层 `.glass-list` 同时退成「无圆角 / 透明 / 无描边」，避免双层描边和 16px 与 18px
+ * 圆角错位的那 1~2px 白边。
+ *
+ * 只在列表非空时铺面（--surface，由 StockPage 按 list.length 加）：
+ * 空态用的是 Empty 排版，垫一块空玻璃矩形会像加载失败。
+ */
+.stock-page__scroll--surface {
+  border-radius: var(--gl-radius-btn); /* 必须与 .glass-list 的令牌同源，别写死 px */
+  border: 1px solid var(--gl-border-subtle);
+  background: var(--gl-surface-1);
+  backdrop-filter: blur(var(--gl-blur-light));
+  -webkit-backdrop-filter: blur(var(--gl-blur-light));
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08), var(--gl-inset-subtle);
+}
+
+/* 里层列表：圆角/背景/描边/投影全部由上面的滚动容器负责，自己归零 */
+.stock-page__scroll > .glass-list {
+  border-radius: 0;
+  border: 0;
+  background: transparent;
+  backdrop-filter: none;
+  -webkit-backdrop-filter: none;
+  box-shadow: none;
+}
+
+/* ------------------------------------------------- 库存列表行（等高、单行） */
+/*
+ * 2026-11-11 实测：34 个商品里有 3 行高的、也有 2 行高的，同一个列表像两种组件。
+ * 两个成因叠在一起：
+ * 1) GlassKit 的 .glass-list__title-row 默认 flex-wrap: wrap，且 :root 把
+ *    --gl-list-title-white-space 设成了 normal（别页多行副标题要用，不能全局改）；
+ * 2) 右侧 trailing 还挂着「负库存 / 没货」badge，与左侧抢宽度，把名字挤成换行。
+ * 修法：标题单行省略 + title-row 不换行 + badge 不参与伸缩；状态词搬进副标题
+ * （StockPage 已改 JSX，trailing 只剩 chevron）；再给行一个统一的 min-height。
+ * 这几条都只作用在 .stock-page，不动别的页面的列表。
+ */
+.stock-page .glass-list__item {
+  min-height: 72px;
+  padding-block: var(--yh-space-2); /* 16→8：多出来的高度交给 min-height，行高才可预测 */
+}
+
+.stock-page .glass-list__title-row {
+  flex-wrap: nowrap;
+}
+
+.stock-page .glass-list__title {
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+/* badge 先保证不换行、不被压缩：要让出宽度的是名字（省略号），不是 badge */
+.stock-page .glass-list__title-row > .glass-badge {
+  flex: none;
+}
+
+/* 「库存 0 · 没货」里的状态词：保留错误色，但不再是一枚 badge */
+.stock-page .stock-flag {
+  color: var(--gl-color-error);
+  font-weight: var(--yh-weight-semibold);
+}
+
+/* 极窄屏（iPhone SE / 分屏）：连「1箱=N个」都省掉，名字优先；装箱信息在详情里还有 */
+@media (max-width: 380px) {
+  .stock-page .glass-list__title-row > .glass-badge {
+    display: none;
+  }
+}
+
+/*
+ * 说明：项目里只有库存页有「列表自己的滚动窗口」。
+ * - HistoryPage 的列表跟着 .app-main 整页滚（.app-main 不是圆角容器），圆角随页面滚走
+ *   是正常的卡片行为，不是这个 bug；
+ * - ReportPage 的 .glass-table-wrap 只做横向滚动（见下方 M-02），表格铺在 Card 的表面上，
+ *   纵向不裁切，所以没有「四角变直角」的问题，不做改动。
+ */
+
+/* 卡片内边距收紧（GlassKit 默认偏大） */
+.glass-card.card-pad {
+  padding: var(--yh-card-pad-y) var(--yh-card-pad-x);
+}
+
+.card-tight {
+  padding: var(--yh-card-tight-pad) !important;
+}
+
+.muted-text {
+  color: var(--gl-color-text-muted);
+  font-size: var(--yh-text-sm);
+  line-height: var(--yh-leading-normal);
+}
+
+.tiny-text {
+  color: var(--gl-color-text-muted);
+  font-size: var(--yh-text-xs);
+  line-height: var(--yh-leading-normal);
+}
+
+.stack-sm {
+  display: flex;
+  flex-direction: column;
+  gap: var(--yh-gap-card);
+}
+
+.row-between {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--yh-gap-card);
+}
+
+.grow {
+  flex: 1;
+  min-width: 0;
+}
+
+/* ------------------------------------------------------------ 表单 */
+
+.form-row {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: var(--yh-gap-card);
+}
+
+/*
+ * 勾选行（商品表单「允许砍价」、设置页「合并前先备份」）。
+ * 实测原来只有 30px 高：文字与 24px 方框都够小，但整行是可点区域，
+ * 30px 落在 WCAG 2.5.5 的 44px 下限外，摊位上单手拇指容易点空。
+ * 用 min-height 而不是写死 height —— 文案换行时仍然能长。
+ */
+.check-row {
+  display: flex;
+  align-items: center;
+  min-height: var(--yh-touch-min, 44px);
+  gap: var(--yh-gap-card);
+  font-size: var(--yh-text-md);
+  color: var(--gl-color-text);
+}
+
+.chip-row {
+  display: flex;
+  gap: var(--yh-space-2);
+  overflow-x: auto;
+  padding: var(--yh-space-0-5) var(--yh-space-0-5) var(--yh-space-1);
+  scrollbar-width: none;
+}
+
+.chip-row::-webkit-scrollbar {
+  display: none;
+}
+
+/* ------------------------------------------------------------ 统计块 */
+
+.stat-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: var(--yh-gap-card);
+}
+
+.stat {
+  border-radius: var(--yh-radius-lg);
+  padding: var(--yh-space-3) calc(var(--yh-space-3) + 2px);
+  background: var(--gl-surface-2);
+  border: var(--yh-border-width) solid var(--gl-border-medium);
+  backdrop-filter: blur(var(--gl-blur-light));
+  -webkit-backdrop-filter: blur(var(--gl-blur-light));
+  box-shadow: var(--yh-shadow-2);
+}
+
+.stat .k {
+  font-size: var(--yh-text-xs);
+  color: var(--gl-color-text-muted);
+}
+
+.stat .v {
+  font-size: var(--yh-text-xl);
+  font-weight: var(--yh-weight-semibold);
+  margin-top: var(--yh-space-0-5);
+  font-variant-numeric: tabular-nums;
+  color: var(--gl-color-text-heading);
+}
+
+.stat .v.brand {
+  color: var(--yh-price-ink);
+}
+
+.stat .v.ok {
+  color: var(--yh-ok-ink);
+}
+
+.stat .v.bad {
+  color: var(--yh-bad-ink);
+}
+
+/* ------------------------------------------------------------ 缺货角标 */
+/*
+ * 缺货提示从「常驻横幅」改成统计卡右上角的角标（2026-11-11）。
+ * 横幅高 56px 且只要有一个商品没货就一直在；角标零占位，点一下就把列表筛成缺货。
+ *
+ * .stat-slot 只是给角标一个定位上下文：不改 kit 里的 Stat（那是全站共用组件），
+ * 包一层只影响库存页这一张卡。
+ */
+.stat-slot {
+  position: relative;
+  display: flex;
+}
+
+.stat-slot > .stat {
+  flex: 1 1 auto;
+  min-width: 0;
+}
+
+/*
+ * 按钮本体撑到 44×44（触控下限，也是 a11y 脚本 getBoundingClientRect 量到的东西），
+ * 视觉上的胶囊是里面的 .stat-badge__pill —— 只有 22px 高，贴卡片右上角。
+ * 多出来的透明区域落在卡片右半边的空白处：数字在左下、标签在左上，谁都不挡。
+ */
+.stat-badge {
+  position: absolute;
+  inset-block-start: 0;
+  inset-inline-end: 0;
+  min-width: var(--yh-touch-min, 44px);
+  min-height: var(--yh-touch-min, 44px);
+  padding: var(--yh-space-1) var(--yh-space-1) 0 0;
+  display: inline-flex;
+  align-items: flex-start;
+  justify-content: flex-end;
+  background: none;
+  border: 0;
+  cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+}
+
+.stat-badge__pill {
+  display: inline-flex;
+  align-items: center;
+  min-height: 22px;
+  padding: 0 var(--yh-space-2);
+  border-radius: var(--yh-radius-pill);
+  font-size: var(--yh-text-xs);
+  font-weight: var(--yh-weight-semibold);
+  line-height: 1;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+  color: var(--gl-color-warning-on-surface, var(--gl-color-warning));
+  background: color-mix(in srgb, var(--gl-color-warning) 16%, transparent);
+  border: 1px solid color-mix(in srgb, var(--gl-color-warning) 42%, transparent);
+}
+
+/* 正在筛选时角标加重，跟搜索框里的「只看缺货 ×」呼应 */
+.stat-badge[aria-pressed='true'] .stat-badge__pill {
+  background: color-mix(in srgb, var(--gl-color-warning) 34%, transparent);
+  border-color: color-mix(in srgb, var(--gl-color-warning) 70%, transparent);
+}
+
+.stat-badge:focus-visible {
+  outline: var(--yh-focus-width) solid var(--yh-focus-ring);
+  outline-offset: var(--yh-space-0-5);
+  border-radius: var(--yh-radius-sm);
+}
+
+/*
+ * 「含欠货 -N」是卡片内的副标（2026-11-12）。
+ *
+ * 原来它绝对定位在卡片右下角（inset-block-end: 0），右上角还有「缺货 N」角标：
+ * 两个绝对定位元素 + 数字抢同一块地方，数字一长或卡片一窄就互相压。
+ * 现在改成**流内**元素，跟在数字下面单独占一行；只有角标留在右上角。
+ *
+ * .stat--stock 是「库存总件数」这张卡的专用包装（见 StockPage.tsx）：
+ * 它不用 kit 的 Stat 就为了能在数字下面塞这行副标。align-items: flex-start
+ * 让标题/数字/副标各自收缩到文字宽度，既不会被角标压住，也方便用
+ * getBoundingClientRect 验证三者互不相交。
+ */
+.stat--stock {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  /* 比其它统计卡少 4px 上下内边距：多出来的一行副标只让卡片高约 7px */
+  padding-block: var(--yh-space-2);
+}
+
+.stat-sub {
+  margin-top: var(--yh-space-0-5);
+  font-size: var(--yh-text-xs);
+  /* 行高 1：副标只占它自己的 12px，卡片净增高度控制在 4-8px 区间内 */
+  line-height: 1;
+  font-weight: var(--yh-weight-semibold);
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+  color: var(--gl-color-warning-on-surface, var(--gl-color-warning));
+}
+
+/* 搜索行里多出来的筛选 chip：只在这一行有第二个子元素时才需要 gap */
+.stock-page .glass-search {
+  gap: var(--yh-space-2);
+}
+
+.stock-filter-chip {
+  flex: 0 0 auto;
+  display: inline-flex;
+  align-items: center;
+  gap: var(--yh-space-1);
+  min-height: var(--yh-touch-min, 44px);
+  padding: 0 var(--yh-space-3) 0 var(--yh-space-2);
+  border-radius: var(--yh-radius-pill);
+  font-size: var(--yh-text-xs);
+  font-weight: var(--yh-weight-semibold);
+  white-space: nowrap;
+  cursor: pointer;
+  color: var(--gl-color-warning-on-surface, var(--gl-color-warning));
+  background: color-mix(in srgb, var(--gl-color-warning) 16%, transparent);
+  border: 1px solid color-mix(in srgb, var(--gl-color-warning) 42%, transparent);
+}
+
+.stock-filter-chip:focus-visible {
+  outline: var(--yh-focus-width) solid var(--yh-focus-ring);
+  outline-offset: var(--yh-space-0-5);
+}
+
+@media (min-width: 520px) {
+  .stat-grid {
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+  }
+}
+
+/* ------------------------------------------------------------ 商品行（选商品弹层） */
+/*
+ * 2026-11-11：这里原来有**两套** .prod-btn —— 双列卡片（:491）+ 单列横条覆写（:574）。
+ * 横条沿用了卡片的高光、--yh-shadow-2 重投影和大圆角，打开选商品弹层像进了另一个 App。
+ * 现在只留一套，直接对齐库存/流水列表行的视觉语言，令牌全部取自 GlassKit，不自造数值：
+ *   - 面/描边/圆角/投影 = .glass-list（--gl-surface-1 / --gl-border-subtle /
+ *     --gl-radius-btn / 同一个 inset 投影），行的 hover/active = --gl-surface-2/3
+ *     （见 .glass-list__item--interactive），分隔线 = --gl-border-subtle；
+ *   - 左右内边距与行间距 = --gl-space-lg（20px）/ --gl-space-sm（12px），
+ *     就是 .glass-list__item 的 padding 与 gap。
+ * 目标：选商品弹层看起来是「同一个 App 的列表」。
+ */
+.product-grid {
+  display: flex;
+  flex-direction: column;
+  /* 行之间靠分隔线，不用网格间隙：gap 会让分隔线悬空 */
+  gap: 0;
+  background: var(--gl-surface-1);
+  border: 1px solid var(--gl-border-subtle);
+  border-radius: var(--gl-radius-btn);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08), var(--gl-inset-subtle);
+  overflow: hidden;
+}
+
+.prod-btn {
+  position: relative;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: center;
+  column-gap: var(--gl-space-sm);
+  row-gap: 1px;
+  width: 100%;
+  /* 56px 高于 44px 触控下限；80 个货一屏能扫 7-9 个，密度靠留白不靠缩字号 */
+  min-height: 56px;
+  padding: var(--yh-space-2) var(--gl-space-lg);
+  text-align: left;
+  color: var(--gl-color-text);
+  background: transparent;
+  /* 描边在容器上：行如果各带一条边，行与行之间会出现双线 */
+  border: 0;
+  border-radius: 0;
+  cursor: pointer;
+  transition: background var(--yh-dur-fast) var(--yh-ease-standard);
+}
+
+/* 行间分隔线：与 .glass-list__item::after 同款（左右各让出 20px 内边距）。
+   ::after 以前是卡片的斜向高光，现在让给分隔线，高光彻底删掉。 */
+.prod-btn:not(:last-child)::after {
+  content: '';
+  position: absolute;
+  inset-inline: var(--gl-space-lg);
+  bottom: 0;
+  height: 1px;
+  background: var(--gl-border-subtle);
+  pointer-events: none;
+}
+
+.prod-btn:hover,
+.prod-btn:focus-visible {
+  background: var(--gl-surface-2);
+  outline: none;
+}
+
+/* 键盘焦点环画在行内侧，和 .glass-list__item--interactive:focus-visible 一致 */
+.prod-btn:focus-visible {
+  box-shadow: inset 0 0 0 2px var(--gl-border-focus);
+}
+
+.prod-btn:active {
+  background: var(--gl-surface-3);
+}
+
+.prod-btn__name {
+  grid-column: 1;
+  grid-row: 1;
+  min-width: 0;
+  font-size: var(--yh-text-base);
+  font-weight: var(--yh-weight-semibold);
+  line-height: var(--yh-leading-snug);
+  color: var(--gl-color-text-heading);
+  /* 单行省略：列表行不该被长商品名撑高（与 .glass-list__title 同一策略） */
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+/* 价格贴右，与库存同列右对齐，形成一列可纵向扫视的数字。
+   字号/颜色跟列表行的金额（.record-actions__total .v）一致：18px + 价格色。 */
+.prod-btn__price {
+  grid-column: 2;
+  grid-row: 1;
+  text-align: right;
+  font-size: var(--yh-text-lg);
+  font-weight: var(--yh-weight-semibold);
+  color: var(--yh-price-ink);
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
+.prod-btn__meta {
+  grid-column: 1;
+  grid-row: 2;
+  min-width: 0;
+  font-size: var(--yh-text-xs);
+  color: var(--gl-color-text-muted);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.prod-btn__stock {
+  grid-column: 2;
+  grid-row: 2;
+  text-align: right;
+  font-size: var(--yh-text-xs);
+  color: var(--gl-color-text-muted);
+  white-space: nowrap;
+}
+
+.prod-btn__stock.low {
+  color: var(--gl-color-error);
+}
+
+/* 本单已加过的行：淡淡一层选中底（对应 .glass-list__item.is-selected），
+   具体加了几件由元信息行里的「已加 N」胶囊说明，不再靠 44px 的左侧角标位。 */
+.prod-btn.is-added {
+  background: color-mix(in srgb, var(--yh-accent) 10%, transparent);
+}
+
+/* 已删除（作废）的销售记录行：透明度 + 删除线同时给，
+   强光下只压透明度看不出“这单不算钱”，必须保留 line-through */
+.glass-list__item.is-voided {
+  opacity: 0.55;
+}
+
+.glass-list__item.is-voided .glass-list__title {
+  text-decoration: line-through;
+}
+
+/* ------------------------------------------------------------ 结算浮条 */
+/*
+ * 2026-11-12：fixed → sticky（任务里「二选一」，这里选 sticky，理由见下）。
+ * 原写法 fixed + bottom: 16 + 74 + safe-area，只能靠 .app-main--dock 的
+ * 172px 硬留白让「滚到底」时最后一条露出来；滚动中间它一直悬在内容上。
+ * 现在它是滚动内容的最后一个流内元素：
+ *   1) 滚到底 → 落在自然位置，最后一张卡与它之间只有 .app-main 的 gap(14px)，
+ *      最后一行一定露得出来，「172px 是多少」这类机型相关的魔法数全部消失；
+ *   2) 滚动中 → 吸在滚动视口底边，而滚动视口底边**就是底栏胶囊带的上沿**，
+ *      所以它既压不到底栏、也不会被底栏压；
+ *   3) safe-area 交给底栏那一行，这里不再重复加（fixed 时代加的是视口底部，
+ *      现在它离视口底部还有一整条底栏带）。
+ * 为什么不用 sticky 之外的第二种（保持 fixed + bottom = 底栏高度）：那仍然要
+ * 手算「胶囊 65 + 上 8 + 下 16 + safe-area」，换主题 / 换机型就会偏，而且
+ * 滚动中间照样盖住内容 —— 与这次要解决的问题是同一类。
+ */
+.checkout-dock {
+  position: sticky;
+  left: auto;
+  transform: none;
+  bottom: 0;
+  z-index: var(--yh-z-dock);
+  /* 之前是 100% - 32px（视口 390 → 358）；.app-main 的内容盒已经是 390-32，
+     这里写 100% 才是同一个 358，胶囊左右仍各留 16px */
+  width: 100%;
+  max-width: var(--yh-dock-max);
+  display: flex;
+  align-items: center;
+  gap: var(--yh-gap-card);
+  padding: var(--yh-space-2) var(--yh-space-2) var(--yh-space-2) var(--yh-space-4);
+  border-radius: var(--yh-radius-pill);
+  background: linear-gradient(to bottom, var(--gl-surface-4), var(--gl-surface-3));
+  border: var(--yh-border-width) solid var(--gl-border-strong);
+  backdrop-filter: blur(var(--gl-blur));
+  -webkit-backdrop-filter: blur(var(--gl-blur));
+  box-shadow: var(--yh-shadow-dock);
+  animation: dock-in var(--yh-dur-base) var(--yh-ease-standard);
+}
+
+/* 入场位移：原来带着 translateX(-50%)（fixed + left:50% 的居中手法）。
+   现在不再用 translateX 居中，动画里也不能留，否则会从左侧 179px 处滑进来。 */
+@keyframes dock-in {
+  from {
+    transform: translateY(14px);
+    opacity: 0;
+  }
+}
+
+.checkout-dock__count {
+  display: flex;
+  align-items: center;
+  gap: var(--yh-gap-tight);
+  color: var(--gl-color-text-heading);
+  font-weight: var(--yh-weight-semibold);
+  font-size: var(--yh-text-md);
+  background: none;
+  border: 0;
+  padding: var(--yh-gap-tight) var(--yh-space-1);
+  cursor: pointer;
+}
+
+.cart-count {
+  min-width: 20px;
+  height: 20px;
+  padding: 0 5px;
+  border-radius: var(--yh-radius-pill);
+  background: var(--gl-color-primary);
+  color: var(--yh-on-accent);
+  font-size: var(--yh-text-2xs);
+  font-weight: var(--yh-weight-semibold);
+  display: grid;
+  place-items: center;
+}
+
+.checkout-dock__total {
+  text-align: right;
+  line-height: var(--yh-leading-tight);
+  margin-left: auto;
+}
+
+.checkout-dock__total .k {
+  font-size: var(--yh-text-2xs);
+  color: var(--gl-color-text-muted);
+}
+
+.checkout-dock__total .v {
+  font-size: var(--yh-text-xl);
+  font-weight: var(--yh-weight-semibold);
+  color: var(--yh-ink-price);
+  font-variant-numeric: tabular-nums;
+}
+
+/* ------------------------------------------------------------ 购物车行 */
+
+.cart-line {
+  display: flex;
+  flex-direction: column;
+  gap: var(--yh-gap-card);
+  padding: var(--yh-space-3) calc(var(--yh-space-3) + 2px);
+  border-radius: var(--yh-cart-radius);
+  background: var(--gl-surface-2);
+  border: 1px solid var(--gl-border-subtle);
+}
+
+.cart-line__name {
+  font-weight: var(--yh-weight-semibold);
+  font-size: var(--yh-text-base);
+  color: var(--gl-color-text-heading);
+}
+
+.cart-line__meta {
+  font-size: var(--yh-text-xs);
+  color: var(--gl-color-text-muted);
+}
+
+.stepper {
+  display: inline-flex;
+  align-items: center;
+  /*
+   * gap 从 2px 提到 4px：原来两个 44px 圆钮几乎贴在一起，
+   * 连点「+」时手指一滑就落到「−」上（卖 10 个变 5 个）。
+   */
+  gap: var(--yh-space-1);
+  border-radius: var(--yh-radius-pill);
+  background: var(--gl-surface-4);
+  border: 1px solid var(--gl-border-subtle);
+  padding: var(--yh-space-1);
+}
+
+.stepper button {
+  width: var(--yh-icon-btn);
+  height: var(--yh-icon-btn);
+  border-radius: var(--yh-radius-pill);
+  border: 0;
+  background: transparent;
+  color: var(--gl-color-text-heading);
+  display: grid;
+  place-items: center;
+  cursor: pointer;
+}
+
+.stepper button:active {
+  background: var(--gl-surface-5);
+}
+
+.stepper .val {
+  /* 44px 数字槽：1 位数和 3 位数宽度一致，连点加号时数字不会左右跳 */
+  min-width: 44px;
+  text-align: center;
+  font-weight: var(--yh-weight-semibold);
+  font-variant-numeric: tabular-nums;
+}
+
+/* ------------------------------------------------------------ 其他 */
+
+.btn-danger {
+  color: var(--yh-ink-bad) !important;
+}
+
+.icon-btn {
+  width: var(--yh-icon-btn);
+  height: var(--yh-icon-btn);
+  padding: 0;
+  border-radius: var(--yh-radius-pill);
+  display: grid;
+  place-items: center;
+  background: var(--gl-surface-3);
+  border: 1px solid var(--gl-border-subtle);
+  color: var(--gl-color-text);
+  cursor: pointer;
+}
+
+.icon-btn:active {
+  background: var(--gl-surface-4);
+}
+
+/*
+ * 按钮文案一律单行（2026-11-12）。
+ * .glass-btn 是 flex 容器，按钮文字是匿名 flex 项，white-space 默认是 normal：
+ * 窄屏（390）上被相邻内容一挤，「收摊结账」就折成「收摊结 / 账」。
+ * 这些按钮的文案都是固定短语，折行只会更难读，所以统一 nowrap；
+ * 真需要超长文案时应在调用处收字号或缩短文案，而不是让它折行。
+ */
+.glass-btn {
+  white-space: nowrap;
+}
+
+/* 弹层：内容超长时只滚 body，底部按钮始终可见 */
+.glass-sheet {
+  display: flex;
+  flex-direction: column;
+  max-height: var(--yh-sheet-max-height);
+}
+
+.glass-sheet__body {
+  overflow-y: auto;
+  overscroll-behavior: contain;
+}
+
+/* ------------------------------------------------------------ 选商品：全屏 + 列表内滚 */
+/*
+ * 全屏选商品层（2026-11-12）。原来 Sheet 封顶 90dvh，顶部露出一条背景，
+ * 用户反馈「上方空着没用，浪费显示空间」；货多时还是整页在滚，
+ * 搜索框和「完成」会被滚出屏幕。
+ *
+ * 这里靠内容的 `.picker--full` 标记 + CSS `:has()` 选中承载它的面板，
+ * 不改 kit 的 Sheet 接口（Sheet 的焦点策略 / 滚动锁 / Esc 栈顶 / 返回键守卫
+ * 全部原样不变）。不支持 :has() 的浏览器退回 90dvh + body 滚动，仍可用。
+ *
+ * 结构：头部（不滚）→ 筛选（不滚）→ 列表（唯一滚动容器）→ 底部按钮（不滚）。
+ */
+.glass-sheet-overlay:has(.picker--full) .glass-sheet {
+  /* 100dvh：顶到状态栏，配合 safe-area 顶部留白，顶部不再露出背景 */
+  height: 100dvh;
+  max-height: 100dvh;
+  padding-top: calc(var(--gl-space-1, 4px) + env(safe-area-inset-top, 0px));
+  border-radius: 0;
+  /* GlassKit 的 .glass-sheet 自带 overflow:auto —— 必须关掉，
+     否则整块面板是可滚区域，会出现「列表内滚 + 面板滚」两条滚动条 */
+  overflow: hidden;
+}
+
+.glass-sheet-overlay:has(.picker--full) .glass-sheet__body {
+  display: flex;
+  flex-direction: column;
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow: hidden;
+}
+
+.glass-sheet-overlay:has(.picker--full) .glass-sheet__actions {
+  flex: 0 0 auto;
+}
+
+/* 弹层内容：上下两段固定，中间列表自己滚 */
+.picker {
+  display: flex;
+  flex-direction: column;
+  gap: var(--yh-gap-card);
+  flex: 1 1 auto;
+  min-height: 0;
+}
+
+.picker__filters {
+  flex: 0 0 auto;
+  display: flex;
+  flex-direction: column;
+  gap: var(--yh-space-2);
+}
+
+/*
+ * 唯一的滚动容器：flex:1 + min-height:0 才允许它在 flex 列里被压缩并产生滚动；
+ * overscroll-behavior: contain 阻止滚到底后把滚动传递给页面（iOS 橡皮筋串滚）。
+ */
+.picker__list {
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  -webkit-overflow-scrolling: touch;
+  padding-bottom: var(--yh-space-1);
+}
+
+/* ------------------------------------------------------------ 进货页：商品触发按钮 */
+/*
+ * 触发按钮沿用 .glass-select 的外观（含右侧 chevron），
+ * 但它是按钮而不是原生下拉：点击打开 ProductPicker（有搜索和分类）。
+ *
+ * 为什么显式写字号：老规则是 `font: inherit`，它连字号一起继承成页面根的
+ * 16px，而 .glass-select / .glass-input 用的是 --gl-font-size-base(15px)，
+ * 于是「选择商品…」比旁边所有输入框都大 1px。字体族与行高仍继承，字号单列。
+ */
+.picker-trigger {
+  display: flex;
+  align-items: center;
+  text-align: left;
+  font-family: inherit;
+  font-size: var(--gl-font-size-base, var(--yh-text-base));
+  line-height: inherit;
+  color: var(--gl-color-text);
+}
+
+.picker-trigger__text {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.picker-trigger.is-placeholder {
+  color: var(--gl-placeholder);
+}
+
+/* 已选商品用标题色 + 中等字重，避免和白底时代的占位文字糊成一片 */
+.picker-trigger:not(.is-placeholder) {
+  color: var(--gl-color-text-heading);
+  font-weight: var(--yh-weight-medium);
+}
+
+.picker-trigger:focus-visible {
+  border-color: var(--gl-border-focus);
+  box-shadow: var(--gl-shadow-focus), var(--gl-inset-medium);
+  outline: none;
+}
+
+/*
+ * 天分组标题吸顶（只在 HistoryPage 用）。
+ * 它吸的是 .app-main 这条滚动容器 —— 中间层（.page-stack、`<div key={day}>`）
+ * 都不能有 overflow，否则最近滚动祖先被截断，sticky 会静默失效。
+ * background 必须不透明：玻璃卡是半透明的，不铺底会让下面的行透上来。
+ */
+.day-header {
+  position: sticky;
+  top: 0;
+  z-index: 1;
+  background: var(--yh-canvas);
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  padding: var(--yh-gap-tight) var(--yh-space-2) var(--yh-space-0-5);
+  font-size: var(--yh-text-md);
+  font-weight: var(--yh-weight-semibold);
+  color: var(--gl-color-text-heading);
+}
+
+.day-header .sub {
+  font-size: var(--yh-text-xs);
+  font-weight: var(--yh-weight-medium);
+  color: var(--gl-color-text-muted);
+}
+
+/*
+ * 报表页的单品表：**整张表纵向交给 .app-main，表头真吸顶**（M6，2026-11-12）。
+ *
+ * 历史：M-02 为了干掉「表格内滚动条 + 页面滚动条」两条并存的假死感，去掉了
+ * max-height，但保留了 `overflow-x: auto; overflow-y: hidden`。
+ * 只要这一层有**任何** overflow（哪怕是 hidden），`thead th` 的 sticky 就会相对
+ * 这个「纵向不滚的盒子」定位：它永远没机会真的粘住，页面滚到 900px 时实测
+ * thTop = -48（表头已滚出视口，8 行数据看不到列名）。
+ *
+ * 为什么 390 宽根本不需要横向滚动容器（这是删掉 overflow 的依据）：
+ * 窄屏下「让利 / 赠品」两列走 `.hide-narrow` 直接不渲染，实测 390×844 时
+ * `.glass-table-wrap` 的 scrollWidth = clientWidth = 328，横向滚动条从来没出现过；
+ * 宽屏列更多但可用宽度也更大，同样不溢出。为一个不存在的溢出保留 overflow，
+ * 代价却是表头永远吸不住，明显不划算。
+ *
+ * 所以这里改成 overflow: visible：纵向滚动回到 .app-main（唯一滚动容器），
+ * sticky 相对它生效；万一将来真多一列溢出，也应该用 min-width / 列宽约束解决，
+ * 不要再给这一层打开 overflow —— 那会让表头再次静默失效。
+ */
+.glass-table-wrap {
+  overflow: visible;
+}
+
+.glass-table thead th {
+  position: sticky;
+  top: 0;
+  z-index: 1;
+  background: var(--yh-canvas);
+  border-bottom: 0;
+  box-shadow: inset 0 -1px 0 var(--gl-border-medium);
+}
+
+/*
+ * 报表页的场次切换不再有吸底浮胶囊（2026-11-12 修复批次一）。
+ *
+ * 历史：L1 为了让收摊时单手够得到切换入口，把它做成 `position: fixed; bottom: 96px`。
+ * 实测它首屏就压住本场「现金 ¥6.00」行（29.2px 高）与本场毛利「—」（17.4px 高），
+ * 滚到 50%/75% 时还压住表格的毛利/成本列；文案「历史场次」也与 Sheet 首行
+ * 「进行中这一场」矛盾。现在入口落在本场卡的卡头（见 record.css
+ * `.report-session-switch`，y≈581、拇指区、不遮任何金额），
+ * 所以 `.report-session-fab` / `.report-session-fab-gap` 一并删除。
+ * 注意审计第十节第 6 条否掉的是「挪回页面顶端」（y≈87），不是卡头。
+ */
+
+.mini-card {
+  padding: var(--yh-space-3) calc(var(--yh-space-3) + 2px);
+  border-radius: var(--yh-radius-md);
+  background: var(--gl-surface-2);
+  border: 1px solid var(--gl-border-subtle);
+}
+
+.icon-text {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--yh-gap-tight);
+}
+
+.form-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--yh-gap-card);
+  margin-bottom: var(--yh-space-1);
+}
+
+.form-head h2 {
+  margin: 0;
+  font-size: var(--yh-card-title-size);
+  font-weight: var(--yh-weight-semibold);
+  color: var(--gl-color-text-heading);
+}
+
+/* 卡片内小标题的左右留白：原来 RecordPage/ReportPage 三处各写一遍内联 margin */
+.form-head--inset {
+  margin: var(--yh-space-1) var(--yh-space-1) var(--yh-space-2);
+}
+
+/* 顶栏和底部玻璃在深色下更沉稳 */
+[data-theme='dark'] .app-nav {
+  background: linear-gradient(
+    to bottom,
+    color-mix(in srgb, var(--yh-canvas) 90%, transparent),
+    color-mix(in srgb, var(--yh-canvas) 0%, transparent)
+  );
+}
+
+/* =====================================================================
+   2026-11-08 设计评审后的修正
+   ===================================================================== */
+
+/* 品牌标记：用应用图标里的烟花爆点，不再用通用 Sparkles 假按钮 */
+.app-brand {
+  width: var(--yh-touch-min);
+  height: var(--yh-touch-min);
+  border-radius: 14px; /* 图标形状，非布局圆角，跟随 1024 图标规范 */
+  display: block;
+  box-shadow: var(--yh-shadow-2);
+}
+
+/* 开单：操作人小胶囊 + 首启选择 */
+.op-pill {
+  width: auto;
+  height: var(--yh-touch-min);
+  padding: 0 var(--yh-space-3);
+  gap: var(--yh-gap-tight);
+  display: inline-flex;
+  align-items: center;
+  font-size: var(--yh-text-sm);
+  font-weight: var(--yh-weight-semibold);
+  color: var(--gl-color-text);
+}
+
+.first-run-card {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--yh-gap-card);
+  padding: var(--yh-space-3) calc(var(--yh-space-3) + 2px);
+  border-radius: var(--yh-radius-lg);
+  background: var(--gl-surface-2);
+  border: 1px solid var(--gl-border-subtle);
+}
+
+.first-run-card__title {
+  font-weight: var(--yh-weight-semibold);
+  font-size: var(--yh-text-md);
+}
+
+.first-run-card--sample {
+  border-color: color-mix(in srgb, var(--gl-color-warning) 45%, transparent);
+}
+
+/* 触控目标：关键控件都到 44 */
+.chip-row > * {
+  flex: 0 0 auto;
+}
+
+.chip-row .glass-badge {
+  min-height: var(--yh-touch-min);
+  display: inline-flex;
+  align-items: center;
+}
+
+.glass-segmented__item {
+  min-height: var(--yh-touch-min);
+}
+
+.glass-sheet__close {
+  width: var(--yh-touch-min);
+  height: var(--yh-touch-min);
+}
+
+.checkout-dock__count {
+  min-height: var(--yh-touch-min);
+}
+
+/* 购物车行允许换行，320 不再裁掉改价 */
+.cart-line__controls {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--yh-space-2);
+  flex-wrap: wrap;
+}
+
+/* 商品卡键盘焦点（亮色下必须 ≥3:1） */
+.prod-btn:focus-visible {
+  outline: var(--yh-focus-width) solid var(--yh-focus-ring);
+  outline-offset: var(--yh-focus-offset);
+}
+
+/* 收银 */
+.pay-recap {
+  border-radius: var(--yh-radius-md);
+  background: var(--gl-surface-2);
+  border: 1px solid var(--gl-border-subtle);
+  padding: var(--yh-gap-card) var(--yh-space-3);
+}
+
+.pay-recap__line {
+  display: flex;
+  justify-content: space-between;
+  gap: var(--yh-gap-card);
+  padding: var(--yh-space-1) 0;
+  font-size: var(--yh-text-sm);
+  color: var(--gl-color-text);
+  font-variant-numeric: tabular-nums;
+}
+
+.pay-recap__line--total {
+  border-top: 1px solid var(--gl-border-subtle);
+  margin-top: var(--yh-space-1);
+  padding-top: var(--yh-space-2);
+  font-weight: var(--yh-weight-semibold);
+}
+
+.cash-change {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  padding: var(--yh-space-3) calc(var(--yh-space-3) + 2px);
+  border-radius: var(--yh-radius-md);
+  background: var(--gl-surface-2);
+  border: 1px solid var(--gl-border-subtle);
+}
+
+.cash-change .k {
+  color: var(--gl-color-text-muted);
+  font-size: var(--yh-text-sm);
+}
+
+.cash-change .v {
+  font-size: var(--yh-text-2xl);
+  font-weight: var(--yh-weight-semibold);
+  font-variant-numeric: tabular-nums;
+}
+
+.cash-change.is-missing .v {
+  color: var(--gl-color-text-muted);
+}
+
+.result-big {
+  text-align: center;
+  font-size: var(--yh-text-4xl);
+  font-weight: var(--yh-weight-semibold);
+  color: var(--yh-ink-price);
+  font-variant-numeric: tabular-nums;
+}
+
+.price-preview {
+  padding: var(--yh-space-3) calc(var(--yh-space-3) + 2px);
+  border-radius: var(--yh-radius-md);
+  background: var(--gl-surface-2);
+  border: 1px solid var(--gl-border-subtle);
+  display: flex;
+  flex-direction: column;
+  gap: var(--yh-gap-tight);
+  font-variant-numeric: tabular-nums;
+}
+
+/* 进货分组 */
+.purchase-extra {
+  border-top: 1px solid var(--gl-border-subtle);
+  padding-top: var(--yh-space-3);
+}
+
+.purchase-extra > summary {
+  cursor: pointer;
+  font-size: var(--yh-text-md);
+  font-weight: var(--yh-weight-semibold);
+  color: var(--gl-color-text);
+  min-height: var(--yh-touch-min);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--yh-space-2);
+  list-style: none;
+}
+
+.purchase-extra > summary::-webkit-details-marker {
+  display: none;
+}
+
+.purchase-extra > summary::after {
+  content: '›';
+  font-size: var(--yh-text-xl);
+  line-height: 1;
+  color: var(--gl-color-text-muted);
+  transform: rotate(90deg);
+  transition: transform var(--yh-dur-fast) var(--yh-ease-standard);
+}
+
+.purchase-extra[open] > summary::after {
+  transform: rotate(-90deg);
+}
+
+/* 设置：备份时间与合并预览 */
+.backup-times {
+  display: flex;
+  flex-direction: column;
+  gap: var(--yh-space-0-5);
+  margin-top: var(--yh-gap-card);
+  font-size: var(--yh-text-xs);
+  color: var(--gl-color-text-muted);
+}
+
+.merge-counts {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--yh-space-2);
+  font-size: var(--yh-text-sm);
+}
+
+.merge-counts span {
+  padding: var(--yh-space-1) var(--yh-gap-card);
+  border-radius: var(--yh-radius-pill);
+  background: var(--gl-surface-3);
+  border: 1px solid var(--gl-border-subtle);
+}
+
+.merge-diff {
+  margin: var(--yh-gap-tight) 0 0;
+  padding-left: var(--yh-space-4);
+  font-size: var(--yh-text-sm);
+  color: var(--gl-color-text);
+}
+
+.merge-diff li {
+  margin: var(--yh-space-0-5) 0;
+}
+
+/* 云同步面板 */
+.sync-lines {
+  display: flex;
+  flex-direction: column;
+  gap: var(--yh-gap-tight);
+}
+
+.sync-line {
+  display: flex;
+  justify-content: space-between;
+  gap: var(--yh-gap-card);
+  font-size: var(--yh-text-sm);
+  color: var(--gl-color-text-muted);
+}
+
+.sync-line .icon-text {
+  color: var(--gl-color-text);
+}
+
+.sql-block {
+  background: var(--gl-surface-1);
+  border: 1px solid var(--gl-border-subtle);
+  border-radius: var(--yh-code-radius);
+  padding: var(--yh-gap-card);
+  margin: var(--yh-space-2) 0;
+  font-size: var(--yh-text-2xs);
+  line-height: var(--yh-leading-normal);
+  overflow-x: auto;
+  white-space: pre;
+  max-height: 240px;
+  color: var(--gl-color-text);
+}
+
+/* 报表：两个主数字 + 收款行 */
+.hero-stats {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: var(--yh-gap-card);
+  margin-bottom: var(--yh-gap-card);
+}
+
+/* 报表「今天」卡只有毛利一个 hero 数字（销售额在标题行里），别留半个空格子 */
+.hero-stats--single {
+  grid-template-columns: 1fr;
+}
+
+.stat--hero .k {
+  font-size: var(--yh-text-sm);
+}
+
+.stat--hero .v {
+  font-size: var(--yh-text-3xl);
+  line-height: var(--yh-leading-tight);
+}
+
+.pay-rows {
+  border-top: 1px solid var(--gl-border-subtle);
+  margin-bottom: var(--yh-gap-card);
+}
+
+.pay-row {
+  display: flex;
+  justify-content: space-between;
+  padding: var(--yh-space-2) var(--yh-space-0-5);
+  border-bottom: 1px solid var(--gl-border-subtle);
+  font-size: var(--yh-text-md);
+  font-variant-numeric: tabular-nums;
+}
+
+.stat-grid--compact {
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+
+/*
+ * 2026-11-11：「N 个商品没货了」的常驻玻璃横幅已删除（改成库存总件数卡上的角标）。
+ * 那条横幅只要有一个商品没货就占着列表上方约 56px，用户要求「不占位」。
+ * .low-stock / .glass-status.low-stock 已无任何引用，样式一并删掉，免得后人以为还有这个组件。
+ */
+
+.prod-btn__stock.low {
+  color: var(--yh-bad-ink);
+}
+
+/* 复选框：不再用原生蓝框 */
+.glass-checkbox {
+  appearance: none;
+  -webkit-appearance: none;
+  width: var(--gl-check-size);
+  height: var(--gl-check-size);
+  flex: 0 0 auto;
+  border-radius: var(--yh-radius-xs);
+  border: var(--yh-border-width) solid var(--gl-border-strong);
+  background: var(--gl-surface-2);
+  display: inline-grid;
+  place-items: center;
+  cursor: pointer;
+}
+
+.glass-checkbox:checked {
+  background: var(--gl-color-primary);
+  border-color: var(--gl-color-primary);
+}
+
+.glass-checkbox:checked::after {
+  content: '';
+  width: 12px;
+  height: 7px;
+  border-left: 2.5px solid var(--gl-color-on-primary);
+  border-bottom: 2.5px solid var(--gl-color-on-primary);
+  transform: rotate(-45deg);
+  margin-top: calc(-1 * var(--yh-space-0-5));
+}
+
+.glass-checkbox:focus-visible {
+  outline: var(--yh-focus-width) solid var(--yh-focus-ring);
+  outline-offset: var(--yh-space-0-5);
+}
+
+/* 320 宽度：压缩档。仍保持 12px 下限与 44px 触控目标。 */
+@media (max-width: 380px) {
+  .glass-table th,
+  .glass-table td {
+    padding-left: var(--yh-gap-tight);
+    padding-right: var(--yh-gap-tight);
+    font-size: var(--yh-text-xs);
+  }
+
+  .hero-stats {
+    gap: var(--yh-space-2);
+  }
+
+  .stat--hero .v {
+    font-size: var(--yh-text-2xl);
+  }
+
+  .cart-line__controls {
+    gap: var(--yh-gap-tight);
+  }
+
+  .glass-tab-bar__label {
+    font-size: 10px; /* 极窄屏专用，唯一允许低于 11px 的文本 */
+  }
+}
+
+/* ------------------------------------------------------ Toast 触控目标（44） */
+/*
+ * 2026-11-11 实测回归（a11y 第 [4] 段量到「知道了 72×32」）：
+ * GlassKit 的 .glass-toast__action 是 height:32px，只靠 ::after 把可点区扩了 6px 上下
+ * —— 布局盒子仍是 32，脚本与读屏量到的就是 32，低于 44 触控下限。
+ * 这里只把按钮本体在**纵向**抬到 44：Toast 容器因此最高约 70px，远低于 96px，
+ * 不会把提示条撑成一条大横幅。横向不强行 44（长中文会被迫换行），
+ * 现有 padding 已让「撤销 / 知道了」都超过 44px 宽。
+ */
+.glass-toast .glass-toast__action {
+  min-height: var(--yh-touch-min, 44px);
+  padding-block: 0;
+}
+
+/* 关闭按钮（只在错误语气出现）：28×28 的圆点太小，补成 44 的圆 */
+.glass-toast .glass-toast__close {
+  min-width: var(--yh-touch-min, 44px);
+  min-height: var(--yh-touch-min, 44px);
+  margin-inline: 0;
+}
+
+/* --------------------------------------------------- 统一搜索框（SearchField） */
+/*
+ * 为什么收敛到 kit：商品管理 / 库存 / 选商品弹层原来各抄了一遍同一段 JSX，
+ * 其中两份还没有可访问名（占位符不构成名字）。抽成一个组件后，这里只补
+ * 组件级的统一行为：
+ *
+ * 1) 干掉 WebKit 的原生清除按钮。实测 `::-webkit-search-cancel-button`
+ *    display 是 block：深色玻璃框里会出现一枚系统灰 X，颜色不受主题控制，
+ *    和旁边的橙色 / 白色细节完全不是一套。
+ * 2) 自绘一枚清除按钮（44px 触控区），因为输入框里本来就有内容时才出现，
+ *    比系统 X 更晚露出，也不会挡住「搜商品」占位符。
+ */
+.glass-search input[type='search']::-webkit-search-cancel-button,
+.glass-search input[type='search']::-webkit-search-decoration {
+  -webkit-appearance: none;
+  appearance: none;
+}
+
+/* 输入框 + 清除按钮的定位壳：flex 撑满剩余宽度，按钮绝对定位在右内侧 */
+.glass-search__field {
+  position: relative;
+  display: flex;
+  flex: 1 1 auto;
+  min-width: 0;
+}
+
+/* 有清除按钮时给输入框右侧让位，长商品名不会压到 X 上 */
+.glass-search__field--clear .glass-input {
+  padding-inline-end: var(--yh-space-10);
+}
+
+.glass-search__clear {
+  position: absolute;
+  inset-inline-end: 0;
+  top: 50%;
+  transform: translateY(-50%);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: var(--yh-touch-min);
+  height: var(--yh-touch-min);
+  padding: 0;
+  border: 0;
+  border-radius: var(--yh-radius-pill);
+  background: transparent;
+  color: var(--gl-color-text-muted);
+  -webkit-tap-highlight-color: transparent;
+}
+
+.glass-search__clear:hover,
+.glass-search__clear:active {
+  color: var(--gl-color-text);
+}
+
+/* --------------------------------------------------- 顶栏同步徽标（SyncDot） */
+/*
+ * 为什么抽成类：这枚按钮原来是 12 个裸值的内联 style（C6/C7），
+ * 其中 fontSize:9 落在字号阶梯外、fontWeight:700 落在字重阶梯外。
+ * 抽出来后尺寸全部走令牌 —— 角标的 min-width / 圆角 / 行高都是
+ * 「状态点直径」的派生值，写成 --yh-sync-dot-size 后三者不会各自漂移。
+ * 字号 9 → --yh-text-2xs(11px)：14px 高的角标仍放得下两位数字。
+ */
+.sync-pill {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--yh-space-1);
+  min-width: var(--yh-touch-min);
+  height: var(--yh-touch-min);
+  padding: 0 var(--yh-space-2);
+}
+
+/* 未同步条数角标：只是「有改动」的提示，真实条数在 aria-label 与详情里给全 */
+.sync-pill__count {
+  position: absolute;
+  top: var(--yh-space-0-5);
+  inset-inline-end: var(--yh-space-0-5);
+  box-sizing: border-box;
+  min-width: var(--yh-sync-dot-size);
+  height: var(--yh-sync-dot-size);
+  padding: 0 var(--yh-space-0-5);
+  border-radius: var(--yh-radius-pill);
+  background: var(--yh-ink-warn);
+  color: #fff;
+  font-size: var(--yh-text-2xs);
+  font-weight: var(--yh-weight-semibold);
+  line-height: var(--yh-sync-dot-size);
+  text-align: center;
+  pointer-events: none;
+}
+
+/*
+ * 状态点：形状也要能区分（不全靠颜色，M-06）——
+ * 实心=已连通，空心实线=离线，空心虚线=未配置。
+ */
+.sync-pill__dot {
+  box-sizing: border-box;
+  flex: 0 0 auto;
+  width: var(--yh-sync-dot-size);
+  height: var(--yh-sync-dot-size);
+  border-radius: 50%;
+}
+
+.sync-pill__dot[data-filled='0'] {
+  border: var(--yh-sync-dot-border) solid currentColor;
+}
+
+.sync-pill__dot[data-filled='0'][data-off='1'] {
+  border-style: dashed;
+}
+
+/* 状态字标（在线 / 断网 / 关）：11px 小字，跟着点的颜色走 */
+.sync-pill__mark {
+  font-size: var(--yh-text-2xs);
+  font-weight: var(--yh-weight-semibold);
+  line-height: 1;
+}
+
+/* --------------------------------------------------- 列表行「编辑」提示 */
+/*
+ * 商品管理点整行直接进编辑表单，其它列表点行是「看详情」（D1）。
+ * 交互这轮不动，只在行尾补两个字，让「点开能改」变得可预期。
+ */
+.list-edit-hint {
+  font-size: var(--yh-text-xs);
+  font-weight: var(--yh-weight-regular);
+}
+
+/* --------------------------------------------------- 卡片内的紧凑空态 */
+/*
+ * .glass-empty 默认 28px 上下内边距是给「整页空态」用的；
+ * 记账页把它放进已有的汇总卡里，会凭空多出 60px 空白，把「记一笔」挤出首屏。
+ */
+.glass-empty--compact {
+  padding: var(--yh-space-3) var(--yh-space-2);
+  gap: var(--yh-space-1);
+}
+
+.glass-empty--compact .glass-empty__icon {
+  width: var(--yh-space-8);
+  height: var(--yh-space-8);
+}
+
+.glass-empty--compact .glass-empty__title {
+  font-size: var(--yh-text-sm);
+}
+
+/* --------------------------------------------------- 弹层入场锁（P1 连点穿透） */
+/*
+ * 只给「保存后自动弹」的层上锁（<Sheet arming>，目前只有连续开单的选商品层）。
+ * 手指还停在屏幕上时连点会落到刚出现的商品卡 / 「完成」上，
+ * 实测 5 连点记成 3 单并多卖了一样货。
+ *
+ * 为什么锁面板而不是锁整层遮罩：遮罩必须继续吃指针，否则点击会穿透到下面的
+ * 开单页（可能误触赠品开关、数量框）；kit.tsx 同时把遮罩的关闭回调摘掉，
+ * 所以这一下点击是被吞掉，而不是把刚开的层关掉。
+ * pointer-events 只影响指针，Tab / 读屏不受影响。
+ */
+.glass-sheet-overlay[data-arming='1'] .glass-sheet {
+  pointer-events: none;
+}
+
+/* 减动效：保留颜色/透明度反馈，去掉位移与弹层动画 */
+@media (prefers-reduced-motion: reduce) {
+  /* 新增的滚动容器不能自带平滑滚动；scroll-snap 也不加（列表吸附在
+     慢设备上会明显掉帧）。这条只是兜底：项目里没有人用 scroll-behavior。 */
+  .app-main,
+  .app-main--editor,
+  .glass-table-wrap,
+  .stock-page__scroll {
+    scroll-behavior: auto;
+  }
+
+  .checkout-dock {
+    animation: none;
+  }
+
+  .prod-btn,
+  .glass-tab-bar__item,
+  .glass-btn,
+  .glass-badge,
+  .glass-input,
+  .glass-pill,
+  .icon-btn,
+  .stepper button {
+    transition-duration: 0.01ms !important;
+  }
+
+  .glass-sheet-overlay,
+  .glass-sheet {
+    transition-duration: 0.01ms !important;
+  }
+}
