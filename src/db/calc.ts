@@ -326,7 +326,7 @@ export function productMarginsBySession(
     if (lineCost === undefined) cur.costIncomplete = true;
     // H3：没有批次可扣的销量（漏录进货 / 超卖）成本是**估算**的。
     // 以前这里没赋值，于是「手持烟花棒 成本 ¥0、毛利 +¥20」显示成绿色盈利，
-    // 摊主会拿这个数去定价。现在标 costIncomplete，表格打「成本待补」+ 毛利加 ~。
+    // 摊主会拿这个数去定价。现在标 costIncomplete，表格打「成本待补」，毛利显示「—」。
     const missing = fifo.uncoveredQtyByLine.get(l.id) ?? 0;
     if (missing > 0) {
       cur.costIncomplete = true;

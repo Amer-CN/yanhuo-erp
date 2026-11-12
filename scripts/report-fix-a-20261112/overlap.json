@@ -1,0 +1,299 @@
+{
+  "open": [
+    {
+      "frac": 0,
+      "scrollTop": 0,
+      "fixed": [
+        {
+          "cls": "glass-tab-bar-dock",
+          "dock": true,
+          "rect": {
+            "x": 56,
+            "y": 763,
+            "w": 278,
+            "h": 65,
+            "right": 334,
+            "bottom": 828
+          }
+        }
+      ],
+      "groups": {
+        "DOCK glass-tab-bar-dock": [
+          {
+            "money": "¥6.00",
+            "area": 41.5
+          },
+          {
+            "money": "¥10.00",
+            "area": 376.2
+          },
+          {
+            "money": "¥0.00",
+            "area": 104.9
+          }
+        ]
+      }
+    },
+    {
+      "frac": 0.25,
+      "scrollTop": 190,
+      "fixed": [
+        {
+          "cls": "glass-tab-bar-dock",
+          "dock": true,
+          "rect": {
+            "x": 56,
+            "y": 763,
+            "w": 278,
+            "h": 65,
+            "right": 334,
+            "bottom": 828
+          }
+        }
+      ],
+      "groups": {}
+    },
+    {
+      "frac": 0.5,
+      "scrollTop": 381,
+      "fixed": [
+        {
+          "cls": "glass-tab-bar-dock",
+          "dock": true,
+          "rect": {
+            "x": 56,
+            "y": 763,
+            "w": 278,
+            "h": 65,
+            "right": 334,
+            "bottom": 828
+          }
+        }
+      ],
+      "groups": {
+        "DOCK glass-tab-bar-dock": [
+          {
+            "money": "5 盒",
+            "area": 452.9
+          },
+          {
+            "money": "¥10.00",
+            "area": 497.8
+          },
+          {
+            "money": "¥5.00",
+            "area": 371.3
+          },
+          {
+            "money": "¥5.00",
+            "area": 301.2
+          }
+        ]
+      }
+    },
+    {
+      "frac": 0.75,
+      "scrollTop": 571,
+      "fixed": [
+        {
+          "cls": "glass-tab-bar-dock",
+          "dock": true,
+          "rect": {
+            "x": 56,
+            "y": 763,
+            "w": 278,
+            "h": 65,
+            "right": 334,
+            "bottom": 828
+          }
+        }
+      ],
+      "groups": {}
+    },
+    {
+      "frac": 1.0,
+      "scrollTop": 761,
+      "fixed": [
+        {
+          "cls": "glass-tab-bar-dock",
+          "dock": true,
+          "rect": {
+            "x": 56,
+            "y": 763,
+            "w": 278,
+            "h": 65,
+            "right": 334,
+            "bottom": 828
+          }
+        }
+      ],
+      "groups": {}
+    }
+  ],
+  "closed": [
+    {
+      "frac": 0,
+      "scrollTop": 0,
+      "fixed": [
+        {
+          "cls": "glass-tab-bar-dock",
+          "dock": true,
+          "rect": {
+            "x": 56,
+            "y": 763,
+            "w": 278,
+            "h": 65,
+            "right": 334,
+            "bottom": 828
+          }
+        }
+      ],
+      "groups": {
+        "DOCK glass-tab-bar-dock": [
+          {
+            "money": "¥389.50",
+            "area": 47.6
+          },
+          {
+            "money": "—",
+            "area": 47.6
+          },
+          {
+            "money": "¥206.00",
+            "area": 518.7
+          }
+        ]
+      }
+    },
+    {
+      "frac": 0.25,
+      "scrollTop": 350,
+      "fixed": [
+        {
+          "cls": "glass-tab-bar-dock",
+          "dock": true,
+          "rect": {
+            "x": 56,
+            "y": 763,
+            "w": 278,
+            "h": 65,
+            "right": 334,
+            "bottom": 828
+          }
+        }
+      ],
+      "groups": {}
+    },
+    {
+      "frac": 0.5,
+      "scrollTop": 701,
+      "fixed": [
+        {
+          "cls": "glass-tab-bar-dock",
+          "dock": true,
+          "rect": {
+            "x": 56,
+            "y": 763,
+            "w": 278,
+            "h": 65,
+            "right": 334,
+            "bottom": 828
+          }
+        }
+      ],
+      "groups": {
+        "DOCK glass-tab-bar-dock": [
+          {
+            "money": "1 箱 + 10 把",
+            "area": 2420.6
+          },
+          {
+            "money": "¥80.00",
+            "area": 2435.4
+          },
+          {
+            "money": "¥44.00",
+            "area": 2095.9
+          },
+          {
+            "money": "—",
+            "area": 1383.7
+          },
+          {
+            "money": "4 支",
+            "area": 1843.4
+          },
+          {
+            "money": "¥20.00",
+            "area": 1854.6
+          },
+          {
+            "money": "¥0.00",
+            "area": 1596.1
+          },
+          {
+            "money": "—",
+            "area": 1053.8
+          }
+        ]
+      }
+    },
+    {
+      "frac": 0.75,
+      "scrollTop": 1051,
+      "fixed": [
+        {
+          "cls": "glass-tab-bar-dock",
+          "dock": true,
+          "rect": {
+            "x": 56,
+            "y": 763,
+            "w": 278,
+            "h": 65,
+            "right": 334,
+            "bottom": 828
+          }
+        }
+      ],
+      "groups": {
+        "DOCK glass-tab-bar-dock": [
+          {
+            "money": "2 个",
+            "area": 3135.7
+          },
+          {
+            "money": "¥78.00",
+            "area": 3154.8
+          },
+          {
+            "money": "¥84.00",
+            "area": 2715
+          },
+          {
+            "money": "¥-6.00",
+            "area": 1792.5
+          }
+        ]
+      }
+    },
+    {
+      "frac": 1.0,
+      "scrollTop": 1401,
+      "fixed": [
+        {
+          "cls": "glass-tab-bar-dock",
+          "dock": true,
+          "rect": {
+            "x": 56,
+            "y": 763,
+            "w": 278,
+            "h": 65,
+            "right": 334,
+            "bottom": 828
+          }
+        }
+      ],
+      "groups": {}
+    }
+  ]
+}

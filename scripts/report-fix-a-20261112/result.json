@@ -1,0 +1,3038 @@
+{
+  "meta": {
+    "date": "2026-11-12",
+    "viewport": [
+      390,
+      844
+    ]
+  },
+  "1-open-top": {
+    "layout": {
+      "scrollTop": 0,
+      "pill": {
+        "text": "本场 · 进行中",
+        "rect": {
+          "x": 33,
+          "y": 496.5,
+          "w": 171.7,
+          "h": 44,
+          "right": 204.7,
+          "bottom": 540.5
+        },
+        "badge": {
+          "text": "进行中",
+          "cls": "glass-badge glass-badge--primary",
+          "rect": {
+            "x": 106.7,
+            "y": 505,
+            "w": 65,
+            "h": 27,
+            "right": 171.7,
+            "bottom": 532
+          }
+        }
+      },
+      "patchedBadge": null,
+      "pillVsPatched": null,
+      "heroes": [
+        {
+          "k": "销售额",
+          "v": "¥16.00",
+          "vRect": {
+            "x": 48,
+            "y": 595.9,
+            "w": 127,
+            "h": 34.5,
+            "right": 175,
+            "bottom": 630.4
+          }
+        },
+        {
+          "k": "毛利",
+          "v": "¥7.80",
+          "vRect": {
+            "x": 215,
+            "y": 595.9,
+            "w": 127,
+            "h": 34.5,
+            "right": 342,
+            "bottom": 630.4
+          }
+        }
+      ],
+      "copy": {
+        "rect": {
+          "x": 33,
+          "y": 787.4,
+          "w": 160,
+          "h": 44,
+          "right": 193,
+          "bottom": 831.4
+        },
+        "text": "复制本场汇总",
+        "disabled": false,
+        "inSummaryCard": true,
+        "inTableCard": false,
+        "gapToGross": 157,
+        "actionsRect": {
+          "x": 33,
+          "y": 774.4,
+          "w": 324,
+          "h": 57,
+          "right": 357,
+          "bottom": 831.4
+        }
+      },
+      "tableInfo": {
+        "rect": {
+          "x": 31,
+          "y": 1057.2,
+          "w": 328,
+          "h": 135,
+          "right": 359,
+          "bottom": 1192.2
+        },
+        "rows": [
+          [
+            "摔炮",
+            "5 盒",
+            "¥10.00",
+            "¥0.00",
+            "无",
+            "¥5.00",
+            "¥5.00"
+          ],
+          [
+            "二踢脚",
+            "4 个",
+            "¥6.00",
+            "¥0.00",
+            "无",
+            "¥3.20",
+            "¥2.80"
+          ]
+        ],
+        "headers": [
+          {
+            "text": "商品",
+            "rect": {
+              "x": 31,
+              "y": 1057.2,
+              "w": 64.3,
+              "h": 60,
+              "right": 95.3,
+              "bottom": 1117.2
+            }
+          },
+          {
+            "text": "数量",
+            "rect": {
+              "x": 95.3,
+              "y": 1057.2,
+              "w": 66.5,
+              "h": 60,
+              "right": 161.9,
+              "bottom": 1117.2
+            }
+          },
+          {
+            "text": "销售额",
+            "rect": {
+              "x": 161.9,
+              "y": 1057.2,
+              "w": 73.2,
+              "h": 60,
+              "right": 235.1,
+              "bottom": 1117.2
+            }
+          },
+          {
+            "text": "让利",
+            "rect": {
+              "x": 0,
+              "y": 0,
+              "w": 0,
+              "h": 0,
+              "right": 0,
+              "bottom": 0
+            }
+          },
+          {
+            "text": "赠品",
+            "rect": {
+              "x": 0,
+              "y": 0,
+              "w": 0,
+              "h": 0,
+              "right": 0,
+              "bottom": 0
+            }
+          },
+          {
+            "text": "成本",
+            "rect": {
+              "x": 235.1,
+              "y": 1057.2,
+              "w": 54.6,
+              "h": 60,
+              "right": 289.7,
+              "bottom": 1117.2
+            }
+          },
+          {
+            "text": "毛利 ↓",
+            "rect": {
+              "x": 289.7,
+              "y": 1057.2,
+              "w": 69.3,
+              "h": 60,
+              "right": 359,
+              "bottom": 1117.2
+            }
+          }
+        ],
+        "badges": [],
+        "rowHeights": [
+          {
+            "i": 0,
+            "h": 37.5
+          },
+          {
+            "i": 1,
+            "h": 37.5
+          }
+        ],
+        "footnote": null
+      },
+      "overlaps": [],
+      "dockHitCount": 0,
+      "fixed": [],
+      "clickables": [
+        {
+          "text": "—",
+          "cls": "glass-pill sync-pill",
+          "rect": {
+            "x": 328,
+            "y": 10,
+            "w": 46,
+            "h": 44,
+            "right": 374,
+            "bottom": 54
+          },
+          "smaller44": false,
+          "lines": 1
+        },
+        {
+          "text": "看今天的 2 笔",
+          "cls": "link-btn",
+          "rect": {
+            "x": 269.5,
+            "y": 336.5,
+            "w": 87.5,
+            "h": 44,
+            "right": 357,
+            "bottom": 380.5
+          },
+          "smaller44": false,
+          "lines": 1
+        },
+        {
+          "text": "本场 · 进行中",
+          "cls": "report-session-switch",
+          "rect": {
+            "x": 33,
+            "y": 496.5,
+            "w": 171.7,
+            "h": 44,
+            "right": 204.7,
+            "bottom": 540.5
+          },
+          "smaller44": false,
+          "lines": 1
+        },
+        {
+          "text": "复制本场汇总",
+          "cls": "glass-btn glass-btn--secondary glass-btn--sm glass-btn--auto",
+          "rect": {
+            "x": 33,
+            "y": 787.4,
+            "w": 160,
+            "h": 44,
+            "right": 193,
+            "bottom": 831.4
+          },
+          "smaller44": false,
+          "lines": 1
+        },
+        {
+          "text": "数量",
+          "cls": "th-btn",
+          "rect": {
+            "x": 103.3,
+            "y": 1065.2,
+            "w": 44,
+            "h": 44,
+            "right": 147.3,
+            "bottom": 1109.2
+          },
+          "smaller44": false,
+          "lines": 1
+        },
+        {
+          "text": "销售额",
+          "cls": "th-btn",
+          "rect": {
+            "x": 169.9,
+            "y": 1065.2,
+            "w": 50,
+            "h": 44,
+            "right": 219.9,
+            "bottom": 1109.2
+          },
+          "smaller44": false,
+          "lines": 1
+        },
+        {
+          "text": "毛利 ↓",
+          "cls": "th-btn",
+          "rect": {
+            "x": 297.7,
+            "y": 1065.2,
+            "w": 46.5,
+            "h": 44,
+            "right": 344.2,
+            "bottom": 1109.2
+          },
+          "smaller44": false,
+          "lines": 1
+        },
+        {
+          "text": "记账",
+          "cls": "glass-tab-bar__item ",
+          "rect": {
+            "x": 67,
+            "y": 770,
+            "w": 48,
+            "h": 51,
+            "right": 115,
+            "bottom": 821
+          },
+          "smaller44": false,
+          "lines": 1
+        },
+        {
+          "text": "进货",
+          "cls": "glass-tab-bar__item ",
+          "rect": {
+            "x": 119,
+            "y": 770,
+            "w": 48,
+            "h": 51,
+            "right": 167,
+            "bottom": 821
+          },
+          "smaller44": false,
+          "lines": 1
+        },
+        {
+          "text": "库存",
+          "cls": "glass-tab-bar__item ",
+          "rect": {
+            "x": 171,
+            "y": 770,
+            "w": 48,
+            "h": 51,
+            "right": 219,
+            "bottom": 821
+          },
+          "smaller44": false,
+          "lines": 1
+        },
+        {
+          "text": "报表",
+          "cls": "glass-tab-bar__item is-active",
+          "rect": {
+            "x": 223,
+            "y": 770,
+            "w": 48,
+            "h": 51,
+            "right": 271,
+            "bottom": 821
+          },
+          "smaller44": false,
+          "lines": 1
+        },
+        {
+          "text": "更多",
+          "cls": "glass-tab-bar__item ",
+          "rect": {
+            "x": 275,
+            "y": 770,
+            "w": 48,
+            "h": 51,
+            "right": 323,
+            "bottom": 821
+          },
+          "smaller44": false,
+          "lines": 1
+        }
+      ],
+      "smallTargets": [],
+      "wrappedButtons": [],
+      "overflow": {
+        "doc": {
+          "sw": 390,
+          "cw": 390
+        },
+        "main": {
+          "sw": 390,
+          "cw": 390
+        },
+        "wrap": {
+          "sw": 328,
+          "cw": 328,
+          "ox": "visible"
+        },
+        "table": {
+          "sw": 328,
+          "cw": 328,
+          "w": 328
+        }
+      },
+      "innerText": "今天 · 已结账 1 场 · ¥389.50\n2026-11-12\n毛利（成本待补）\n—\n现金\n¥206.00\n微信\n¥89.00\n支付宝\n¥94.50\n单数\n16\n让利\n¥63.00\n赠品成本\n¥1.50\n已排除 2 笔删除（¥83.00）\n看今天的 2 笔\n\n今天有 1 场成本待补（缺批次），补录进货后毛利会自动恢复。\n\n还有 1 场进行中 · ¥16.00（不计入今天）\n\n本场 ·\n进行中\n11-12 22:00 → 进行中\n销售额\n¥16.00\n毛利\n¥7.80\n现金\n¥6.00\n微信\n¥10.00\n支付宝\n¥0.00\n复制本场汇总\n单数\n2\n让利\n¥0.00\n赠品成本\n¥0.00\n\n成本按批次先进先出算（FIFO）。毛利 = 销售额 − 成本。赠品金额 0、成本照算，单独列示。\n\n单品（按毛利降序，成本待补置顶）\n11-12 场\n商品\t数量\t销售额\t成本\t毛利 ↓\n\n摔炮\n\t5 盒\t¥10.00\t¥5.00\t¥5.00\n\n二踢脚\n\t4 个\t¥6.00\t¥3.20\t¥2.80\n临期 / 过期预警\n30 天内\n\n30 天内没有到期批次"
+    },
+    "scrollOverlap": [
+      {
+        "frac": 0,
+        "scrollTop": 0,
+        "fixedCount": 0,
+        "hits": []
+      },
+      {
+        "frac": 0.25,
+        "scrollTop": 169,
+        "fixedCount": 0,
+        "hits": []
+      },
+      {
+        "frac": 0.5,
+        "scrollTop": 338,
+        "fixedCount": 0,
+        "hits": []
+      },
+      {
+        "frac": 0.75,
+        "scrollTop": 507,
+        "fixedCount": 0,
+        "hits": []
+      },
+      {
+        "frac": 1.0,
+        "scrollTop": 676,
+        "fixedCount": 0,
+        "hits": []
+      }
+    ]
+  },
+  "2-closed-top": {
+    "layout": {
+      "scrollTop": 0,
+      "pill": {
+        "text": "本场 · 已结账 21:30",
+        "rect": {
+          "x": 33,
+          "y": 496.5,
+          "w": 205.3,
+          "h": 44,
+          "right": 238.3,
+          "bottom": 540.5
+        },
+        "badge": {
+          "text": "已结账 21:30",
+          "cls": "glass-badge",
+          "rect": {
+            "x": 106.7,
+            "y": 505,
+            "w": 98.6,
+            "h": 27,
+            "right": 205.3,
+            "bottom": 532
+          }
+        }
+      },
+      "patchedBadge": {
+        "text": "补过 2 单",
+        "rect": {
+          "x": 33,
+          "y": 553,
+          "w": 79.4,
+          "h": 27,
+          "right": 112.4,
+          "bottom": 580
+        }
+      },
+      "pillVsPatched": {
+        "w": 79.4,
+        "h": 0,
+        "area": 0
+      },
+      "heroes": [
+        {
+          "k": "销售额",
+          "v": "¥389.50",
+          "vRect": {
+            "x": 48,
+            "y": 643.9,
+            "w": 127,
+            "h": 34.5,
+            "right": 175,
+            "bottom": 678.4
+          }
+        },
+        {
+          "k": "毛利（成本待补）",
+          "v": "—",
+          "vRect": {
+            "x": 215,
+            "y": 643.9,
+            "w": 127,
+            "h": 34.5,
+            "right": 342,
+            "bottom": 678.4
+          }
+        }
+      ],
+      "copy": {
+        "rect": {
+          "x": 33,
+          "y": 835.4,
+          "w": 160,
+          "h": 44,
+          "right": 193,
+          "bottom": 879.4
+        },
+        "text": "复制本场汇总",
+        "disabled": false,
+        "inSummaryCard": true,
+        "inTableCard": false,
+        "gapToGross": 157,
+        "actionsRect": {
+          "x": 33,
+          "y": 822.4,
+          "w": 324,
+          "h": 57,
+          "right": 357,
+          "bottom": 879.4
+        }
+      },
+      "tableInfo": {
+        "rect": {
+          "x": 31,
+          "y": 1299.4,
+          "w": 328,
+          "h": 477.4,
+          "right": 359,
+          "bottom": 1776.8
+        },
+        "rows": [
+          [
+            "电光花 成本待补",
+            "1 箱 + 10 把",
+            "¥80.00",
+            "¥0.00",
+            "无",
+            "¥44.00",
+            "—"
+          ],
+          [
+            "手持烟花棒 成本待补",
+            "4 支",
+            "¥20.00",
+            "¥0.00",
+            "无",
+            "¥0.00",
+            "—"
+          ],
+          [
+            "大地红 1000 响",
+            "4 挂",
+            "¥95.00",
+            "¥5.00",
+            "无",
+            "¥60.00",
+            "¥35.00"
+          ],
+          [
+            "二踢脚",
+            "35 个",
+            "¥52.50",
+            "¥0.00",
+            "无",
+            "¥28.00",
+            "¥24.50"
+          ],
+          [
+            "加特林",
+            "3 支",
+            "¥45.00",
+            "¥0.00",
+            "无",
+            "¥27.00",
+            "¥18.00"
+          ],
+          [
+            "仙女棒 赠 1",
+            "6 把",
+            "¥15.00",
+            "¥0.00",
+            "1 · ¥1.50",
+            "¥9.00",
+            "¥6.00"
+          ],
+          [
+            "摔炮",
+            "2 盒",
+            "¥4.00",
+            "¥0.00",
+            "无",
+            "¥2.00",
+            "¥2.00"
+          ],
+          [
+            "组合烟花 36 发",
+            "2 个",
+            "¥78.00",
+            "¥58.00",
+            "无",
+            "¥84.00",
+            "¥-6.00"
+          ]
+        ],
+        "headers": [
+          {
+            "text": "商品",
+            "rect": {
+              "x": 31,
+              "y": 1299.4,
+              "w": 77.1,
+              "h": 60,
+              "right": 108.1,
+              "bottom": 1359.4
+            }
+          },
+          {
+            "text": "数量",
+            "rect": {
+              "x": 108.1,
+              "y": 1299.4,
+              "w": 65.6,
+              "h": 60,
+              "right": 173.7,
+              "bottom": 1359.4
+            }
+          },
+          {
+            "text": "销售额",
+            "rect": {
+              "x": 173.7,
+              "y": 1299.4,
+              "w": 66,
+              "h": 60,
+              "right": 239.7,
+              "bottom": 1359.4
+            }
+          },
+          {
+            "text": "让利",
+            "rect": {
+              "x": 0,
+              "y": 0,
+              "w": 0,
+              "h": 0,
+              "right": 0,
+              "bottom": 0
+            }
+          },
+          {
+            "text": "赠品",
+            "rect": {
+              "x": 0,
+              "y": 0,
+              "w": 0,
+              "h": 0,
+              "right": 0,
+              "bottom": 0
+            }
+          },
+          {
+            "text": "成本",
+            "rect": {
+              "x": 239.7,
+              "y": 1299.4,
+              "w": 56.8,
+              "h": 60,
+              "right": 296.5,
+              "bottom": 1359.4
+            }
+          },
+          {
+            "text": "毛利 ↓",
+            "rect": {
+              "x": 296.5,
+              "y": 1299.4,
+              "w": 62.5,
+              "h": 60,
+              "right": 359,
+              "bottom": 1359.4
+            }
+          }
+        ],
+        "badges": [
+          {
+            "text": "成本待补",
+            "rect": {
+              "x": 39,
+              "y": 1389.4,
+              "w": 54,
+              "h": 17,
+              "right": 93,
+              "bottom": 1406.4
+            },
+            "lines": 1
+          },
+          {
+            "text": "成本待补",
+            "rect": {
+              "x": 39,
+              "y": 1465.4,
+              "w": 54,
+              "h": 17,
+              "right": 93,
+              "bottom": 1482.4
+            },
+            "lines": 1
+          }
+        ],
+        "rowHeights": [
+          {
+            "i": 0,
+            "h": 56.5
+          },
+          {
+            "i": 1,
+            "h": 76
+          },
+          {
+            "i": 2,
+            "h": 57
+          },
+          {
+            "i": 3,
+            "h": 38
+          },
+          {
+            "i": 4,
+            "h": 38
+          },
+          {
+            "i": 5,
+            "h": 57.4
+          },
+          {
+            "i": 6,
+            "h": 38
+          },
+          {
+            "i": 7,
+            "h": 56.5
+          }
+        ],
+        "footnote": "— = 成本待补，毛利暂不可算；去「进货」补录后自动恢复。"
+      },
+      "overlaps": [],
+      "dockHitCount": 2,
+      "fixed": [],
+      "clickables": [
+        {
+          "text": "—",
+          "cls": "glass-pill sync-pill",
+          "rect": {
+            "x": 328,
+            "y": 10,
+            "w": 46,
+            "h": 44,
+            "right": 374,
+            "bottom": 54
+          },
+          "smaller44": false,
+          "lines": 1
+        },
+        {
+          "text": "看今天的 2 笔",
+          "cls": "link-btn",
+          "rect": {
+            "x": 269.5,
+            "y": 336.5,
+            "w": 87.5,
+            "h": 44,
+            "right": 357,
+            "bottom": 380.5
+          },
+          "smaller44": false,
+          "lines": 1
+        },
+        {
+          "text": "本场 · 已结账 21:30",
+          "cls": "report-session-switch",
+          "rect": {
+            "x": 33,
+            "y": 496.5,
+            "w": 205.3,
+            "h": 44,
+            "right": 238.3,
+            "bottom": 540.5
+          },
+          "smaller44": false,
+          "lines": 1
+        },
+        {
+          "text": "补过 2 单",
+          "cls": "report-patch-btn",
+          "rect": {
+            "x": 33,
+            "y": 544.5,
+            "w": 79.4,
+            "h": 44,
+            "right": 112.4,
+            "bottom": 588.5
+          },
+          "smaller44": false,
+          "lines": 1
+        },
+        {
+          "text": "补记",
+          "cls": "link-btn",
+          "rect": {
+            "x": 112.4,
+            "y": 544.5,
+            "w": 44,
+            "h": 44,
+            "right": 156.4,
+            "bottom": 588.5
+          },
+          "smaller44": false,
+          "lines": 1
+        },
+        {
+          "text": "复制本场汇总",
+          "cls": "glass-btn glass-btn--secondary glass-btn--sm glass-btn--auto",
+          "rect": {
+            "x": 33,
+            "y": 835.4,
+            "w": 160,
+            "h": 44,
+            "right": 193,
+            "bottom": 879.4
+          },
+          "smaller44": false,
+          "lines": 1
+        },
+        {
+          "text": "看这一场的 2 笔",
+          "cls": "link-btn",
+          "rect": {
+            "x": 256.5,
+            "y": 971.4,
+            "w": 100.5,
+            "h": 44,
+            "right": 357,
+            "bottom": 1015.4
+          },
+          "smaller44": false,
+          "lines": 1
+        },
+        {
+          "text": "数量",
+          "cls": "th-btn",
+          "rect": {
+            "x": 116.1,
+            "y": 1307.4,
+            "w": 44,
+            "h": 44,
+            "right": 160.1,
+            "bottom": 1351.4
+          },
+          "smaller44": false,
+          "lines": 1
+        },
+        {
+          "text": "销售额",
+          "cls": "th-btn",
+          "rect": {
+            "x": 181.7,
+            "y": 1307.4,
+            "w": 50,
+            "h": 44,
+            "right": 231.7,
+            "bottom": 1351.4
+          },
+          "smaller44": false,
+          "lines": 1
+        },
+        {
+          "text": "毛利 ↓",
+          "cls": "th-btn",
+          "rect": {
+            "x": 304.5,
+            "y": 1307.4,
+            "w": 46.5,
+            "h": 44,
+            "right": 351,
+            "bottom": 1351.4
+          },
+          "smaller44": false,
+          "lines": 1
+        },
+        {
+          "text": "记账",
+          "cls": "glass-tab-bar__item ",
+          "rect": {
+            "x": 67,
+            "y": 770,
+            "w": 48,
+            "h": 51,
+            "right": 115,
+            "bottom": 821
+          },
+          "smaller44": false,
+          "lines": 1
+        },
+        {
+          "text": "进货",
+          "cls": "glass-tab-bar__item ",
+          "rect": {
+            "x": 119,
+            "y": 770,
+            "w": 48,
+            "h": 51,
+            "right": 167,
+            "bottom": 821
+          },
+          "smaller44": false,
+          "lines": 1
+        },
+        {
+          "text": "库存",
+          "cls": "glass-tab-bar__item ",
+          "rect": {
+            "x": 171,
+            "y": 770,
+            "w": 48,
+            "h": 51,
+            "right": 219,
+            "bottom": 821
+          },
+          "smaller44": false,
+          "lines": 1
+        },
+        {
+          "text": "报表",
+          "cls": "glass-tab-bar__item is-active",
+          "rect": {
+            "x": 223,
+            "y": 770,
+            "w": 48,
+            "h": 51,
+            "right": 271,
+            "bottom": 821
+          },
+          "smaller44": false,
+          "lines": 1
+        },
+        {
+          "text": "更多",
+          "cls": "glass-tab-bar__item ",
+          "rect": {
+            "x": 275,
+            "y": 770,
+            "w": 48,
+            "h": 51,
+            "right": 323,
+            "bottom": 821
+          },
+          "smaller44": false,
+          "lines": 1
+        }
+      ],
+      "smallTargets": [],
+      "wrappedButtons": [],
+      "overflow": {
+        "doc": {
+          "sw": 390,
+          "cw": 390
+        },
+        "main": {
+          "sw": 390,
+          "cw": 390
+        },
+        "wrap": {
+          "sw": 328,
+          "cw": 328,
+          "ox": "visible"
+        },
+        "table": {
+          "sw": 328,
+          "cw": 328,
+          "w": 328
+        }
+      },
+      "innerText": "今天 · 已结账 1 场 · ¥389.50\n2026-11-12\n毛利（成本待补）\n—\n现金\n¥206.00\n微信\n¥89.00\n支付宝\n¥94.50\n单数\n16\n让利\n¥63.00\n赠品成本\n¥1.50\n已排除 2 笔删除（¥83.00）\n看今天的 2 笔\n\n今天有 1 场成本待补（缺批次），补录进货后毛利会自动恢复。\n\n还有 1 场进行中 · ¥16.00（不计入今天）\n\n本场 ·\n已结账 21:30\n补过 2 单\n补记\n11-12 09:05 → 21:30\n销售额\n¥389.50\n毛利（成本待补）\n—\n现金\n¥206.00\n微信\n¥89.00\n支付宝\n¥94.50\n复制本场汇总\n单数\n16\n让利\n¥63.00\n赠品成本\n¥1.50\n已排除 2 笔删除（¥83.00）\n看这一场的 2 笔\n\n成本按批次先进先出算（FIFO）。毛利 = 销售额 − 成本。赠品金额 0、成本照算，单独列示。\n\n本场有 34 个（基本单位）销量没有对应的进货批次（漏录进货或超卖）， 这部分成本用均价估算，本场毛利先显示为「—」。 去「进货」补录后会自动恢复。\n\n单品（按毛利降序，成本待补置顶）\n11-12 场\n商品\t数量\t销售额\t成本\t毛利 ↓\n\n电光花\n成本待补\n\t1 箱 + 10 把\t¥80.00\t¥44.00\t—\n\n手持烟花棒\n成本待补\n\t4 支\t¥20.00\t¥0.00\t—\n\n大地红 1000 响\n\t4 挂\t¥95.00\t¥60.00\t¥35.00\n\n二踢脚\n\t35 个\t¥52.50\t¥28.00\t¥24.50\n\n加特林\n\t3 支\t¥45.00\t¥27.00\t¥18.00\n\n仙女棒\n赠 1\n\t6 把\t¥15.00\t¥9.00\t¥6.00\n\n摔炮\n\t2 盒\t¥4.00\t¥2.00\t¥2.00\n\n组合烟花 36 发\n\t2 个\t¥78.00\t¥84.00\t¥-6.00\n\n— = 成本待补，毛利暂不可算；去「进货」补录后自动恢复。\n\n临期 / 过期预警\n30 天内\n\n30 天内没有到期批次"
+    },
+    "scrollOverlap": [
+      {
+        "frac": 0,
+        "scrollTop": 0,
+        "fixedCount": 0,
+        "hits": []
+      },
+      {
+        "frac": 0.25,
+        "scrollTop": 329,
+        "fixedCount": 0,
+        "hits": []
+      },
+      {
+        "frac": 0.5,
+        "scrollTop": 658,
+        "fixedCount": 0,
+        "hits": []
+      },
+      {
+        "frac": 0.75,
+        "scrollTop": 987,
+        "fixedCount": 0,
+        "hits": []
+      },
+      {
+        "frac": 1.0,
+        "scrollTop": 1316,
+        "fixedCount": 0,
+        "hits": []
+      }
+    ]
+  },
+  "3-no-open-top": {
+    "layout": {
+      "scrollTop": 0,
+      "pill": {
+        "text": "本场 · 已结账 21:30",
+        "rect": {
+          "x": 33,
+          "y": 472.5,
+          "w": 205.3,
+          "h": 44,
+          "right": 238.3,
+          "bottom": 516.5
+        },
+        "badge": {
+          "text": "已结账 21:30",
+          "cls": "glass-badge",
+          "rect": {
+            "x": 106.7,
+            "y": 481,
+            "w": 98.6,
+            "h": 27,
+            "right": 205.3,
+            "bottom": 508
+          }
+        }
+      },
+      "patchedBadge": {
+        "text": "补过 2 单",
+        "rect": {
+          "x": 33,
+          "y": 529,
+          "w": 79.4,
+          "h": 27,
+          "right": 112.4,
+          "bottom": 556
+        }
+      },
+      "pillVsPatched": {
+        "w": 79.4,
+        "h": 0,
+        "area": 0
+      },
+      "heroes": [
+        {
+          "k": "销售额",
+          "v": "¥389.50",
+          "vRect": {
+            "x": 48,
+            "y": 619.9,
+            "w": 127,
+            "h": 34.5,
+            "right": 175,
+            "bottom": 654.4
+          }
+        },
+        {
+          "k": "毛利（成本待补）",
+          "v": "—",
+          "vRect": {
+            "x": 215,
+            "y": 619.9,
+            "w": 127,
+            "h": 34.5,
+            "right": 342,
+            "bottom": 654.4
+          }
+        }
+      ],
+      "copy": {
+        "rect": {
+          "x": 33,
+          "y": 811.4,
+          "w": 160,
+          "h": 44,
+          "right": 193,
+          "bottom": 855.4
+        },
+        "text": "复制本场汇总",
+        "disabled": false,
+        "inSummaryCard": true,
+        "inTableCard": false,
+        "gapToGross": 157,
+        "actionsRect": {
+          "x": 33,
+          "y": 798.4,
+          "w": 324,
+          "h": 57,
+          "right": 357,
+          "bottom": 855.4
+        }
+      },
+      "tableInfo": {
+        "rect": {
+          "x": 31,
+          "y": 1275.4,
+          "w": 328,
+          "h": 477.4,
+          "right": 359,
+          "bottom": 1752.8
+        },
+        "rows": [
+          [
+            "电光花 成本待补",
+            "1 箱 + 10 把",
+            "¥80.00",
+            "¥0.00",
+            "无",
+            "¥44.00",
+            "—"
+          ],
+          [
+            "手持烟花棒 成本待补",
+            "4 支",
+            "¥20.00",
+            "¥0.00",
+            "无",
+            "¥0.00",
+            "—"
+          ],
+          [
+            "大地红 1000 响",
+            "4 挂",
+            "¥95.00",
+            "¥5.00",
+            "无",
+            "¥60.00",
+            "¥35.00"
+          ],
+          [
+            "二踢脚",
+            "35 个",
+            "¥52.50",
+            "¥0.00",
+            "无",
+            "¥28.00",
+            "¥24.50"
+          ],
+          [
+            "加特林",
+            "3 支",
+            "¥45.00",
+            "¥0.00",
+            "无",
+            "¥27.00",
+            "¥18.00"
+          ],
+          [
+            "仙女棒 赠 1",
+            "6 把",
+            "¥15.00",
+            "¥0.00",
+            "1 · ¥1.50",
+            "¥9.00",
+            "¥6.00"
+          ],
+          [
+            "摔炮",
+            "2 盒",
+            "¥4.00",
+            "¥0.00",
+            "无",
+            "¥2.00",
+            "¥2.00"
+          ],
+          [
+            "组合烟花 36 发",
+            "2 个",
+            "¥78.00",
+            "¥58.00",
+            "无",
+            "¥84.00",
+            "¥-6.00"
+          ]
+        ],
+        "headers": [
+          {
+            "text": "商品",
+            "rect": {
+              "x": 31,
+              "y": 1275.4,
+              "w": 77.1,
+              "h": 60,
+              "right": 108.1,
+              "bottom": 1335.4
+            }
+          },
+          {
+            "text": "数量",
+            "rect": {
+              "x": 108.1,
+              "y": 1275.4,
+              "w": 65.6,
+              "h": 60,
+              "right": 173.7,
+              "bottom": 1335.4
+            }
+          },
+          {
+            "text": "销售额",
+            "rect": {
+              "x": 173.7,
+              "y": 1275.4,
+              "w": 66,
+              "h": 60,
+              "right": 239.7,
+              "bottom": 1335.4
+            }
+          },
+          {
+            "text": "让利",
+            "rect": {
+              "x": 0,
+              "y": 0,
+              "w": 0,
+              "h": 0,
+              "right": 0,
+              "bottom": 0
+            }
+          },
+          {
+            "text": "赠品",
+            "rect": {
+              "x": 0,
+              "y": 0,
+              "w": 0,
+              "h": 0,
+              "right": 0,
+              "bottom": 0
+            }
+          },
+          {
+            "text": "成本",
+            "rect": {
+              "x": 239.7,
+              "y": 1275.4,
+              "w": 56.8,
+              "h": 60,
+              "right": 296.5,
+              "bottom": 1335.4
+            }
+          },
+          {
+            "text": "毛利 ↓",
+            "rect": {
+              "x": 296.5,
+              "y": 1275.4,
+              "w": 62.5,
+              "h": 60,
+              "right": 359,
+              "bottom": 1335.4
+            }
+          }
+        ],
+        "badges": [
+          {
+            "text": "成本待补",
+            "rect": {
+              "x": 39,
+              "y": 1365.4,
+              "w": 54,
+              "h": 17,
+              "right": 93,
+              "bottom": 1382.4
+            },
+            "lines": 1
+          },
+          {
+            "text": "成本待补",
+            "rect": {
+              "x": 39,
+              "y": 1441.4,
+              "w": 54,
+              "h": 17,
+              "right": 93,
+              "bottom": 1458.4
+            },
+            "lines": 1
+          }
+        ],
+        "rowHeights": [
+          {
+            "i": 0,
+            "h": 56.5
+          },
+          {
+            "i": 1,
+            "h": 76
+          },
+          {
+            "i": 2,
+            "h": 57
+          },
+          {
+            "i": 3,
+            "h": 38
+          },
+          {
+            "i": 4,
+            "h": 38
+          },
+          {
+            "i": 5,
+            "h": 57.4
+          },
+          {
+            "i": 6,
+            "h": 38
+          },
+          {
+            "i": 7,
+            "h": 56.5
+          }
+        ],
+        "footnote": "— = 成本待补，毛利暂不可算；去「进货」补录后自动恢复。"
+      },
+      "overlaps": [],
+      "dockHitCount": 1,
+      "fixed": [],
+      "clickables": [
+        {
+          "text": "—",
+          "cls": "glass-pill sync-pill",
+          "rect": {
+            "x": 328,
+            "y": 10,
+            "w": 46,
+            "h": 44,
+            "right": 374,
+            "bottom": 54
+          },
+          "smaller44": false,
+          "lines": 1
+        },
+        {
+          "text": "看今天的 2 笔",
+          "cls": "link-btn",
+          "rect": {
+            "x": 269.5,
+            "y": 336.5,
+            "w": 87.5,
+            "h": 44,
+            "right": 357,
+            "bottom": 380.5
+          },
+          "smaller44": false,
+          "lines": 1
+        },
+        {
+          "text": "本场 · 已结账 21:30",
+          "cls": "report-session-switch",
+          "rect": {
+            "x": 33,
+            "y": 472.5,
+            "w": 205.3,
+            "h": 44,
+            "right": 238.3,
+            "bottom": 516.5
+          },
+          "smaller44": false,
+          "lines": 1
+        },
+        {
+          "text": "补过 2 单",
+          "cls": "report-patch-btn",
+          "rect": {
+            "x": 33,
+            "y": 520.5,
+            "w": 79.4,
+            "h": 44,
+            "right": 112.4,
+            "bottom": 564.5
+          },
+          "smaller44": false,
+          "lines": 1
+        },
+        {
+          "text": "补记",
+          "cls": "link-btn",
+          "rect": {
+            "x": 112.4,
+            "y": 520.5,
+            "w": 44,
+            "h": 44,
+            "right": 156.4,
+            "bottom": 564.5
+          },
+          "smaller44": false,
+          "lines": 1
+        },
+        {
+          "text": "复制本场汇总",
+          "cls": "glass-btn glass-btn--secondary glass-btn--sm glass-btn--auto",
+          "rect": {
+            "x": 33,
+            "y": 811.4,
+            "w": 160,
+            "h": 44,
+            "right": 193,
+            "bottom": 855.4
+          },
+          "smaller44": false,
+          "lines": 1
+        },
+        {
+          "text": "看这一场的 2 笔",
+          "cls": "link-btn",
+          "rect": {
+            "x": 256.5,
+            "y": 947.4,
+            "w": 100.5,
+            "h": 44,
+            "right": 357,
+            "bottom": 991.4
+          },
+          "smaller44": false,
+          "lines": 1
+        },
+        {
+          "text": "数量",
+          "cls": "th-btn",
+          "rect": {
+            "x": 116.1,
+            "y": 1283.4,
+            "w": 44,
+            "h": 44,
+            "right": 160.1,
+            "bottom": 1327.4
+          },
+          "smaller44": false,
+          "lines": 1
+        },
+        {
+          "text": "销售额",
+          "cls": "th-btn",
+          "rect": {
+            "x": 181.7,
+            "y": 1283.4,
+            "w": 50,
+            "h": 44,
+            "right": 231.7,
+            "bottom": 1327.4
+          },
+          "smaller44": false,
+          "lines": 1
+        },
+        {
+          "text": "毛利 ↓",
+          "cls": "th-btn",
+          "rect": {
+            "x": 304.5,
+            "y": 1283.4,
+            "w": 46.5,
+            "h": 44,
+            "right": 351,
+            "bottom": 1327.4
+          },
+          "smaller44": false,
+          "lines": 1
+        },
+        {
+          "text": "记账",
+          "cls": "glass-tab-bar__item ",
+          "rect": {
+            "x": 67,
+            "y": 770,
+            "w": 48,
+            "h": 51,
+            "right": 115,
+            "bottom": 821
+          },
+          "smaller44": false,
+          "lines": 1
+        },
+        {
+          "text": "进货",
+          "cls": "glass-tab-bar__item ",
+          "rect": {
+            "x": 119,
+            "y": 770,
+            "w": 48,
+            "h": 51,
+            "right": 167,
+            "bottom": 821
+          },
+          "smaller44": false,
+          "lines": 1
+        },
+        {
+          "text": "库存",
+          "cls": "glass-tab-bar__item ",
+          "rect": {
+            "x": 171,
+            "y": 770,
+            "w": 48,
+            "h": 51,
+            "right": 219,
+            "bottom": 821
+          },
+          "smaller44": false,
+          "lines": 1
+        },
+        {
+          "text": "报表",
+          "cls": "glass-tab-bar__item is-active",
+          "rect": {
+            "x": 223,
+            "y": 770,
+            "w": 48,
+            "h": 51,
+            "right": 271,
+            "bottom": 821
+          },
+          "smaller44": false,
+          "lines": 1
+        },
+        {
+          "text": "更多",
+          "cls": "glass-tab-bar__item ",
+          "rect": {
+            "x": 275,
+            "y": 770,
+            "w": 48,
+            "h": 51,
+            "right": 323,
+            "bottom": 821
+          },
+          "smaller44": false,
+          "lines": 1
+        }
+      ],
+      "smallTargets": [],
+      "wrappedButtons": [],
+      "overflow": {
+        "doc": {
+          "sw": 390,
+          "cw": 390
+        },
+        "main": {
+          "sw": 390,
+          "cw": 390
+        },
+        "wrap": {
+          "sw": 328,
+          "cw": 328,
+          "ox": "visible"
+        },
+        "table": {
+          "sw": 328,
+          "cw": 328,
+          "w": 328
+        }
+      },
+      "innerText": "今天 · 已结账 1 场 · ¥389.50\n2026-11-12\n毛利（成本待补）\n—\n现金\n¥206.00\n微信\n¥89.00\n支付宝\n¥94.50\n单数\n16\n让利\n¥63.00\n赠品成本\n¥1.50\n已排除 2 笔删除（¥83.00）\n看今天的 2 笔\n\n今天有 1 场成本待补（缺批次），补录进货后毛利会自动恢复。\n\n本场 ·\n已结账 21:30\n补过 2 单\n补记\n11-12 09:05 → 21:30\n销售额\n¥389.50\n毛利（成本待补）\n—\n现金\n¥206.00\n微信\n¥89.00\n支付宝\n¥94.50\n复制本场汇总\n单数\n16\n让利\n¥63.00\n赠品成本\n¥1.50\n已排除 2 笔删除（¥83.00）\n看这一场的 2 笔\n\n成本按批次先进先出算（FIFO）。毛利 = 销售额 − 成本。赠品金额 0、成本照算，单独列示。\n\n本场有 34 个（基本单位）销量没有对应的进货批次（漏录进货或超卖）， 这部分成本用均价估算，本场毛利先显示为「—」。 去「进货」补录后会自动恢复。\n\n单品（按毛利降序，成本待补置顶）\n11-12 场\n商品\t数量\t销售额\t成本\t毛利 ↓\n\n电光花\n成本待补\n\t1 箱 + 10 把\t¥80.00\t¥44.00\t—\n\n手持烟花棒\n成本待补\n\t4 支\t¥20.00\t¥0.00\t—\n\n大地红 1000 响\n\t4 挂\t¥95.00\t¥60.00\t¥35.00\n\n二踢脚\n\t35 个\t¥52.50\t¥28.00\t¥24.50\n\n加特林\n\t3 支\t¥45.00\t¥27.00\t¥18.00\n\n仙女棒\n赠 1\n\t6 把\t¥15.00\t¥9.00\t¥6.00\n\n摔炮\n\t2 盒\t¥4.00\t¥2.00\t¥2.00\n\n组合烟花 36 发\n\t2 个\t¥78.00\t¥84.00\t¥-6.00\n\n— = 成本待补，毛利暂不可算；去「进货」补录后自动恢复。\n\n临期 / 过期预警\n30 天内\n\n30 天内没有到期批次"
+    },
+    "scrollOverlap": [
+      {
+        "frac": 0,
+        "scrollTop": 0,
+        "fixedCount": 0,
+        "hits": []
+      },
+      {
+        "frac": 0.25,
+        "scrollTop": 323,
+        "fixedCount": 0,
+        "hits": []
+      },
+      {
+        "frac": 0.5,
+        "scrollTop": 646,
+        "fixedCount": 0,
+        "hits": []
+      },
+      {
+        "frac": 0.75,
+        "scrollTop": 969,
+        "fixedCount": 0,
+        "hits": []
+      },
+      {
+        "frac": 1.0,
+        "scrollTop": 1292,
+        "fixedCount": 0,
+        "hits": []
+      }
+    ]
+  },
+  "4-empty-top": {
+    "layout": {
+      "scrollTop": 0,
+      "pill": {
+        "text": "还没有场次",
+        "rect": {
+          "x": 33,
+          "y": 368,
+          "w": 113,
+          "h": 44,
+          "right": 146,
+          "bottom": 412
+        },
+        "badge": null
+      },
+      "patchedBadge": null,
+      "pillVsPatched": null,
+      "heroes": [],
+      "copy": null,
+      "tableInfo": null,
+      "overlaps": [],
+      "dockHitCount": 0,
+      "fixed": [],
+      "clickables": [
+        {
+          "text": "—",
+          "cls": "glass-pill sync-pill",
+          "rect": {
+            "x": 328,
+            "y": 10,
+            "w": 46,
+            "h": 44,
+            "right": 374,
+            "bottom": 54
+          },
+          "smaller44": false,
+          "lines": 1
+        },
+        {
+          "text": "去记一笔",
+          "cls": "glass-btn glass-btn--primary glass-btn--sm glass-btn--auto",
+          "rect": {
+            "x": 142,
+            "y": 244,
+            "w": 106,
+            "h": 44,
+            "right": 248,
+            "bottom": 288
+          },
+          "smaller44": false,
+          "lines": 1
+        },
+        {
+          "text": "记一笔",
+          "cls": "glass-btn glass-btn--primary glass-btn--sm glass-btn--auto",
+          "rect": {
+            "x": 149,
+            "y": 537,
+            "w": 92,
+            "h": 44,
+            "right": 241,
+            "bottom": 581
+          },
+          "smaller44": false,
+          "lines": 1
+        },
+        {
+          "text": "记账",
+          "cls": "glass-tab-bar__item ",
+          "rect": {
+            "x": 67,
+            "y": 770,
+            "w": 48,
+            "h": 51,
+            "right": 115,
+            "bottom": 821
+          },
+          "smaller44": false,
+          "lines": 1
+        },
+        {
+          "text": "进货",
+          "cls": "glass-tab-bar__item ",
+          "rect": {
+            "x": 119,
+            "y": 770,
+            "w": 48,
+            "h": 51,
+            "right": 167,
+            "bottom": 821
+          },
+          "smaller44": false,
+          "lines": 1
+        },
+        {
+          "text": "库存",
+          "cls": "glass-tab-bar__item ",
+          "rect": {
+            "x": 171,
+            "y": 770,
+            "w": 48,
+            "h": 51,
+            "right": 219,
+            "bottom": 821
+          },
+          "smaller44": false,
+          "lines": 1
+        },
+        {
+          "text": "报表",
+          "cls": "glass-tab-bar__item is-active",
+          "rect": {
+            "x": 223,
+            "y": 770,
+            "w": 48,
+            "h": 51,
+            "right": 271,
+            "bottom": 821
+          },
+          "smaller44": false,
+          "lines": 1
+        },
+        {
+          "text": "更多",
+          "cls": "glass-tab-bar__item ",
+          "rect": {
+            "x": 275,
+            "y": 770,
+            "w": 48,
+            "h": 51,
+            "right": 323,
+            "bottom": 821
+          },
+          "smaller44": false,
+          "lines": 1
+        }
+      ],
+      "smallTargets": [],
+      "wrappedButtons": [],
+      "overflow": {
+        "doc": {
+          "sw": 390,
+          "cw": 390
+        },
+        "main": {
+          "sw": 390,
+          "cw": 390
+        },
+        "wrap": null,
+        "table": null
+      },
+      "innerText": "今天\n2026-11-12\n\n今天还没有已结账的场次\n\n去记一笔\n还没有场次\n\n还没有场次，记一笔就开始这一场\n\n记一笔\n单品（按毛利降序，成本待补置顶）\n\n还没有场次\n\n先在上方「记一笔」开始这一场\n\n临期 / 过期预警\n30 天内\n\n30 天内没有到期批次"
+    }
+  },
+  "5-closed-no-sales-top": {
+    "layout": {
+      "scrollTop": 0,
+      "pill": {
+        "text": "本场 · 已结账 12:00",
+        "rect": {
+          "x": 33,
+          "y": 371.5,
+          "w": 205.3,
+          "h": 44,
+          "right": 238.3,
+          "bottom": 415.5
+        },
+        "badge": {
+          "text": "已结账 12:00",
+          "cls": "glass-badge",
+          "rect": {
+            "x": 106.7,
+            "y": 380,
+            "w": 98.6,
+            "h": 27,
+            "right": 205.3,
+            "bottom": 407
+          }
+        }
+      },
+      "patchedBadge": null,
+      "pillVsPatched": null,
+      "heroes": [
+        {
+          "k": "销售额",
+          "v": "¥0.00",
+          "vRect": {
+            "x": 48,
+            "y": 470.9,
+            "w": 127,
+            "h": 34.5,
+            "right": 175,
+            "bottom": 505.4
+          }
+        },
+        {
+          "k": "毛利",
+          "v": "¥0.00",
+          "vRect": {
+            "x": 215,
+            "y": 470.9,
+            "w": 127,
+            "h": 34.5,
+            "right": 342,
+            "bottom": 505.4
+          }
+        }
+      ],
+      "copy": {
+        "rect": {
+          "x": 33,
+          "y": 662.4,
+          "w": 160,
+          "h": 44,
+          "right": 193,
+          "bottom": 706.4
+        },
+        "text": "复制本场汇总",
+        "disabled": true,
+        "inSummaryCard": true,
+        "inTableCard": false,
+        "gapToGross": 157,
+        "actionsRect": {
+          "x": 33,
+          "y": 649.4,
+          "w": 324,
+          "h": 57,
+          "right": 357,
+          "bottom": 706.4
+        }
+      },
+      "tableInfo": null,
+      "overlaps": [],
+      "dockHitCount": 0,
+      "fixed": [],
+      "clickables": [
+        {
+          "text": "—",
+          "cls": "glass-pill sync-pill",
+          "rect": {
+            "x": 328,
+            "y": 10,
+            "w": 46,
+            "h": 44,
+            "right": 374,
+            "bottom": 54
+          },
+          "smaller44": false,
+          "lines": 1
+        },
+        {
+          "text": "本场 · 已结账 12:00",
+          "cls": "report-session-switch",
+          "rect": {
+            "x": 33,
+            "y": 371.5,
+            "w": 205.3,
+            "h": 44,
+            "right": 238.3,
+            "bottom": 415.5
+          },
+          "smaller44": false,
+          "lines": 1
+        },
+        {
+          "text": "补记",
+          "cls": "link-btn",
+          "rect": {
+            "x": 313,
+            "y": 371.5,
+            "w": 44,
+            "h": 44,
+            "right": 357,
+            "bottom": 415.5
+          },
+          "smaller44": false,
+          "lines": 1
+        },
+        {
+          "text": "复制本场汇总",
+          "cls": "glass-btn glass-btn--secondary glass-btn--sm glass-btn--auto",
+          "rect": {
+            "x": 33,
+            "y": 662.4,
+            "w": 160,
+            "h": 44,
+            "right": 193,
+            "bottom": 706.4
+          },
+          "smaller44": false,
+          "lines": 1
+        },
+        {
+          "text": "记账",
+          "cls": "glass-tab-bar__item ",
+          "rect": {
+            "x": 67,
+            "y": 770,
+            "w": 48,
+            "h": 51,
+            "right": 115,
+            "bottom": 821
+          },
+          "smaller44": false,
+          "lines": 1
+        },
+        {
+          "text": "进货",
+          "cls": "glass-tab-bar__item ",
+          "rect": {
+            "x": 119,
+            "y": 770,
+            "w": 48,
+            "h": 51,
+            "right": 167,
+            "bottom": 821
+          },
+          "smaller44": false,
+          "lines": 1
+        },
+        {
+          "text": "库存",
+          "cls": "glass-tab-bar__item ",
+          "rect": {
+            "x": 171,
+            "y": 770,
+            "w": 48,
+            "h": 51,
+            "right": 219,
+            "bottom": 821
+          },
+          "smaller44": false,
+          "lines": 1
+        },
+        {
+          "text": "报表",
+          "cls": "glass-tab-bar__item is-active",
+          "rect": {
+            "x": 223,
+            "y": 770,
+            "w": 48,
+            "h": 51,
+            "right": 271,
+            "bottom": 821
+          },
+          "smaller44": false,
+          "lines": 1
+        },
+        {
+          "text": "更多",
+          "cls": "glass-tab-bar__item ",
+          "rect": {
+            "x": 275,
+            "y": 770,
+            "w": 48,
+            "h": 51,
+            "right": 323,
+            "bottom": 821
+          },
+          "smaller44": false,
+          "lines": 1
+        }
+      ],
+      "smallTargets": [],
+      "wrappedButtons": [],
+      "overflow": {
+        "doc": {
+          "sw": 390,
+          "cw": 390
+        },
+        "main": {
+          "sw": 390,
+          "cw": 390
+        },
+        "wrap": null,
+        "table": null
+      },
+      "innerText": "今天 · 已结账 1 场 · ¥0.00\n2026-11-12\n毛利\n¥0.00\n现金\n¥0.00\n微信\n¥0.00\n支付宝\n¥0.00\n单数\n0\n让利\n¥0.00\n赠品成本\n¥0.00\n本场 ·\n已结账 12:00\n补记\n11-12 09:00 → 12:00\n销售额\n¥0.00\n毛利\n¥0.00\n现金\n¥0.00\n微信\n¥0.00\n支付宝\n¥0.00\n复制本场汇总\n单数\n0\n让利\n¥0.00\n赠品成本\n¥0.00\n\n成本按批次先进先出算（FIFO）。毛利 = 销售额 − 成本。赠品金额 0、成本照算，单独列示。\n\n单品（按毛利降序，成本待补置顶）\n11-12 场\n\n这一场还没卖东西\n\n点上方「补记」可补录\n\n临期 / 过期预警\n30 天内\n\n30 天内没有到期批次"
+    }
+  },
+  "6-all-voided-top": {
+    "layout": {
+      "scrollTop": 0,
+      "pill": {
+        "text": "本场 · 已结账 12:00",
+        "rect": {
+          "x": 33,
+          "y": 432.5,
+          "w": 205.3,
+          "h": 44,
+          "right": 238.3,
+          "bottom": 476.5
+        },
+        "badge": {
+          "text": "已结账 12:00",
+          "cls": "glass-badge",
+          "rect": {
+            "x": 106.7,
+            "y": 441,
+            "w": 98.6,
+            "h": 27,
+            "right": 205.3,
+            "bottom": 468
+          }
+        }
+      },
+      "patchedBadge": null,
+      "pillVsPatched": null,
+      "heroes": [
+        {
+          "k": "销售额",
+          "v": "¥0.00",
+          "vRect": {
+            "x": 48,
+            "y": 531.9,
+            "w": 127,
+            "h": 34.5,
+            "right": 175,
+            "bottom": 566.4
+          }
+        },
+        {
+          "k": "毛利",
+          "v": "¥0.00",
+          "vRect": {
+            "x": 215,
+            "y": 531.9,
+            "w": 127,
+            "h": 34.5,
+            "right": 342,
+            "bottom": 566.4
+          }
+        }
+      ],
+      "copy": {
+        "rect": {
+          "x": 33,
+          "y": 723.4,
+          "w": 160,
+          "h": 44,
+          "right": 193,
+          "bottom": 767.4
+        },
+        "text": "复制本场汇总",
+        "disabled": true,
+        "inSummaryCard": true,
+        "inTableCard": false,
+        "gapToGross": 157,
+        "actionsRect": {
+          "x": 33,
+          "y": 710.4,
+          "w": 324,
+          "h": 57,
+          "right": 357,
+          "bottom": 767.4
+        }
+      },
+      "tableInfo": null,
+      "overlaps": [],
+      "dockHitCount": 0,
+      "fixed": [],
+      "clickables": [
+        {
+          "text": "—",
+          "cls": "glass-pill sync-pill",
+          "rect": {
+            "x": 328,
+            "y": 10,
+            "w": 46,
+            "h": 44,
+            "right": 374,
+            "bottom": 54
+          },
+          "smaller44": false,
+          "lines": 1
+        },
+        {
+          "text": "看今天的 2 笔",
+          "cls": "link-btn",
+          "rect": {
+            "x": 269.5,
+            "y": 336.5,
+            "w": 87.5,
+            "h": 44,
+            "right": 357,
+            "bottom": 380.5
+          },
+          "smaller44": false,
+          "lines": 1
+        },
+        {
+          "text": "本场 · 已结账 12:00",
+          "cls": "report-session-switch",
+          "rect": {
+            "x": 33,
+            "y": 432.5,
+            "w": 205.3,
+            "h": 44,
+            "right": 238.3,
+            "bottom": 476.5
+          },
+          "smaller44": false,
+          "lines": 1
+        },
+        {
+          "text": "补记",
+          "cls": "link-btn",
+          "rect": {
+            "x": 313,
+            "y": 432.5,
+            "w": 44,
+            "h": 44,
+            "right": 357,
+            "bottom": 476.5
+          },
+          "smaller44": false,
+          "lines": 1
+        },
+        {
+          "text": "复制本场汇总",
+          "cls": "glass-btn glass-btn--secondary glass-btn--sm glass-btn--auto",
+          "rect": {
+            "x": 33,
+            "y": 723.4,
+            "w": 160,
+            "h": 44,
+            "right": 193,
+            "bottom": 767.4
+          },
+          "smaller44": false,
+          "lines": 1
+        },
+        {
+          "text": "看这一场的 2 笔",
+          "cls": "link-btn",
+          "rect": {
+            "x": 256.5,
+            "y": 859.4,
+            "w": 100.5,
+            "h": 44,
+            "right": 357,
+            "bottom": 903.4
+          },
+          "smaller44": false,
+          "lines": 1
+        },
+        {
+          "text": "记账",
+          "cls": "glass-tab-bar__item ",
+          "rect": {
+            "x": 67,
+            "y": 770,
+            "w": 48,
+            "h": 51,
+            "right": 115,
+            "bottom": 821
+          },
+          "smaller44": false,
+          "lines": 1
+        },
+        {
+          "text": "进货",
+          "cls": "glass-tab-bar__item ",
+          "rect": {
+            "x": 119,
+            "y": 770,
+            "w": 48,
+            "h": 51,
+            "right": 167,
+            "bottom": 821
+          },
+          "smaller44": false,
+          "lines": 1
+        },
+        {
+          "text": "库存",
+          "cls": "glass-tab-bar__item ",
+          "rect": {
+            "x": 171,
+            "y": 770,
+            "w": 48,
+            "h": 51,
+            "right": 219,
+            "bottom": 821
+          },
+          "smaller44": false,
+          "lines": 1
+        },
+        {
+          "text": "报表",
+          "cls": "glass-tab-bar__item is-active",
+          "rect": {
+            "x": 223,
+            "y": 770,
+            "w": 48,
+            "h": 51,
+            "right": 271,
+            "bottom": 821
+          },
+          "smaller44": false,
+          "lines": 1
+        },
+        {
+          "text": "更多",
+          "cls": "glass-tab-bar__item ",
+          "rect": {
+            "x": 275,
+            "y": 770,
+            "w": 48,
+            "h": 51,
+            "right": 323,
+            "bottom": 821
+          },
+          "smaller44": false,
+          "lines": 1
+        }
+      ],
+      "smallTargets": [],
+      "wrappedButtons": [],
+      "overflow": {
+        "doc": {
+          "sw": 390,
+          "cw": 390
+        },
+        "main": {
+          "sw": 390,
+          "cw": 390
+        },
+        "wrap": null,
+        "table": null
+      },
+      "innerText": "今天 · 已结账 1 场 · ¥0.00\n2026-11-12\n毛利\n¥0.00\n现金\n¥0.00\n微信\n¥0.00\n支付宝\n¥0.00\n单数\n0\n让利\n¥0.00\n赠品成本\n¥0.00\n已排除 2 笔删除（¥6.00）\n看今天的 2 笔\n本场 ·\n已结账 12:00\n补记\n11-12 09:00 → 12:00\n销售额\n¥0.00\n毛利\n¥0.00\n现金\n¥0.00\n微信\n¥0.00\n支付宝\n¥0.00\n复制本场汇总\n单数\n0\n让利\n¥0.00\n赠品成本\n¥0.00\n已排除 2 笔删除（¥6.00）\n看这一场的 2 笔\n\n成本按批次先进先出算（FIFO）。毛利 = 销售额 − 成本。赠品金额 0、成本照算，单独列示。\n\n单品（按毛利降序，成本待补置顶）\n11-12 场\n\n这一场没有有效销售（2 笔已删除，可在上方「看这一场的 2 笔」撤销）\n\n点上方「补记」可补录\n\n临期 / 过期预警\n30 天内\n\n30 天内没有到期批次"
+    }
+  },
+  "7-cost-missing-top": {
+    "layout": {
+      "scrollTop": 0,
+      "pill": {
+        "text": "本场 · 已结账 12:00",
+        "rect": {
+          "x": 33,
+          "y": 411.5,
+          "w": 205.3,
+          "h": 44,
+          "right": 238.3,
+          "bottom": 455.5
+        },
+        "badge": {
+          "text": "已结账 12:00",
+          "cls": "glass-badge",
+          "rect": {
+            "x": 106.7,
+            "y": 420,
+            "w": 98.6,
+            "h": 27,
+            "right": 205.3,
+            "bottom": 447
+          }
+        }
+      },
+      "patchedBadge": null,
+      "pillVsPatched": null,
+      "heroes": [
+        {
+          "k": "销售额",
+          "v": "¥5.00",
+          "vRect": {
+            "x": 48,
+            "y": 510.9,
+            "w": 127,
+            "h": 34.5,
+            "right": 175,
+            "bottom": 545.4
+          }
+        },
+        {
+          "k": "毛利（成本待补）",
+          "v": "—",
+          "vRect": {
+            "x": 215,
+            "y": 510.9,
+            "w": 127,
+            "h": 34.5,
+            "right": 342,
+            "bottom": 545.4
+          }
+        }
+      ],
+      "copy": {
+        "rect": {
+          "x": 33,
+          "y": 702.4,
+          "w": 160,
+          "h": 44,
+          "right": 193,
+          "bottom": 746.4
+        },
+        "text": "复制本场汇总",
+        "disabled": false,
+        "inSummaryCard": true,
+        "inTableCard": false,
+        "gapToGross": 157,
+        "actionsRect": {
+          "x": 33,
+          "y": 689.4,
+          "w": 324,
+          "h": 57,
+          "right": 357,
+          "bottom": 746.4
+        }
+      },
+      "tableInfo": {
+        "rect": {
+          "x": 31,
+          "y": 1101.4,
+          "w": 328,
+          "h": 116,
+          "right": 359,
+          "bottom": 1217.4
+        },
+        "rows": [
+          [
+            "手持烟花棒 成本待补",
+            "1 支",
+            "¥5.00",
+            "¥0.00",
+            "无",
+            "¥0.00",
+            "—"
+          ]
+        ],
+        "headers": [
+          {
+            "text": "商品",
+            "rect": {
+              "x": 31,
+              "y": 1101.4,
+              "w": 87.1,
+              "h": 60,
+              "right": 118.1,
+              "bottom": 1161.4
+            }
+          },
+          {
+            "text": "数量",
+            "rect": {
+              "x": 118.1,
+              "y": 1101.4,
+              "w": 60.8,
+              "h": 60,
+              "right": 178.9,
+              "bottom": 1161.4
+            }
+          },
+          {
+            "text": "销售额",
+            "rect": {
+              "x": 178.9,
+              "y": 1101.4,
+              "w": 66.9,
+              "h": 60,
+              "right": 245.8,
+              "bottom": 1161.4
+            }
+          },
+          {
+            "text": "让利",
+            "rect": {
+              "x": 0,
+              "y": 0,
+              "w": 0,
+              "h": 0,
+              "right": 0,
+              "bottom": 0
+            }
+          },
+          {
+            "text": "赠品",
+            "rect": {
+              "x": 0,
+              "y": 0,
+              "w": 0,
+              "h": 0,
+              "right": 0,
+              "bottom": 0
+            }
+          },
+          {
+            "text": "成本",
+            "rect": {
+              "x": 245.8,
+              "y": 1101.4,
+              "w": 49.9,
+              "h": 60,
+              "right": 295.7,
+              "bottom": 1161.4
+            }
+          },
+          {
+            "text": "毛利 ↓",
+            "rect": {
+              "x": 295.7,
+              "y": 1101.4,
+              "w": 63.3,
+              "h": 60,
+              "right": 359,
+              "bottom": 1161.4
+            }
+          }
+        ],
+        "badges": [
+          {
+            "text": "成本待补",
+            "rect": {
+              "x": 39,
+              "y": 1191.4,
+              "w": 54,
+              "h": 17,
+              "right": 93,
+              "bottom": 1208.4
+            },
+            "lines": 1
+          }
+        ],
+        "rowHeights": [
+          {
+            "i": 0,
+            "h": 56
+          }
+        ],
+        "footnote": "— = 成本待补，毛利暂不可算；去「进货」补录后自动恢复。"
+      },
+      "overlaps": [],
+      "dockHitCount": 0,
+      "fixed": [],
+      "clickables": [
+        {
+          "text": "—",
+          "cls": "glass-pill sync-pill",
+          "rect": {
+            "x": 328,
+            "y": 10,
+            "w": 46,
+            "h": 44,
+            "right": 374,
+            "bottom": 54
+          },
+          "smaller44": false,
+          "lines": 1
+        },
+        {
+          "text": "本场 · 已结账 12:00",
+          "cls": "report-session-switch",
+          "rect": {
+            "x": 33,
+            "y": 411.5,
+            "w": 205.3,
+            "h": 44,
+            "right": 238.3,
+            "bottom": 455.5
+          },
+          "smaller44": false,
+          "lines": 1
+        },
+        {
+          "text": "补记",
+          "cls": "link-btn",
+          "rect": {
+            "x": 313,
+            "y": 411.5,
+            "w": 44,
+            "h": 44,
+            "right": 357,
+            "bottom": 455.5
+          },
+          "smaller44": false,
+          "lines": 1
+        },
+        {
+          "text": "复制本场汇总",
+          "cls": "glass-btn glass-btn--secondary glass-btn--sm glass-btn--auto",
+          "rect": {
+            "x": 33,
+            "y": 702.4,
+            "w": 160,
+            "h": 44,
+            "right": 193,
+            "bottom": 746.4
+          },
+          "smaller44": false,
+          "lines": 1
+        },
+        {
+          "text": "数量",
+          "cls": "th-btn",
+          "rect": {
+            "x": 126.1,
+            "y": 1109.4,
+            "w": 44,
+            "h": 44,
+            "right": 170.1,
+            "bottom": 1153.4
+          },
+          "smaller44": false,
+          "lines": 1
+        },
+        {
+          "text": "销售额",
+          "cls": "th-btn",
+          "rect": {
+            "x": 186.9,
+            "y": 1109.4,
+            "w": 50,
+            "h": 44,
+            "right": 236.9,
+            "bottom": 1153.4
+          },
+          "smaller44": false,
+          "lines": 1
+        },
+        {
+          "text": "毛利 ↓",
+          "cls": "th-btn",
+          "rect": {
+            "x": 303.7,
+            "y": 1109.4,
+            "w": 46.5,
+            "h": 44,
+            "right": 350.1,
+            "bottom": 1153.4
+          },
+          "smaller44": false,
+          "lines": 1
+        },
+        {
+          "text": "记账",
+          "cls": "glass-tab-bar__item ",
+          "rect": {
+            "x": 67,
+            "y": 770,
+            "w": 48,
+            "h": 51,
+            "right": 115,
+            "bottom": 821
+          },
+          "smaller44": false,
+          "lines": 1
+        },
+        {
+          "text": "进货",
+          "cls": "glass-tab-bar__item ",
+          "rect": {
+            "x": 119,
+            "y": 770,
+            "w": 48,
+            "h": 51,
+            "right": 167,
+            "bottom": 821
+          },
+          "smaller44": false,
+          "lines": 1
+        },
+        {
+          "text": "库存",
+          "cls": "glass-tab-bar__item ",
+          "rect": {
+            "x": 171,
+            "y": 770,
+            "w": 48,
+            "h": 51,
+            "right": 219,
+            "bottom": 821
+          },
+          "smaller44": false,
+          "lines": 1
+        },
+        {
+          "text": "报表",
+          "cls": "glass-tab-bar__item is-active",
+          "rect": {
+            "x": 223,
+            "y": 770,
+            "w": 48,
+            "h": 51,
+            "right": 271,
+            "bottom": 821
+          },
+          "smaller44": false,
+          "lines": 1
+        },
+        {
+          "text": "更多",
+          "cls": "glass-tab-bar__item ",
+          "rect": {
+            "x": 275,
+            "y": 770,
+            "w": 48,
+            "h": 51,
+            "right": 323,
+            "bottom": 821
+          },
+          "smaller44": false,
+          "lines": 1
+        }
+      ],
+      "smallTargets": [],
+      "wrappedButtons": [],
+      "overflow": {
+        "doc": {
+          "sw": 390,
+          "cw": 390
+        },
+        "main": {
+          "sw": 390,
+          "cw": 390
+        },
+        "wrap": {
+          "sw": 328,
+          "cw": 328,
+          "ox": "visible"
+        },
+        "table": {
+          "sw": 328,
+          "cw": 328,
+          "w": 328
+        }
+      },
+      "innerText": "今天 · 已结账 1 场 · ¥5.00\n2026-11-12\n毛利（成本待补）\n—\n现金\n¥5.00\n微信\n¥0.00\n支付宝\n¥0.00\n单数\n1\n让利\n¥0.00\n赠品成本\n¥0.00\n\n今天有 1 场成本待补（缺批次），补录进货后毛利会自动恢复。\n\n本场 ·\n已结账 12:00\n补记\n11-12 09:00 → 12:00\n销售额\n¥5.00\n毛利（成本待补）\n—\n现金\n¥5.00\n微信\n¥0.00\n支付宝\n¥0.00\n复制本场汇总\n单数\n1\n让利\n¥0.00\n赠品成本\n¥0.00\n\n成本按批次先进先出算（FIFO）。毛利 = 销售额 − 成本。赠品金额 0、成本照算，单独列示。\n\n本场有 1 个（基本单位）销量没有对应的进货批次（漏录进货或超卖）， 这部分成本用均价估算，本场毛利先显示为「—」。 去「进货」补录后会自动恢复。\n\n单品（按毛利降序，成本待补置顶）\n11-12 场\n商品\t数量\t销售额\t成本\t毛利 ↓\n\n手持烟花棒\n成本待补\n\t1 支\t¥5.00\t¥0.00\t—\n\n— = 成本待补，毛利暂不可算；去「进货」补录后自动恢复。\n\n临期 / 过期预警\n30 天内\n\n30 天内没有到期批次"
+    }
+  },
+  "8-pay-mismatch": {
+    "layout": {
+      "scrollTop": 0,
+      "pill": {
+        "text": "本场 · 已结账 12:00",
+        "rect": {
+          "x": 33,
+          "y": 411.5,
+          "w": 205.3,
+          "h": 44,
+          "right": 238.3,
+          "bottom": 455.5
+        },
+        "badge": {
+          "text": "已结账 12:00",
+          "cls": "glass-badge",
+          "rect": {
+            "x": 106.7,
+            "y": 420,
+            "w": 98.6,
+            "h": 27,
+            "right": 205.3,
+            "bottom": 447
+          }
+        }
+      },
+      "patchedBadge": null,
+      "pillVsPatched": null,
+      "heroes": [
+        {
+          "k": "销售额",
+          "v": "¥10.00",
+          "vRect": {
+            "x": 48,
+            "y": 510.9,
+            "w": 127,
+            "h": 34.5,
+            "right": 175,
+            "bottom": 545.4
+          }
+        },
+        {
+          "k": "毛利（成本待补）",
+          "v": "—",
+          "vRect": {
+            "x": 215,
+            "y": 510.9,
+            "w": 127,
+            "h": 34.5,
+            "right": 342,
+            "bottom": 545.4
+          }
+        }
+      ],
+      "copy": {
+        "rect": {
+          "x": 33,
+          "y": 738.4,
+          "w": 160,
+          "h": 44,
+          "right": 193,
+          "bottom": 782.4
+        },
+        "text": "复制本场汇总",
+        "disabled": false,
+        "inSummaryCard": true,
+        "inTableCard": false,
+        "gapToGross": 193,
+        "actionsRect": {
+          "x": 33,
+          "y": 725.4,
+          "w": 324,
+          "h": 57,
+          "right": 357,
+          "bottom": 782.4
+        }
+      },
+      "tableInfo": {
+        "rect": {
+          "x": 31,
+          "y": 1266.6,
+          "w": 328,
+          "h": 116,
+          "right": 359,
+          "bottom": 1382.6
+        },
+        "rows": [
+          [
+            "二踢脚 成本待补",
+            "2 个",
+            "¥3.00",
+            "¥0.00",
+            "无",
+            "¥0.00",
+            "—"
+          ]
+        ],
+        "headers": [
+          {
+            "text": "商品",
+            "rect": {
+              "x": 31,
+              "y": 1266.6,
+              "w": 74.6,
+              "h": 60,
+              "right": 105.6,
+              "bottom": 1326.6
+            }
+          },
+          {
+            "text": "数量",
+            "rect": {
+              "x": 105.6,
+              "y": 1266.6,
+              "w": 64,
+              "h": 60,
+              "right": 169.6,
+              "bottom": 1326.6
+            }
+          },
+          {
+            "text": "销售额",
+            "rect": {
+              "x": 169.6,
+              "y": 1266.6,
+              "w": 70.3,
+              "h": 60,
+              "right": 239.9,
+              "bottom": 1326.6
+            }
+          },
+          {
+            "text": "让利",
+            "rect": {
+              "x": 0,
+              "y": 0,
+              "w": 0,
+              "h": 0,
+              "right": 0,
+              "bottom": 0
+            }
+          },
+          {
+            "text": "赠品",
+            "rect": {
+              "x": 0,
+              "y": 0,
+              "w": 0,
+              "h": 0,
+              "right": 0,
+              "bottom": 0
+            }
+          },
+          {
+            "text": "成本",
+            "rect": {
+              "x": 239.9,
+              "y": 1266.6,
+              "w": 52.5,
+              "h": 60,
+              "right": 292.4,
+              "bottom": 1326.6
+            }
+          },
+          {
+            "text": "毛利 ↓",
+            "rect": {
+              "x": 292.4,
+              "y": 1266.6,
+              "w": 66.6,
+              "h": 60,
+              "right": 359,
+              "bottom": 1326.6
+            }
+          }
+        ],
+        "badges": [
+          {
+            "text": "成本待补",
+            "rect": {
+              "x": 39,
+              "y": 1356.6,
+              "w": 54,
+              "h": 17,
+              "right": 93,
+              "bottom": 1373.6
+            },
+            "lines": 1
+          }
+        ],
+        "rowHeights": [
+          {
+            "i": 0,
+            "h": 56
+          }
+        ],
+        "footnote": "— = 成本待补，毛利暂不可算；去「进货」补录后自动恢复。"
+      },
+      "overlaps": [],
+      "dockHitCount": 0,
+      "fixed": [],
+      "clickables": [
+        {
+          "text": "—",
+          "cls": "glass-pill sync-pill",
+          "rect": {
+            "x": 328,
+            "y": 10,
+            "w": 46,
+            "h": 44,
+            "right": 374,
+            "bottom": 54
+          },
+          "smaller44": false,
+          "lines": 1
+        },
+        {
+          "text": "本场 · 已结账 12:00",
+          "cls": "report-session-switch",
+          "rect": {
+            "x": 33,
+            "y": 411.5,
+            "w": 205.3,
+            "h": 44,
+            "right": 238.3,
+            "bottom": 455.5
+          },
+          "smaller44": false,
+          "lines": 1
+        },
+        {
+          "text": "补记",
+          "cls": "link-btn",
+          "rect": {
+            "x": 313,
+            "y": 411.5,
+            "w": 44,
+            "h": 44,
+            "right": 357,
+            "bottom": 455.5
+          },
+          "smaller44": false,
+          "lines": 1
+        },
+        {
+          "text": "复制本场汇总",
+          "cls": "glass-btn glass-btn--secondary glass-btn--sm glass-btn--auto",
+          "rect": {
+            "x": 33,
+            "y": 738.4,
+            "w": 160,
+            "h": 44,
+            "right": 193,
+            "bottom": 782.4
+          },
+          "smaller44": false,
+          "lines": 1
+        },
+        {
+          "text": "数量",
+          "cls": "th-btn",
+          "rect": {
+            "x": 113.6,
+            "y": 1274.6,
+            "w": 44,
+            "h": 44,
+            "right": 157.6,
+            "bottom": 1318.6
+          },
+          "smaller44": false,
+          "lines": 1
+        },
+        {
+          "text": "销售额",
+          "cls": "th-btn",
+          "rect": {
+            "x": 177.6,
+            "y": 1274.6,
+            "w": 50,
+            "h": 44,
+            "right": 227.6,
+            "bottom": 1318.6
+          },
+          "smaller44": false,
+          "lines": 1
+        },
+        {
+          "text": "毛利 ↓",
+          "cls": "th-btn",
+          "rect": {
+            "x": 300.4,
+            "y": 1274.6,
+            "w": 46.5,
+            "h": 44,
+            "right": 346.8,
+            "bottom": 1318.6
+          },
+          "smaller44": false,
+          "lines": 1
+        },
+        {
+          "text": "记账",
+          "cls": "glass-tab-bar__item ",
+          "rect": {
+            "x": 67,
+            "y": 770,
+            "w": 48,
+            "h": 51,
+            "right": 115,
+            "bottom": 821
+          },
+          "smaller44": false,
+          "lines": 1
+        },
+        {
+          "text": "进货",
+          "cls": "glass-tab-bar__item ",
+          "rect": {
+            "x": 119,
+            "y": 770,
+            "w": 48,
+            "h": 51,
+            "right": 167,
+            "bottom": 821
+          },
+          "smaller44": false,
+          "lines": 1
+        },
+        {
+          "text": "库存",
+          "cls": "glass-tab-bar__item ",
+          "rect": {
+            "x": 171,
+            "y": 770,
+            "w": 48,
+            "h": 51,
+            "right": 219,
+            "bottom": 821
+          },
+          "smaller44": false,
+          "lines": 1
+        },
+        {
+          "text": "报表",
+          "cls": "glass-tab-bar__item is-active",
+          "rect": {
+            "x": 223,
+            "y": 770,
+            "w": 48,
+            "h": 51,
+            "right": 271,
+            "bottom": 821
+          },
+          "smaller44": false,
+          "lines": 1
+        },
+        {
+          "text": "更多",
+          "cls": "glass-tab-bar__item ",
+          "rect": {
+            "x": 275,
+            "y": 770,
+            "w": 48,
+            "h": 51,
+            "right": 323,
+            "bottom": 821
+          },
+          "smaller44": false,
+          "lines": 1
+        }
+      ],
+      "smallTargets": [],
+      "wrappedButtons": [],
+      "overflow": {
+        "doc": {
+          "sw": 390,
+          "cw": 390
+        },
+        "main": {
+          "sw": 390,
+          "cw": 390
+        },
+        "wrap": {
+          "sw": 328,
+          "cw": 328,
+          "ox": "visible"
+        },
+        "table": {
+          "sw": 328,
+          "cw": 328,
+          "w": 328
+        }
+      },
+      "innerText": "今天 · 已结账 1 场 · ¥10.00\n2026-11-12\n毛利（成本待补）\n—\n现金\n¥10.00\n微信\n¥0.00\n支付宝\n¥0.00\n单数\n1\n让利\n¥0.00\n赠品成本\n¥0.00\n\n今天有 1 场成本待补（缺批次），补录进货后毛利会自动恢复。\n\n本场 ·\n已结账 12:00\n补记\n11-12 09:00 → 12:00\n销售额\n¥10.00\n毛利（成本待补）\n—\n现金\n¥10.00\n微信\n¥0.00\n支付宝\n¥0.00\n收款合计\n¥1000.00 ≠\n复制本场汇总\n单数\n1\n让利\n¥0.00\n赠品成本\n¥0.00\n\n成本按批次先进先出算（FIFO）。毛利 = 销售额 − 成本。赠品金额 0、成本照算，单独列示。\n\n收款合计 ¥1000.00 与销售额 ¥10.00 对不上， 可能是导入了旧数据或补记后未重算。请检查这一场的删除单与补记。这是数据异常，不是现金短款；现金请自己数一遍。\n\n本场有 2 个（基本单位）销量没有对应的进货批次（漏录进货或超卖）， 这部分成本用均价估算，本场毛利先显示为「—」。 去「进货」补录后会自动恢复。\n\n单品（按毛利降序，成本待补置顶）\n11-12 场\n商品\t数量\t销售额\t成本\t毛利 ↓\n\n二踢脚\n成本待补\n\t2 个\t¥3.00\t¥0.00\t—\n\n— = 成本待补，毛利暂不可算；去「进货」补录后自动恢复。\n\n临期 / 过期预警\n30 天内\n\n30 天内没有到期批次"
+    },
+    "copyText": "⚠ 收款合计 ¥1000.00 与销售额 ¥10.00 不符，请在 App 里核对\r\n本场 11-12 09:00 → 12:00\r\n销售额 ¥10.00 · 1 单\r\n现金 ¥10.00 · 微信 ¥0.00 · 支付宝 ¥0.00\r\n毛利 —（成本待补：本场 2 个缺批次） · 让利 ¥0.00 · 赠品成本 ¥0.00"
+  }
+}

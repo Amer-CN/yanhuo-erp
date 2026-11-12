@@ -3,7 +3,7 @@ import {
   TriangleAlert,
   TrendingUp,
   Copy,
-  ChevronUp,
+  ChevronDown,
   PenLine,
   CalendarRange,
   Ban,
@@ -58,63 +58,57 @@ function newestFirst(list: SalesOrder[]): SalesOrder[] {
 }
 
 /**
- * 场次选择：顶部只留「统计范围」只读标签，**可点入口下移成底部浮胶囊**（L1）。
+ * 本场「状态 + 切换场次」胶囊（P0-1 / P0-2 / P1-6）。
  *
- * 2026-11-12（L1）：原来「进行中 / 历史场次」分段 + 场次胶囊都在页面顶端（实测 y≈87），
- * 收摊时单手拿手机根本够不到（390×844 的拇指舒适区在 y > 562）。
- * 现在按 A 方案：顶部不再放任何可点控件，只写清「现在看的是哪一场」；
- * 唯一的入口是吸在浮动底栏上方的这颗 44px 胶囊（`position: fixed`，
- * 底边 = .app-main 给底栏预留的 96px + 安全区），点开仍是原来的场次 Sheet。
- * 为什么不用 B（整体挪到「今天」卡下方）：那还停在上半屏，仍然够不到。
- */
-function SessionScopeLabel({ mode, selected }: { mode: 'current' | 'history'; selected?: Session }) {
-  const scopeText =
-    mode === 'current' ? '进行中这一场' : selected ? sessionLabel(selected) : '历史场次';
-  return (
-    /* 只读：让用户知道下面这些数字属于哪一场，但这里不再承担切换动作 */
-    <div className="tiny-text" style={{ marginBottom: 6 }}>
-      统计范围：{scopeText}
-    </div>
-  );
-}
-
-/**
- * 底部浮胶囊（B2 的唯一切换入口）。
+ * 为什么状态必须看 `selected.status` 而不是 `mode`：
+ * 没有进行中场次时 `selected = openSession ?? closed[0]`（收摊后最常见），
+ * `mode` 仍停在 'current'，旧标签于是把已结账场次写成「进行中这一场」，
+ * 下面却显示 09:05 → 21:30 的已结账金额 —— 状态标签会说谎。
+ * 现在只认选中场次自己的 status，mode 只负责「用户点的是哪个」。
  *
- * **必须挂在页面根节点上**，不能放进 `<Card>`：GlassKit 的玻璃卡带
- * `backdrop-filter`，它会成为 fixed 后代的包含块，胶囊就跟着卡片定位
- * （实测落到 y=869，比视口还低 25px），吸附底栏的效果直接失效。
+ * 为什么入口放在本场卡头部、而不是页面顶端：
+ * 审计第十节第 6 条否掉的是「把胶囊挪回页面顶端」（顶端 y≈87，收摊时单手够不到）。
+ * 这里的位置是本场卡的卡头（390×844 实测 y≈581，首屏内、拇指区），
+ * 与顶部横条性质不同；而且它紧贴被它控制的数字，看状态与切换合成一个动作，
+ * 不再像旧浮胶囊那样浮在内容上挡住本场现金行/毛利值。
  */
-function SessionSwitchFab({
-  mode,
+function SessionSwitchButton({
+  selected,
   onOpenPicker
 }: {
-  mode: 'current' | 'history';
+  selected: Session;
   onOpenPicker: () => void;
 }) {
+  const open = selected.status === 'open';
   return (
     <button
       type="button"
-      className="glass-pill season-pick report-session-fab"
-      aria-label="切换场次"
+      className="report-session-switch"
       aria-haspopup="dialog"
+      aria-label="切换场次"
       onClick={onOpenPicker}
     >
       <CalendarRange size={16} aria-hidden="true" />
-      <span>{mode === 'current' ? '历史场次' : '换一场'}</span>
-      <ChevronUp size={14} aria-hidden="true" />
+      <span className="report-session-switch__scope">本场 ·</span>
+      <span className={`glass-badge ${open ? 'glass-badge--primary' : ''}`.trim()}>
+        {open ? '进行中' : `已结账${selected.closedAt ? ` ${isoToTime(selected.closedAt)}` : ''}`}
+      </span>
+      <ChevronDown size={14} aria-hidden="true" />
     </button>
   );
 }
 
-/** 「已排除 N 笔删除（¥X）· 点开看」：作废单不再等于没发生（M1） */
+/** 「已排除 N 笔删除（¥X）· 看今天/看这一场的 N 笔」：作废单不再等于没发生（M1） */
 function ExcludedLine({
   count,
   fen,
+  scope,
   onOpen
 }: {
   count: number;
   fen: number;
+  /** 两个入口范围不同：今天 = 今天所有已结账场次；session = 当前这一场（P1-9） */
+  scope: 'day' | 'session';
   onOpen: () => void;
 }) {
   if (count === 0) return null;
@@ -124,7 +118,7 @@ function ExcludedLine({
         已排除 {count} 笔删除（¥{fenToStr(fen)}）
       </span>
       <button type="button" className="link-btn" onClick={onOpen}>
-        点开看
+        看{scope === 'day' ? '今天的' : '这一场的'} {count} 笔
       </button>
     </div>
   );
@@ -145,21 +139,47 @@ function OpenSessionNote({ count, fen }: { count: number; fen: number }) {
  *
  * 数据是 `dayReport()` 按 closedAt 落在今天的**已结账**场次累加的，
  * 所以收摊后打开报表第一眼就是今天的账，不会跳到 22:00 新开的那一场。
+ *
+ * P2-8：今天卡在 390×844 上占到 480px（内容视口 61.6%），把本场卡的数字全挤到
+ * 首屏之外。这里只压缩密度、不重排卡片顺序（审计第十节第 1 条），
+ * 也不删任何一项：三行收款改成一行三列（标签在上、金额在下）。
  */
-function TodayCard({ day, onOpenVoided }: { day: DayReport; onOpenVoided: () => void }) {
+function TodayCard({
+  day,
+  externalCount,
+  hasOpenSession,
+  onGoCurrent,
+  onGoRecord,
+  onOpenVoided
+}: {
+  day: DayReport;
+  /** 今天已结账场次里属于另一台手机的数量（跨设备下钻用，P1-7） */
+  externalCount: number;
+  /** 本机是否有进行中的场次：决定空态按钮是「去看进行中」还是「去记一笔」 */
+  hasOpenSession: boolean;
+  onGoCurrent: () => void;
+  onGoRecord: () => void;
+  onOpenVoided: () => void;
+}) {
   const hasClosed = day.sessionCount > 0;
   return (
-    <Card>
+    <Card className="report-day-card">
       <div className="report-day-head">
-        <div className="report-day-head__title">
-          {hasClosed ? (
-            <>
-              今天 · 已结账 {day.sessionCount} 场
-              <span className="brand"> · ¥{fenToStr(day.revenueFen)}</span>
-            </>
-          ) : (
-            '今天'
-          )}
+        <div>
+          <div className="report-day-head__title">
+            {hasClosed ? (
+              <>
+                今天 · 已结账 {day.sessionCount} 场
+                <span className="brand"> · ¥{fenToStr(day.revenueFen)}</span>
+              </>
+            ) : (
+              '今天'
+            )}
+          </div>
+          {/* P1-7：今天合计跨设备，这里说明其中有几场来自另一台手机 */}
+          {hasClosed && externalCount > 0 ? (
+            <div className="tiny-text report-day-external">含另一台手机 {externalCount} 场</div>
+          ) : null}
         </div>
         <span className="tiny-text">{day.date}</span>
       </div>
@@ -175,18 +195,19 @@ function TodayCard({ day, onOpenVoided }: { day: DayReport; onOpenVoided: () => 
             </div>
           </div>
 
-          <div className="pay-rows">
-            <div className="pay-row">
-              <span>现金</span>
-              <span>¥{fenToStr(day.cashFen)}</span>
+          {/* P2-8：一行三列；金额 15px（≥15px 可读），每格 1/3 宽 */}
+          <div className="report-pay-grid">
+            <div className="report-pay-cell">
+              <span className="k">现金</span>
+              <span className="v">¥{fenToStr(day.cashFen)}</span>
             </div>
-            <div className="pay-row">
-              <span>微信</span>
-              <span>¥{fenToStr(day.wechatFen)}</span>
+            <div className="report-pay-cell">
+              <span className="k">微信</span>
+              <span className="v">¥{fenToStr(day.wechatFen)}</span>
             </div>
-            <div className="pay-row">
-              <span>支付宝</span>
-              <span>¥{fenToStr(day.alipayFen)}</span>
+            <div className="report-pay-cell">
+              <span className="k">支付宝</span>
+              <span className="v">¥{fenToStr(day.alipayFen)}</span>
             </div>
           </div>
 
@@ -196,7 +217,7 @@ function TodayCard({ day, onOpenVoided }: { day: DayReport; onOpenVoided: () => 
             <Stat k="赠品成本" v={`¥${fenToStr(day.giftCostFen)}`} />
           </div>
 
-          <ExcludedLine count={day.voidedCount} fen={day.voidedFen} onOpen={onOpenVoided} />
+          <ExcludedLine count={day.voidedCount} fen={day.voidedFen} scope="day" onOpen={onOpenVoided} />
 
           {!day.grossKnown ? (
             <p className="report-note">
@@ -205,7 +226,16 @@ function TodayCard({ day, onOpenVoided }: { day: DayReport; onOpenVoided: () => 
           ) : null}
         </>
       ) : (
-        <Empty icon={<Sun size={24} />} text="今天还没有已结账的场次" />
+        /* P2-6：空态给下一步，而不是只报「没有」 */
+        <Empty
+          icon={<Sun size={24} />}
+          text="今天还没有已结账的场次"
+          action={
+            <Btn block={false} size="sm" onClick={hasOpenSession ? onGoCurrent : onGoRecord}>
+              {hasOpenSession ? '去看进行中这一场' : '去记一笔'}
+            </Btn>
+          }
+        />
       )}
 
       <OpenSessionNote count={day.openSessionCount} fen={day.openRevenueFen} />
@@ -270,6 +300,81 @@ function VoidedSheet({
   );
 }
 
+/**
+ * 「补过 N 单」明细（P2-7）。
+ *
+ * 数据来源（为什么不用新字段）：`SalesOrder` 没有 patchedAt / patched 标记，
+ * `repo.addPatchedRecord` 写的就是一张普通订单，只在 Session 上 patchedCount+1。
+ * 但补记只允许发生在结账之后，所以「本场里 createdAt 晚于 closedAt 的未删除单」
+ * 就是补记单，createdAt 就是补记时间 —— 不需要改 db 层，也不怕旧数据没有标记。
+ * 时间格式统一是 nowIso() 的 UTC ISO（`...Z`），字符串比较即时间比较。
+ *
+ * 补记单如果后来被删除，这里列出的会比 patchedCount 少；副标题如实给出总数。
+ */
+function PatchedSheet({
+  session,
+  orders,
+  lines,
+  productByName,
+  onClose
+}: {
+  session: Session;
+  orders: SalesOrder[];
+  lines: SaleLine[];
+  productByName: Map<string, Product>;
+  onClose: () => void;
+}) {
+  const summaryByOrder = useMemo(() => {
+    const m = new Map<string, string>();
+    for (const l of lines) {
+      const p = productByName.get(l.productId);
+      const text = `${p?.name ?? DELETED_PRODUCT} ${qtyToStr(l.qtyBase, p?.boxQty ?? 0, p?.unitBase ?? '个')}`;
+      m.set(l.orderId, m.has(l.orderId) ? `${m.get(l.orderId)}、${text}` : text);
+    }
+    return m;
+  }, [lines, productByName]);
+
+  return (
+    <Sheet
+      title={`这一场补过的 ${session.patchedCount} 单`}
+      subtitle={`共 ${orders.length} 笔 · 按补记时间倒序`}
+      onClose={onClose}
+    >
+      {orders.length === 0 ? (
+        <Empty
+          icon={<PenLine size={24} />}
+          text="没有找到补记单明细"
+          hint="补记单可能已被删除，或另一台手机的数据还没同步过来"
+        />
+      ) : (
+        <ul className="glass-list">
+          {orders.map((o) => (
+            <li key={o.id} className="glass-list__item">
+              <span className="glass-list__leading">
+                <PenLine size={20} aria-hidden="true" />
+              </span>
+              <div className="glass-list__content">
+                <div className="glass-list__title-row">
+                  <div className="glass-list__title">
+                    {isoToLocalDate(o.createdAt)} {isoToTime(o.createdAt)} · {o.operator}
+                  </div>
+                  <span className="glass-badge">{PAY_LABEL[o.payMethod]}</span>
+                </div>
+                <div className="glass-list__subtitle">
+                  {summaryByOrder.get(o.id) ?? '商品明细缺失'}
+                </div>
+              </div>
+              <div className="glass-list__trailing">
+                <span className="report-patched-amount">¥{fenToStr(o.totalFen)}</span>
+              </div>
+            </li>
+          ))}
+        </ul>
+      )}
+    </Sheet>
+  );
+}
+
 /** 本场汇总卡内容（销售额 / 收款分项 / 毛利 / 让利 / 赠品） */
 function SessionSummaryCard({
   selected,
@@ -277,6 +382,10 @@ function SessionSummaryCard({
   payTotal,
   payMismatch,
   costMissing,
+  isLocal,
+  onOpenPicker,
+  onOpenPatched,
+  onCopy,
   onPatchSession,
   onGoRecord,
   onOpenVoided
@@ -286,40 +395,79 @@ function SessionSummaryCard({
   payTotal: number;
   payMismatch: boolean;
   costMissing: boolean;
+  /** 是否本机场次：只有本机才能补记；另一台手机的场次要标出来，免得用户找不到「补记」 */
+  isLocal: boolean;
+  onOpenPicker: () => void;
+  onOpenPatched: () => void;
+  onCopy: () => void;
   onPatchSession: () => void;
   onGoRecord: () => void;
   onOpenVoided: () => void;
 }) {
   if (!selected) {
     return (
-      <Empty
-        icon={<PenLine size={24} />}
-        text="还没有场次，记一笔就开始这一场"
-        action={
-          <Btn block={false} size="sm" onClick={onGoRecord}>
-            记一笔
-          </Btn>
-        }
-      />
+      <>
+        {/*
+          无场次也要给出一致的状态标签（「还没有场次」）：此时没有可切换的对象，
+          所以只做展示、不做按钮，避免一个点开也是空列表的死入口。
+        */}
+        <div className="report-session-head">
+          <span className="report-session-switch report-session-switch--static">
+            <CalendarRange size={16} aria-hidden="true" />
+            <span className="report-session-switch__scope">还没有场次</span>
+          </span>
+        </div>
+        <Empty
+          icon={<PenLine size={24} />}
+          text="还没有场次，记一笔就开始这一场"
+          action={
+            <Btn block={false} size="sm" onClick={onGoRecord}>
+              记一笔
+            </Btn>
+          }
+        />
+      </>
     );
   }
   return (
     <>
-      <div className="row-between" style={{ marginBottom: 6 }}>
-        <div className="tiny-text">{sessionRange(selected)}</div>
+      {/*
+        卡头 = 「当前是哪一场」+「怎么切换」合一（P0-2 / D / E）。
+        旧浮胶囊浮在内容上压住本场现金行与毛利值，文案「历史场次」也与
+        Sheet 首行「进行中这一场」矛盾；这里把它落到卡头，44px、拇指区、不遮任何金额。
+      */}
+      <div className="row-between report-session-head">
+        <SessionSwitchButton selected={selected} onOpenPicker={onOpenPicker} />
         <div className="row" style={{ gap: 8 }}>
+          {/* 另一台手机的场次：标出来，用户就不会疑惑为什么没有「补记」 */}
+          {!isLocal ? <span className="glass-badge report-foreign-badge">另一台手机</span> : null}
+          {/*
+            P2-7：徽标改成可点按钮（44px 命中区，视觉仍是 27px 徽标），
+            点开列出补了哪几单，不用再去「更多 → 销售记录」翻。
+          */}
           {selected.patchedCount > 0 ? (
-            <span className="glass-badge glass-badge--primary">
-              补过 {selected.patchedCount} 单
-            </span>
+            <button
+              type="button"
+              className="report-patch-btn"
+              aria-haspopup="dialog"
+              aria-label={`查看这一场补过的 ${selected.patchedCount} 单`}
+              onClick={onOpenPatched}
+            >
+              <span className="glass-badge glass-badge--primary glass-badge--interactive">
+                补过 {selected.patchedCount} 单
+              </span>
+            </button>
           ) : null}
-          {selected.status === 'closed' ? (
+          {selected.status === 'closed' && isLocal ? (
             <button type="button" className="link-btn" onClick={onPatchSession}>
               补记
             </button>
           ) : null}
         </div>
       </div>
+
+      {/* 时间范围仍是只读的次级信息：状态已由上面的徽标承担，这里只补具体起止时间 */}
+      <div className="tiny-text report-session-range">{sessionRange(selected)}</div>
 
       <div className="hero-stats">
         <div className="stat stat--hero">
@@ -347,12 +495,33 @@ function SessionSummaryCard({
           <span>支付宝</span>
           <span>¥{fenToStr(summary.alipayFen)}</span>
         </div>
-        <div className="pay-row pay-row--check">
-          <span>合计校验</span>
-          <span className={payMismatch ? 'bad' : 'ok'}>
-            ¥{fenToStr(payTotal)} {payMismatch ? '≠' : '✓'}
+        {/*
+          P1-8：正常时**不显示**「合计校验 ✓」。
+          payTotal 只是 cash+wechat+alipay 再相加，与 revenueFen 同源于
+          order.totalFen，恒等成立；打绿勾会让摊主误以为「现金箱已对过账」。
+          只有脏数据兜底（payMismatch）才亮红，并提示这不是现金短款。
+        */}
+        {payMismatch ? (
+          <div className="pay-row pay-row--check">
+            <span>收款合计</span>
+            <span className="bad">¥{fenToStr(payTotal)} ≠</span>
+          </div>
+        ) : null}
+      </div>
+
+      {/* 操作条：只服务上面的本场数字，所以紧贴三行收款，不再挂在单品表底部（A） */}
+      <div className="report-actions">
+        <Btn
+          block={false}
+          variant="secondary"
+          size="sm"
+          onClick={onCopy}
+          disabled={summary.orderCount === 0}
+        >
+          <span className="icon-text">
+            <Copy size={16} aria-hidden="true" /> 复制本场汇总
           </span>
-        </div>
+        </Btn>
       </div>
 
       <div className="stat-grid stat-grid--compact">
@@ -365,6 +534,7 @@ function SessionSummaryCard({
       <ExcludedLine
         count={summary.voidedCount ?? 0}
         fen={summary.voidedFen ?? 0}
+        scope="session"
         onOpen={onOpenVoided}
       />
 
@@ -375,26 +545,23 @@ function SessionSummaryCard({
   );
 }
 
-/** 单品毛利表：排序 state 与表头都在这里 */
+/**
+ * 单品毛利表：排序 state 与表头都在这里。
+ *
+ * 这里**只放表格**：单品卡不再承载任何跨卡操作（A）。「复制本场汇总」在
+ * 本场汇总卡里，否则要穿过整张表才够得到（实测 1223px）。
+ */
 function MarginTable({
   margins,
   productByName,
   selected,
-  orderCount,
-  voidedCount,
-  onCopy,
-  onPatchSession,
-  onGoRecord
+  voidedCount
 }: {
   margins: ProductMargin[];
   productByName: Map<string, Product>;
   selected?: Session;
-  orderCount: number;
   /** 本场被删除的单数：只有删除单的场次不能说成「还没卖东西」（M1） */
   voidedCount: number;
-  onCopy: () => void;
-  onPatchSession: () => void;
-  onGoRecord: () => void;
 }) {
   const [sort, setSort] = useState<SortKey>('gross');
 
@@ -431,7 +598,13 @@ function MarginTable({
   return (
     <Card flush>
       <div className="form-head form-head--inset">
-        <h2>单品（按{sort === 'gross' ? '毛利' : sort === 'revenue' ? '销售额' : '数量'}降序）</h2>
+        {/*
+          P2-3：缺成本的行永远置顶（H3 的安全默认），所以标题不能只说「按毛利降序」。
+          aria-sort 仍只表达点击列的方向，不受这句补充说明影响。
+        */}
+        <h2>
+          {`单品（按${sort === 'gross' ? '毛利' : sort === 'revenue' ? '销售额' : '数量'}降序，成本待补置顶）`}
+        </h2>
         {selected ? <span className="tiny-text">{sessionLabel(selected)}</span> : null}
       </div>
       {sortedMargins.length === 0 ? (
@@ -440,25 +613,27 @@ function MarginTable({
           text={
             selected
               ? voidedCount > 0
-                ? `这一场没有有效销售（${voidedCount} 笔已删除，可在上方「点开看」撤销）`
+                ? `这一场没有有效销售（${voidedCount} 笔已删除，可在上方「看这一场的 ${voidedCount} 笔」撤销）`
                 : '这一场还没卖东西'
               : '还没有场次'
           }
-          action={
-            selected && selected.status === 'closed' ? (
-              <Btn block={false} size="sm" onClick={onPatchSession}>
-                补记到这一场
-              </Btn>
-            ) : (
-              <Btn block={false} size="sm" onClick={onGoRecord}>
-                记一笔
-              </Btn>
-            )
+          /*
+            B/C：这里不再放「记一笔」或「补记到这一场」按钮。
+            补记的唯一入口在本场卡头，记一笔的唯一入口在空账本的空态里；
+            重复按钮会让摊主不知道该点哪个，还容易重复补记。
+            只留一句纯文案指向正确位置。
+          */
+          hint={
+            !selected
+              ? '先在上方「记一笔」开始这一场'
+              : selected.status === 'closed'
+                ? '点上方「补记」可补录'
+                : '用底栏「记账」开单'
           }
         />
       ) : (
         <div className="glass-table-wrap">
-          <table className="glass-table">
+          <table className="glass-table report-table">
             <thead>
               <tr>
                 <th>商品</th>
@@ -508,13 +683,13 @@ function MarginTable({
                     <td className="glass-table__num">¥{fenToStr(m.revenueFen)}</td>
                     <td className="glass-table__num hide-narrow">¥{fenToStr(m.discountFen)}</td>
                     <td className="glass-table__num hide-narrow">
-                      {m.giftQty ? `${m.giftQty} · ¥${fenToStr(m.giftCostFen ?? 0)}` : '—'}
+                      {m.giftQty ? `${m.giftQty} · ¥${fenToStr(m.giftCostFen ?? 0)}` : '无'}
                     </td>
                     <td className="glass-table__num">¥{fenToStr(m.costFen)}</td>
                     <td
                       className="glass-table__num"
                       style={{
-                        // 缺成本的行不许用「盈利绿」：数字后面加 ~，颜色降为次要文字
+                        // 缺成本的行不许用「盈利绿」：毛利本身就是未知，颜色降为次要文字
                         color: m.costIncomplete
                           ? 'var(--gl-color-text-muted)'
                           : m.grossFen >= 0
@@ -523,8 +698,12 @@ function MarginTable({
                         fontWeight: 'var(--yh-weight-semibold)'
                       }}
                     >
-                      ¥{fenToStr(m.grossFen)}
-                      {m.costIncomplete ? '~' : ''}
+                      {/*
+                        P0-3：汇总 hero 成本待补时显示「—」，本行必须同样说「—」。
+                        以前这里显示「¥5.00~」，同一屏对「这一场赚多少」给出两个答案，
+                        摊主会拿表格里那个数去定价。
+                      */}
+                      {m.costIncomplete ? '—' : `¥${fenToStr(m.grossFen)}`}
                     </td>
                   </tr>
                 );
@@ -534,33 +713,14 @@ function MarginTable({
         </div>
       )}
 
-      {selected ? (
-        <div className="report-actions">
-          <Btn
-            block={false}
-            variant="secondary"
-            size="sm"
-            onClick={onCopy}
-            disabled={orderCount === 0}
-          >
-            <span className="icon-text">
-              <Copy size={16} aria-hidden="true" /> 复制本场汇总
-            </span>
-          </Btn>
-          {selected.status === 'closed' ? (
-            <Btn block={false} size="sm" onClick={onPatchSession}>
-              <span className="icon-text">
-                <PenLine size={16} aria-hidden="true" /> 补记到这一场
-              </span>
-            </Btn>
-          ) : (
-            <Btn block={false} size="sm" onClick={onGoRecord}>
-              <span className="icon-text">
-                <PenLine size={16} aria-hidden="true" /> 去记一笔
-              </span>
-            </Btn>
-          )}
-        </div>
+      {/*
+        P0-3 脚注：只在真的有「—」时出现，解释它和 0 的区别。
+        赠品列的空值已改用「无」，避免和「毛利未知」共用同一个破折号。
+      */}
+      {sortedMargins.some((m) => m.costIncomplete) ? (
+        <p className="tiny-text report-table-footnote">
+          — = 成本待补，毛利暂不可算；去「进货」补录后自动恢复。
+        </p>
       ) : null}
     </Card>
   );
@@ -584,7 +744,8 @@ function ExpiryWarnings({
         <span className="tiny-text">{warnDays} 天内</span>
       </div>
       {warnings.length === 0 ? (
-        <Empty icon={<TriangleAlert size={24} />} text="没有临期批次" />
+        /* P2-6：空态写明窗口口径，和右上角「N 天内」一致；warnDays 来自设置，不写死 */
+        <Empty icon={<TriangleAlert size={24} />} text={`${warnDays} 天内没有到期批次`} />
       ) : (
         <ul className="glass-list" style={{ borderRadius: 'var(--yh-radius-lg)' }}>
           {warnings.map((w) => {
@@ -660,6 +821,8 @@ export default function ReportPage({
   const [mode, setMode] = useState<'current' | 'history'>('current');
   const [pickedId, setPickedId] = useState<string | null>(null);
   const [pickerOpen, setPickerOpen] = useState(false);
+  /** 「补过 N 单」明细弹层（P2-7） */
+  const [patchedOpen, setPatchedOpen] = useState(false);
   /** 删除单明细弹层：'today' = 今天已结账场次的删除单；'session' = 当前这一场 */
   const [voidedSheet, setVoidedSheet] = useState<'today' | 'session' | null>(null);
   /** 撤销删除的防连点（与流水页同一份守卫思路） */
@@ -672,25 +835,39 @@ export default function ReportPage({
     return m;
   }, [products]);
 
-  const deviceSessions = useMemo(
-    () => sessions.filter((s) => s.deviceId === deviceId),
-    [sessions, deviceId]
-  );
-
-  // 本机进行中的场次：与首页共用 db/sessionLogic.pickOpenSession 的口径，
-  // 依赖项仍是 sessions/deviceId（deviceSessions 由二者派生，等价）。
+  // 本机进行中的场次：与首页共用 db/sessionLogic.pickOpenSession 的口径。
+  // 进行中只属于开它的那台手机，所以这里**不**跨设备。
   const openSession = useMemo(
     () => pickOpenSession(sessions, deviceId),
     [sessions, deviceId]
   );
 
+  /**
+   * P1-7：场次 Sheet 要能下钻今天合计里的**每一场**，而 `dayReport` 用的是全部
+   * `sessions`（两台手机同步到本机 IndexedDB 的行都在），所以这里也按全部设备过滤。
+   *
+   * 旧实现用 `deviceSessions`（本机），于是今天卡「已结账 2 场 · ¥439.50」
+   * 而 Sheet 只有本机 1 场 ¥389.50 —— 另一台手机的 ¥50 场次无法下钻。
+   * 排序仍按 closedAt 倒序；数据只同步了一半时，就显示已同步的部分，不额外报错。
+   */
   const closed = useMemo(
     () =>
-      deviceSessions
+      sessions
         .filter((s) => s.status === 'closed')
         .sort((a, b) => ((a.closedAt ?? a.startedAt) < (b.closedAt ?? b.startedAt) ? 1 : -1)),
-    [deviceSessions]
+    [sessions]
   );
+
+  /** 今天已结账场次里，属于其它设备的数量（今天卡提示「含另一台手机 N 场」） */
+  const externalClosedTodayCount = useMemo(() => {
+    let n = 0;
+    for (const s of sessions) {
+      if (s.status !== 'closed' || !s.closedAt) continue;
+      if (isoToLocalDate(s.closedAt) !== today) continue;
+      if (s.deviceId !== deviceId) n += 1;
+    }
+    return n;
+  }, [sessions, deviceId, today]);
 
   /**
    * 今天合计（H1）：只算 closedAt 落在本地今天的**已结账**场次；
@@ -746,6 +923,18 @@ export default function ReportPage({
   );
 
   /**
+   * P2-7：补记单 = 本场里 createdAt 晚于 closedAt 的未删除单。
+   * 见 PatchedSheet 的注释：不改 db 层，用时间先后作等价标记。
+   */
+  const sessionPatchedOrders = useMemo(() => {
+    const closedAt = selected?.closedAt;
+    if (!selected || !closedAt) return [];
+    return newestFirst(
+      orders.filter((o) => !o.voided && o.sessionId === selected.id && o.createdAt > closedAt)
+    );
+  }, [orders, selected]);
+
+  /**
    * H2：毛利「—」按**场次**判断，不再看全局 fifo.uncoveredQty。
    *
    * 为什么要按场次：全局口径下，只要昨天/下一场/任何一个商品缺一批货，
@@ -785,6 +974,10 @@ export default function ReportPage({
       ? `毛利 —（成本待补：本场 ${summary.uncoveredQty} 个缺批次）`
       : `毛利 ¥${fenToStr(summary.grossFen)}`;
     const text = [
+      // P1-8：对账异常必须跟着复制文本走，否则发到微信里对方只看到一串干净数字
+      payMismatch
+        ? `⚠ 收款合计 ¥${fenToStr(payTotal)} 与销售额 ¥${fenToStr(summary.revenueFen)} 不符，请在 App 里核对`
+        : '',
       `本场 ${sessionRange(selected)}`,
       `销售额 ¥${fenToStr(summary.revenueFen)} · ${summary.orderCount} 单`,
       `现金 ¥${fenToStr(summary.cashFen)} · 微信 ¥${fenToStr(summary.wechatFen)} · 支付宝 ¥${fenToStr(summary.alipayFen)}`,
@@ -811,17 +1004,30 @@ export default function ReportPage({
   return (
     <div className="page-stack">
       {/* 今天合计：固定最上面、不参与场次切换（H1） */}
-      <TodayCard day={day} onOpenVoided={() => setVoidedSheet('today')} />
+      <TodayCard
+        day={day}
+        externalCount={externalClosedTodayCount}
+        hasOpenSession={Boolean(openSession)}
+        onGoCurrent={() => {
+          // 切回进行中这一场：mode 是内部状态，标签仍由 selected.status 决定
+          setMode('current');
+          setPickedId(null);
+        }}
+        onGoRecord={onGoRecord}
+        onOpenVoided={() => setVoidedSheet('today')}
+      />
 
       <Card>
-        <SessionScopeLabel mode={mode} selected={selected} />
-
         <SessionSummaryCard
           selected={selected}
           summary={summary}
           payTotal={payTotal}
           payMismatch={payMismatch}
           costMissing={costMissing}
+          isLocal={selected?.deviceId === deviceId}
+          onOpenPicker={() => setPickerOpen(true)}
+          onOpenPatched={() => setPatchedOpen(true)}
+          onCopy={copySummary}
           onPatchSession={patchSelected}
           onGoRecord={onGoRecord}
           onOpenVoided={() => setVoidedSheet('session')}
@@ -834,6 +1040,7 @@ export default function ReportPage({
           <p>
             收款合计 ¥{fenToStr(payTotal)} 与销售额 ¥{fenToStr(summary.revenueFen)} 对不上，
             可能是导入了旧数据或补记后未重算。请检查这一场的删除单与补记。
+            <strong>这是数据异常，不是现金短款；现金请自己数一遍。</strong>
           </p>
         </div>
       ) : null}
@@ -853,19 +1060,10 @@ export default function ReportPage({
         margins={margins}
         productByName={productByName}
         selected={selected}
-        orderCount={summary.orderCount}
         voidedCount={summary.voidedCount}
-        onCopy={copySummary}
-        onPatchSession={patchSelected}
-        onGoRecord={onGoRecord}
       />
 
       <ExpiryWarnings warnings={warnings} warnDays={warnDays} productById={productByName} />
-
-      {/* 场次切换的唯一点击入口：固定在底栏上方，页面滚到哪儿都够得到 */}
-      <SessionSwitchFab mode={mode} onOpenPicker={() => setPickerOpen(true)} />
-      {/* 占位：滚到底时最后一张卡能停在胶囊上方，不被浮胶囊压住右下角 */}
-      <div className="report-session-fab-gap" aria-hidden="true" />
 
       {voidedSheet ? (
         <VoidedSheet
@@ -874,6 +1072,17 @@ export default function ReportPage({
           restoringId={restoring}
           onUndo={(id) => void undoDelete(id)}
           onClose={() => setVoidedSheet(null)}
+        />
+      ) : null}
+
+      {/* P2-7：补记明细只在选中场次存在时打开 */}
+      {patchedOpen && selected ? (
+        <PatchedSheet
+          session={selected}
+          orders={sessionPatchedOrders}
+          lines={lines}
+          productByName={productByName}
+          onClose={() => setPatchedOpen(false)}
         />
       ) : null}
 
@@ -940,9 +1149,15 @@ export default function ReportPage({
                   }}
                 >
                   <div className="glass-list__content">
-                    <div className="glass-list__title">
-                      {isoToLocalDate(s.startedAt)} · {isoToTime(s.startedAt)}
-                      {s.patchedCount > 0 ? ` · 补过 ${s.patchedCount} 单` : ''}
+                    <div className="glass-list__title-row">
+                      <div className="glass-list__title">
+                        {isoToLocalDate(s.startedAt)} · {isoToTime(s.startedAt)}
+                        {s.patchedCount > 0 ? ` · 补过 ${s.patchedCount} 单` : ''}
+                      </div>
+                      {/* P1-7：中性徽标说明这是另一台手机的场次，不是异常 */}
+                      {s.deviceId !== deviceId ? (
+                        <span className="glass-badge report-foreign-badge">另一台手机</span>
+                      ) : null}
                     </div>
                     <div className="glass-list__subtitle">
                       {rep.orderCount} 单 · 销售额 ¥{fenToStr(rep.revenueFen)}

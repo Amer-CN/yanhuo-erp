@@ -1047,48 +1047,17 @@ body {
   box-shadow: inset 0 -1px 0 var(--gl-border-medium);
 }
 
-/* ------------------------------------------- 报表页：场次切换浮胶囊（L1） */
-
 /*
- * 场次切换原来在页面顶端（实测 y≈87），单手收摊时拇指够不到
- * （390×844 的拇指舒适区在 y > 562）。改成吸底胶囊：
- *   底边 = 96px（.app-main 给浮动底栏预留的那条）+ 安全区
- * 实测底栏浮起后占 763..828，胶囊 44px 高、底边落在 748，与底栏留 15px 呼吸位，
- * 中心 y≈726 —— 正好落在拇指区，且不占内容区高度。
- * 顶端只留一行只读的「统计范围」文字，不再放可点控件。
+ * 报表页的场次切换不再有吸底浮胶囊（2026-11-12 修复批次一）。
+ *
+ * 历史：L1 为了让收摊时单手够得到切换入口，把它做成 `position: fixed; bottom: 96px`。
+ * 实测它首屏就压住本场「现金 ¥6.00」行（29.2px 高）与本场毛利「—」（17.4px 高），
+ * 滚到 50%/75% 时还压住表格的毛利/成本列；文案「历史场次」也与 Sheet 首行
+ * 「进行中这一场」矛盾。现在入口落在本场卡的卡头（见 record.css
+ * `.report-session-switch`，y≈581、拇指区、不遮任何金额），
+ * 所以 `.report-session-fab` / `.report-session-fab-gap` 一并删除。
+ * 注意审计第十节第 6 条否掉的是「挪回页面顶端」（y≈87），不是卡头。
  */
-.report-session-fab {
-  position: fixed;
-  right: var(--yh-page-pad);
-  bottom: calc(96px + env(safe-area-inset-bottom, 0px));
-  z-index: var(--yh-z-dock);
-  min-height: var(--yh-touch-min);
-  max-width: calc(100% - var(--yh-space-8));
-  padding: 0 var(--yh-space-3);
-  display: inline-flex;
-  align-items: center;
-  gap: var(--yh-gap-tight);
-  border-radius: var(--yh-radius-pill);
-  background: linear-gradient(to bottom, var(--gl-surface-4), var(--gl-surface-3));
-  border: var(--yh-border-width) solid var(--gl-border-strong);
-  box-shadow: var(--yh-shadow-dock);
-  color: var(--gl-color-text-heading);
-  font-size: var(--yh-text-sm);
-  font-weight: var(--yh-weight-semibold);
-  white-space: nowrap;
-  cursor: pointer;
-  backdrop-filter: blur(var(--gl-blur));
-  -webkit-backdrop-filter: blur(var(--gl-blur));
-}
-
-.report-session-fab svg {
-  flex: 0 0 auto;
-}
-
-/* 浮在内容之上，滚到底时最后一屏给胶囊让出位置（否则表格末行右侧会被盖住） */
-.report-session-fab-gap {
-  height: calc(var(--yh-touch-min) + var(--yh-space-2));
-}
 
 .mini-card {
   padding: var(--yh-space-3) calc(var(--yh-space-3) + 2px);

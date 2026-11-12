@@ -758,20 +758,71 @@
 /* 示例商品横幅的样式已随 L-10 一起删除：那条提示改成一次性 Toast 后
    .sample-note 没有任何引用，留着只会让后人以为还有这么个组件。 */
 
-/* 报表：场次胶囊 / 排序表头 / 操作条 */
-.season-pick {
-  width: auto;
-  height: var(--yh-touch-min);
+/* 报表：本场状态胶囊 / 排序表头 / 本场卡操作条 */
+
+/*
+ * 本场「状态 + 切换场次」胶囊（P0-2 / D / E）。
+ *
+ * 位置：本场卡的卡头 —— 不是审计第十节第 6 条否掉的「页面顶端横条」：
+ * 卡头实测 y≈581，在首屏可视区与拇指区之内，而且紧贴它控制的金额；
+ * 顶端 y≈87 才是收摊时单手够不到的那个位置。
+ *
+ * 44px 触控下限 + pill 圆角；视觉上像一颗可点的玻璃胶囊，内容里带状态徽标，
+ * 所以「现在看的是哪一场」和「怎么切换」是同一个控件，且不遮挡任何内容。
+ */
+.report-session-switch {
+  min-height: var(--yh-touch-min);
   padding: 0 var(--yh-space-3);
   display: inline-flex;
   align-items: center;
   gap: var(--yh-gap-tight);
+  border-radius: var(--yh-radius-pill);
+  border: var(--yh-border-width) solid var(--gl-border-subtle);
+  background: var(--gl-surface-2);
+  color: var(--gl-color-text-heading);
+  /* 原生 button 不继承字体；不写这条会掉回 Arial，和卡片里的系统字体不一致 */
+  font-family: inherit;
   font-size: var(--yh-text-sm);
   font-weight: var(--yh-weight-medium);
-  color: var(--gl-color-text);
+  white-space: nowrap;
+  cursor: pointer;
+}
+
+.report-session-switch svg {
+  flex: 0 0 auto;
+}
+
+.report-session-switch:focus-visible {
+  outline: var(--yh-focus-width) solid var(--yh-focus-ring);
+  outline-offset: var(--yh-focus-offset);
+}
+
+/* 无场次时的状态标签只展示不可点：没有可切换的对象，不做假入口 */
+.report-session-switch--static {
+  cursor: default;
+}
+
+/* 卡头一行：390 宽下胶囊 + 「补过 N 单」+「补记」可能挤不下时整体换行，不压缩胶囊 */
+.report-session-head {
+  flex-wrap: wrap;
+  align-items: center;
+  row-gap: var(--yh-space-1);
+}
+
+/* 时间范围：状态已由徽标承担，这行只补具体起止时间 */
+.report-session-range {
+  margin-bottom: var(--yh-gap-tight);
+}
+
+/* 单品表脚注（P0-3）：解释「— = 成本待补」，只有表里真有「—」时才渲染 */
+.report-table-footnote {
+  margin: 0;
+  /* 与表格单元格的 10px 文字内边距对齐（--yh-gap-card 恰好是 10px） */
+  padding: var(--yh-space-2) var(--yh-gap-card) var(--yh-space-3);
 }
 
 .th-btn {
+  min-width: var(--yh-touch-min);
   min-height: var(--yh-touch-min);
   padding: 0 var(--yh-space-1);
   background: none;
@@ -789,15 +840,18 @@
   border-radius: var(--yh-radius-xs);
 }
 
-.pay-row--check .ok {
-  color: var(--yh-ink-ok);
-}
-
+/* 只剩异常（脏数据）时用的红字；正常状态不再有「合计校验 ✓」这一行（P1-8） */
 .pay-row--check .bad {
   color: var(--yh-ink-bad);
   font-weight: var(--yh-weight-semibold);
 }
 
+/*
+ * 本场汇总卡里的操作条（A）。
+ * 它以前挂在单品表底部，离本场毛利值 1223px；现在紧贴三行收款，
+ * 所以只保留一条上分隔线，表达「下面是对上面这组数字的操作」，
+ * 不再是表格页脚。
+ */
 .report-actions {
   display: flex;
   flex-wrap: wrap;
@@ -805,6 +859,109 @@
   padding: var(--yh-space-3) 0 0;
   border-top: 1px solid var(--gl-border-subtle);
   margin-top: var(--yh-space-3);
+}
+
+/* --------------------------------------------------- 报表：今天卡（P1-7 / P2-8） */
+
+/* 「含另一台手机 N 场」：跟标题同一块，但不抢 18px 标题的层级 */
+.report-day-external {
+  margin-top: var(--yh-space-0-5);
+}
+
+/*
+ * P2-8：三行收款（各约 36px）压成一行三列 —— 标签在上、金额在下。
+ * 不删任何一项，只改排布；金额用 15px（--yh-text-base）保证可读。
+ * 每格 minmax(0,1fr) 是让「¥1234.56」在 390 宽也不会把格子撑出卡片。
+ * 上下留 4px（--yh-space-1）而不是 8px：光靠三列只省 59px（480.5 → 421.5），
+ * 离 ≤400 还差 21.5px，所以今天卡内部间距统一收一档（只动间距，不动内容）。
+ */
+.report-pay-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: var(--yh-space-2);
+  padding: var(--yh-space-1) 0;
+  border-top: 1px solid var(--gl-border-subtle);
+  margin-bottom: var(--yh-space-2);
+}
+
+.report-pay-cell {
+  display: flex;
+  flex-direction: column;
+  gap: var(--yh-space-0-5);
+  min-width: 0;
+}
+
+.report-pay-cell .k {
+  font-size: var(--yh-text-xs);
+  color: var(--gl-color-text-muted);
+  line-height: var(--yh-leading-tight);
+}
+
+.report-pay-cell .v {
+  font-size: var(--yh-text-base);
+  font-weight: var(--yh-weight-semibold);
+  font-variant-numeric: tabular-nums;
+  line-height: var(--yh-leading-tight);
+  white-space: nowrap;
+}
+
+/*
+ * 光靠三列收款只省 59px（480.5 → 421.5），离 ≤400 还差 21.5px。
+ * 这里只收今天卡内部的**间距**（不删任何一项、不动卡片顺序）：
+ *   卡头 10→8、hero 10→8、hero 自身上下 12→8、收款格上下 8→4、
+ *   收款块下 10→8、已排除行上 12→8，合计 -26px。
+ * 作用域限定在 .report-day-card，本场卡的节奏不受影响。
+ */
+.report-day-card .report-day-head {
+  margin-bottom: var(--yh-space-2);
+}
+
+.report-day-card .hero-stats {
+  margin-bottom: var(--yh-space-2);
+}
+
+.report-day-card .stat--hero {
+  padding-top: var(--yh-space-2);
+  padding-bottom: var(--yh-space-2);
+}
+
+.report-day-card .report-excluded {
+  margin-top: var(--yh-space-2);
+}
+
+/*
+ * P2-7：「补过 N 单」徽标可点。徽标本身只有 27px 高（GlassKit 规格），
+ * 用 44px 的透明按钮包一层做命中区，视觉尺寸不变、也不会撑高卡头那一行
+ * （同一行的「补记」本来就是 44px）。
+ */
+.report-patch-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: var(--yh-touch-min);
+  padding: 0;
+  background: none;
+  border: 0;
+  font: inherit;
+  cursor: pointer;
+}
+
+.report-patch-btn:focus-visible {
+  outline: var(--yh-focus-width) solid var(--yh-focus-ring);
+  outline-offset: var(--yh-focus-offset);
+  border-radius: var(--yh-radius-pill);
+}
+
+/* 补记明细里的金额：与删除单金额同级的次要强调，但不加删除线 */
+.report-patched-amount {
+  font-variant-numeric: tabular-nums;
+  font-weight: var(--yh-weight-semibold);
+}
+
+/* P1-7：另一台手机的场次用中性徽标，不暗示异常 */
+.report-foreign-badge {
+  white-space: nowrap;
+  flex: 0 0 auto;
 }
 
 /* ------------------------------------------------------------ 报表：今天合计卡（H1） */
@@ -833,7 +990,7 @@
   font-variant-numeric: tabular-nums;
 }
 
-/* 「已排除 2 笔删除（¥83.00）· 点开看」：灰色小字，但可点 */
+/* 「已排除 2 笔删除（¥83.00）· 看今天的 2 笔」：灰色小字，但可点 */
 .report-excluded {
   display: flex;
   align-items: center;
@@ -854,6 +1011,29 @@
   align-items: center;
   gap: var(--yh-space-1);
   margin-top: 2px;
+}
+
+/*
+ * P2-4：商品列只有 64.9px，徽标文字被挤成「成本」/「待补」两行（实测 44.9×78），
+ * 整行被撑到 117.5–137px。徽标改成单行（11px 是角标档 `--yh-text-2xs`，
+ * 不是把正文缩小），并允许它整体换到商品名下一行（flex 不压缩）。
+ */
+.margin-flags .glass-badge {
+  white-space: nowrap;
+  flex: 0 0 auto;
+  font-size: var(--yh-text-2xs);
+  padding: 0 var(--yh-space-1);
+}
+
+/*
+ * 徽标单行后商品列的 min-content 会变宽，而表格在 390 宽只有 328px 可放。
+ * 把单元格左右内边距从 10px 收到 8px（5 列省 20px）换给商品列，
+ * 表格仍是 328px、不给 `.glass-table-wrap` 加任何 overflow（审计第十节第 5 条）。
+ */
+.report-table th,
+.report-table td {
+  padding-left: var(--yh-space-2);
+  padding-right: var(--yh-space-2);
 }
 
 /* 删除单弹层里的金额：灰 + 删除线，别让它看着像有效收入 */
