@@ -39,6 +39,7 @@ import MorePage from './MorePage';
 import RecordPage from './pages/RecordPage';
 import type { RecordDraft } from './recordDraft';
 import type { SyncApi } from './useSync';
+import { describeRemoteChanges } from './useSync';
 
 export type Tab = 'record' | 'purchase' | 'stock' | 'report' | 'more';
 export type SubPage = 'products' | 'history' | 'settings' | null;
@@ -113,18 +114,23 @@ export function useTheme() {
  * 颜色只用于一眼扫；形状 / 数字 / 符号保证色弱用户也能区分：
  *   空心灰环 = 离线（或未开云同步）、实心橙 + 数字 = 待推送 N 条、
  *   实心绿 + ✓ = 已同步、实心红 + ! = 同步出错。
+ * H3：另有一枚橙色数字角标表示「最近有 N 条对方改动」，点击查看并清空。
+ * B3：新设备首次拉历史时是「空心橙环 + ↓」，**不能**先亮绿 ✓「已同步」——
+ *     那一刻账本还是空的，绿色对勾等于告诉用户「历史没了」。
  * 点击只弹 Toast 说明，不新增全局状态。
  */
 function SyncDot({ sync, showToast }: { sync: SyncApi; showToast: Done }) {
-  const state: 'ok' | 'pending' | 'offline' | 'error' | 'off' = sync.error
+  const state: 'ok' | 'pending' | 'offline' | 'error' | 'off' | 'downloading' = sync.error
     ? 'error'
     : !sync.configured
       ? 'off'
       : !sync.online
         ? 'offline'
-        : sync.pending > 0
-          ? 'pending'
-          : 'ok';
+        : sync.initialSync === 'running'
+          ? 'downloading'
+          : sync.pending > 0
+            ? 'pending'
+            : 'ok';
 
   const clock = (ts: number | null): string => {
     if (!ts) return '';
@@ -139,22 +145,33 @@ function SyncDot({ sync, showToast }: { sync: SyncApi; showToast: Done }) {
 
   // 统一以「同步状态：」开头：避免与底部「记账」页签的可访问名撞车
   // （Playwright get_by_role(name=...) 默认是子串匹配，strict 模式会因两个按钮都含「记账」而报错）。
-  const label =
+  const baseLabel =
     state === 'error'
       ? '同步状态：同步出错，数据还在本机'
       : state === 'off'
         ? '同步状态：未开启云同步'
         : state === 'offline'
           ? '同步状态：离线，联网自动补发'
-          : state === 'pending'
-            ? `同步状态：待推送 ${sync.pending} 条`
-            : last
-              ? `同步状态：已同步，上次 ${last}`
-              : '同步状态：已同步';
+          : state === 'downloading'
+            ? sync.pulledCount > 0
+              ? `同步状态：正在下载历史（已拉 ${sync.pulledCount} 条）`
+              : '同步状态：正在下载历史'
+            : state === 'pending'
+              ? `同步状态：待推送 ${sync.pending} 条`
+              : last
+                ? `同步状态：已同步，上次 ${last}`
+                : '同步状态：已同步';
+  /**
+   * H3：最近有 N 条「对方改动」时，状态点仍显示 ✓（数据已同步），
+   * 但 aria-label 与数字角标会说明「刚刚被动过什么」——不能只靠颜色区分。
+   */
+  const changeCount = sync.remoteChanges.length;
+  const label =
+    changeCount > 0 ? `${baseLabel}，最近有 ${changeCount} 条对方改动` : baseLabel;
   const color =
     state === 'error'
       ? 'var(--yh-ink-bad)'
-      : state === 'pending'
+      : state === 'pending' || state === 'downloading'
         ? 'var(--yh-ink-warn)'
         : state === 'ok'
           ? 'var(--yh-ink-ok)'
@@ -170,19 +187,32 @@ function SyncDot({ sync, showToast }: { sync: SyncApi; showToast: Done }) {
   const mark =
     state === 'error'
       ? '!'
-      : state === 'pending'
-        ? sync.pending > 99
-          ? '99+'
-          : String(sync.pending)
-        : state === 'ok'
-          ? '✓'
-          : state === 'off'
-            ? '—'
-            : '';
+      : state === 'downloading'
+        ? '↓'
+        : state === 'pending'
+          ? sync.pending > 99
+            ? '99+'
+            : String(sync.pending)
+          : state === 'ok'
+            ? '✓'
+            : state === 'off'
+              ? '—'
+              : '';
 
   const showDetail = () => {
+    // H3：有「对方改动」角标时，点击先清空角标并打开列表，而不是只报一句「已同步」
+    if (changeCount > 0) {
+      const text = describeRemoteChanges(sync.remoteChanges);
+      sync.clearRemoteChanges();
+      // 带 action 只是避免被下一条普通提示顶掉（M-16 只保护「撤销」类）
+      showToast(text, 'warning', { label: '知道了', onClick: () => undefined });
+      return;
+    }
     if (state === 'error') {
       showToast(`同步出错：${sync.error}。数据还在本机，联网后会自动重试`, 'error');
+    } else if (state === 'downloading') {
+      // B3：别在这个节骨眼说「已同步」——历史还在路上，说清了用户才不会以为账本空了
+      showToast(sync.pulledCount > 0 ? `正在下载历史…（已拉 ${sync.pulledCount} 条），稍等一下` : '正在下载历史…，稍等一下', 'warning');
     } else if (state === 'off') {
       showToast('没开启云同步，账本只在这台手机上。到「设置与同步」可以开启', 'warning');
     } else if (state === 'offline') {
@@ -205,6 +235,7 @@ function SyncDot({ sync, showToast }: { sync: SyncApi; showToast: Done }) {
       aria-label={label}
       title={label}
       style={{
+        position: 'relative',
         minWidth: 44,
         height: 44,
         display: 'inline-flex',
@@ -214,6 +245,31 @@ function SyncDot({ sync, showToast }: { sync: SyncApi; showToast: Done }) {
         padding: '0 8px'
       }}
     >
+      {changeCount > 0 ? (
+        /* H3 角标：橙色数字（不只靠颜色；真实条数在 aria-label / 详情里给全） */
+        <span
+          aria-hidden="true"
+          style={{
+            position: 'absolute',
+            top: 2,
+            right: 1,
+            minWidth: 14,
+            height: 14,
+            padding: '0 3px',
+            borderRadius: 7,
+            background: 'var(--yh-ink-warn)',
+            color: '#fff',
+            fontSize: 9,
+            fontWeight: 700,
+            lineHeight: '14px',
+            textAlign: 'center',
+            boxSizing: 'border-box',
+            pointerEvents: 'none'
+          }}
+        >
+          {changeCount > 99 ? '99+' : changeCount}
+        </span>
+      ) : null}
       <span
         aria-hidden="true"
         style={{

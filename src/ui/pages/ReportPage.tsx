@@ -3,7 +3,7 @@ import {
   TriangleAlert,
   TrendingUp,
   Copy,
-  ChevronDown,
+  ChevronUp,
   PenLine,
   CalendarRange,
   Ban,
@@ -58,54 +58,52 @@ function newestFirst(list: SalesOrder[]): SalesOrder[] {
 }
 
 /**
- * 场次选择：进行中 / 历史场次切换 + 历史场次下拉入口（弹层仍在容器末尾渲染）。
+ * 场次选择：顶部只留「统计范围」只读标签，**可点入口下移成底部浮胶囊**（L1）。
  *
- * 2026-11-12（H1）：原来叫「本场」——收摊后它指的是**下一场**（22:00 新开、还没结账），
- * 摊主首屏看到的 ¥16.00 就是这么来的。改名「进行中」，而「今天合计」固定在最上面。
+ * 2026-11-12（L1）：原来「进行中 / 历史场次」分段 + 场次胶囊都在页面顶端（实测 y≈87），
+ * 收摊时单手拿手机根本够不到（390×844 的拇指舒适区在 y > 562）。
+ * 现在按 A 方案：顶部不再放任何可点控件，只写清「现在看的是哪一场」；
+ * 唯一的入口是吸在浮动底栏上方的这颗 44px 胶囊（`position: fixed`，
+ * 底边 = .app-main 给底栏预留的 96px + 安全区），点开仍是原来的场次 Sheet。
+ * 为什么不用 B（整体挪到「今天」卡下方）：那还停在上半屏，仍然够不到。
  */
-function SessionPicker({
+function SessionScopeLabel({ mode, selected }: { mode: 'current' | 'history'; selected?: Session }) {
+  const scopeText =
+    mode === 'current' ? '进行中这一场' : selected ? sessionLabel(selected) : '历史场次';
+  return (
+    /* 只读：让用户知道下面这些数字属于哪一场，但这里不再承担切换动作 */
+    <div className="tiny-text" style={{ marginBottom: 6 }}>
+      统计范围：{scopeText}
+    </div>
+  );
+}
+
+/**
+ * 底部浮胶囊（B2 的唯一切换入口）。
+ *
+ * **必须挂在页面根节点上**，不能放进 `<Card>`：GlassKit 的玻璃卡带
+ * `backdrop-filter`，它会成为 fixed 后代的包含块，胶囊就跟着卡片定位
+ * （实测落到 y=869，比视口还低 25px），吸附底栏的效果直接失效。
+ */
+function SessionSwitchFab({
   mode,
-  onMode,
-  historyDisabled,
-  selected,
   onOpenPicker
 }: {
   mode: 'current' | 'history';
-  onMode: (mode: 'current' | 'history') => void;
-  historyDisabled: boolean;
-  selected?: Session;
   onOpenPicker: () => void;
 }) {
   return (
-    <div className="row-between" style={{ marginBottom: 12, alignItems: 'flex-start' }}>
-      <div className="glass-segmented" role="group" aria-label="统计范围">
-        <button
-          type="button"
-          className="glass-segmented__item"
-          aria-pressed={mode === 'current'}
-          onClick={() => onMode('current')}
-        >
-          进行中
-        </button>
-        <button
-          type="button"
-          className="glass-segmented__item"
-          aria-pressed={mode === 'history'}
-          onClick={() => onMode('history')}
-          disabled={historyDisabled}
-        >
-          历史场次
-        </button>
-      </div>
-
-      {mode === 'history' ? (
-        <button type="button" className="glass-pill season-pick" onClick={onOpenPicker}>
-          <CalendarRange size={16} aria-hidden="true" />
-          <span>{selected ? sessionLabel(selected) : '还没有历史场次'}</span>
-          <ChevronDown size={14} aria-hidden="true" />
-        </button>
-      ) : null}
-    </div>
+    <button
+      type="button"
+      className="glass-pill season-pick report-session-fab"
+      aria-label="切换场次"
+      aria-haspopup="dialog"
+      onClick={onOpenPicker}
+    >
+      <CalendarRange size={16} aria-hidden="true" />
+      <span>{mode === 'current' ? '历史场次' : '换一场'}</span>
+      <ChevronUp size={14} aria-hidden="true" />
+    </button>
   );
 }
 
@@ -816,13 +814,7 @@ export default function ReportPage({
       <TodayCard day={day} onOpenVoided={() => setVoidedSheet('today')} />
 
       <Card>
-        <SessionPicker
-          mode={mode}
-          onMode={setMode}
-          historyDisabled={closed.length === 0}
-          selected={selected}
-          onOpenPicker={() => setPickerOpen(true)}
-        />
+        <SessionScopeLabel mode={mode} selected={selected} />
 
         <SessionSummaryCard
           selected={selected}
@@ -870,6 +862,11 @@ export default function ReportPage({
 
       <ExpiryWarnings warnings={warnings} warnDays={warnDays} productById={productByName} />
 
+      {/* 场次切换的唯一点击入口：固定在底栏上方，页面滚到哪儿都够得到 */}
+      <SessionSwitchFab mode={mode} onOpenPicker={() => setPickerOpen(true)} />
+      {/* 占位：滚到底时最后一张卡能停在胶囊上方，不被浮胶囊压住右下角 */}
+      <div className="report-session-fab-gap" aria-hidden="true" />
+
       {voidedSheet ? (
         <VoidedSheet
           title={voidedSheet === 'today' ? '今天被删除的单' : '这一场被删除的单'}
@@ -886,45 +883,78 @@ export default function ReportPage({
           subtitle="按结账时间倒序"
           onClose={() => setPickerOpen(false)}
         >
+          <ul className="glass-list">
+            {/*
+              第一行固定是「进行中这一场」：底部胶囊是唯一的切换入口，
+              用户点进历史场次之后必须有一条明确的路回到进行中，
+              否则只能离开页面再进来（旧的分段控件消失后就没有退路了）。
+            */}
+            <li
+              className="glass-list__item glass-list__item--interactive list-item"
+              role="button"
+              tabIndex={0}
+              aria-pressed={mode === 'current'}
+              onClick={() => {
+                setMode('current');
+                setPickerOpen(false);
+              }}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter' || e.key === ' ') {
+                  e.preventDefault();
+                  setMode('current');
+                  setPickerOpen(false);
+                }
+              }}
+            >
+              <div className="glass-list__content">
+                <div className="glass-list__title">进行中这一场</div>
+                <div className="glass-list__subtitle">
+                  {openSession
+                    ? `${isoToTime(openSession.startedAt)} 开始 · 还没结账`
+                    : '本机没有进行中的场次'}
+                </div>
+              </div>
+            </li>
+            {closed.map((s) => {
+              const rep = sessionReport(s.id, orders, lines, fifo);
+              return (
+                <li
+                  key={s.id}
+                  className="glass-list__item glass-list__item--interactive list-item"
+                  role="button"
+                  tabIndex={0}
+                  aria-pressed={mode === 'history' && s.id === selected?.id}
+                  onClick={() => {
+                    setPickedId(s.id);
+                    // 选中某个历史场次 = 显式进入历史视图（旧的「历史场次」分段按钮已移除）
+                    setMode('history');
+                    setPickerOpen(false);
+                  }}
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter' || e.key === ' ') {
+                      e.preventDefault();
+                      setPickedId(s.id);
+                      setMode('history');
+                      setPickerOpen(false);
+                    }
+                  }}
+                >
+                  <div className="glass-list__content">
+                    <div className="glass-list__title">
+                      {isoToLocalDate(s.startedAt)} · {isoToTime(s.startedAt)}
+                      {s.patchedCount > 0 ? ` · 补过 ${s.patchedCount} 单` : ''}
+                    </div>
+                    <div className="glass-list__subtitle">
+                      {rep.orderCount} 单 · 销售额 ¥{fenToStr(rep.revenueFen)}
+                    </div>
+                  </div>
+                </li>
+              );
+            })}
+          </ul>
           {closed.length === 0 ? (
             <Empty icon={<CalendarRange size={24} />} text="还没有历史场次" />
-          ) : (
-            <ul className="glass-list">
-              {closed.map((s) => {
-                const rep = sessionReport(s.id, orders, lines, fifo);
-                return (
-                  <li
-                    key={s.id}
-                    className="glass-list__item glass-list__item--interactive list-item"
-                    role="button"
-                    tabIndex={0}
-                    aria-pressed={s.id === selected?.id}
-                    onClick={() => {
-                      setPickedId(s.id);
-                      setPickerOpen(false);
-                    }}
-                    onKeyDown={(e) => {
-                      if (e.key === 'Enter' || e.key === ' ') {
-                        e.preventDefault();
-                        setPickedId(s.id);
-                        setPickerOpen(false);
-                      }
-                    }}
-                  >
-                    <div className="glass-list__content">
-                      <div className="glass-list__title">
-                        {isoToLocalDate(s.startedAt)} · {isoToTime(s.startedAt)}
-                        {s.patchedCount > 0 ? ` · 补过 ${s.patchedCount} 单` : ''}
-                      </div>
-                      <div className="glass-list__subtitle">
-                        {rep.orderCount} 单 · 销售额 ¥{fenToStr(rep.revenueFen)}
-                      </div>
-                    </div>
-                  </li>
-                );
-              })}
-            </ul>
-          )}
+          ) : null}
         </Sheet>
       ) : null}
     </div>

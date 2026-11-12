@@ -7,6 +7,7 @@ import {
   SKIP_SETTINGS,
   UNKNOWN_KINDS_KEY,
   enqueueAllLocal,
+  enqueueInTx,
   enqueueMany,
   pendingCount,
   syncWanted
@@ -33,6 +34,59 @@ export interface SyncStatus {
   pending: number;
   lastSyncAt: number | null;
   error: string | null;
+}
+
+/**
+ * H3：本轮「被远端改变」的一条记录。
+ *
+ * **为什么只收三种**（其余一律不报）：
+ * 1. `overwritten`：本地**本来就有**、且内容真的不同，被远端覆盖（典型：对方改了商品标价）；
+ * 2. `removed`：本地本来就有，被远端墓碑删除；
+ * 3. `restored`：本地是删除态 / 曾经见过但已不存在，远端却是一条活行（典型：对方撤销了删除、
+ *    或清空后对方把旧数据带回来）。
+ *
+ * 不报：本地本来就没有的远端新记录（对方正常开单，不是「改你的账」）、初次全量拉取、
+ * 以及内容完全相同的重复应用（canonicalJson 已消除假差异）。否则每次同步都会刷屏，
+ * 真正需要人看一眼的那一条反而会被淹没。
+ */
+export type RemoteChangeType = 'overwritten' | 'removed' | 'restored';
+
+export interface RemoteChange {
+  type: RemoteChangeType;
+  kind: Kind;
+  recordId: string;
+  /** 人能看懂的名字（商品名 / 订单时间+金额 / 场次时间）；取不到退回类型名 */
+  label: string;
+  /** 覆盖 / 删除前的本地快照（撤销用） */
+  local?: Record<string, unknown>;
+  /** 远端带来的新快照（复活时用于判方向） */
+  remote?: Record<string, unknown>;
+  /** 被删订单的明细快照：撤销删除时一并还原，否则单回来了、钱却没了 */
+  children?: Record<string, unknown>[];
+}
+
+/** 一轮同步里三类「对方改动」的集合 */
+export interface RemoteImpact {
+  overwritten: RemoteChange[];
+  removed: RemoteChange[];
+  restored: RemoteChange[];
+}
+
+export function emptyRemoteImpact(): RemoteImpact {
+  return { overwritten: [], removed: [], restored: [] };
+}
+
+/** 把一页/一轮的 impact 合并进累计结果（顺序：删除 → 覆盖 → 复活） */
+export function mergeRemoteImpact(target: RemoteImpact, from: RemoteImpact): RemoteImpact {
+  target.overwritten.push(...from.overwritten);
+  target.removed.push(...from.removed);
+  target.restored.push(...from.restored);
+  return target;
+}
+
+/** 把三类合成一条时间序列表（Toast / 角标只关心「一共几条」） */
+export function remoteChangeList(impact: RemoteImpact): RemoteChange[] {
+  return [...impact.removed, ...impact.overwritten, ...impact.restored];
 }
 
 const LS = {
@@ -410,7 +464,7 @@ async function rest<T = unknown>(
 
 /* ------------------------------------------------------------------ 记录映射 */
 
-type Kind = 'product' | 'batch' | 'order' | 'line' | 'adjustment' | 'session' | 'setting';
+export type Kind = 'product' | 'batch' | 'order' | 'line' | 'adjustment' | 'session' | 'setting';
 
 /** 记录类型 → 本地表；同步的读写按类型批量合并，避免逐条往返。 */
 const TABLE_BY_KIND: Record<Kind, Table<any, any>> = {
@@ -852,6 +906,11 @@ interface RemotePlan {
   repush: { kind: Kind; id: string }[];
   /** 被入站校验判非法、整行丢弃的条数（诊断用，见 L-4） */
   invalid: number;
+  /**
+   * H3：本轮相对本地真正改变了哪些记录（覆盖 / 删除 / 复活）。
+   * 只用于同步结束后的提示与顶栏角标，不参与落库决策。
+   */
+  impact: RemoteImpact;
 }
 
 /** 回推节流表：`${kind}:${id}` → 上次回推时间（模块级，进程内有效即可） */
@@ -882,6 +941,210 @@ export function __resetSyncFlagsForTest(): void {
 function sameContentAsRemote(cur: unknown, remote: unknown, id: string): boolean {
   if (!isPlainObject(remote)) return false;
   return canonicalJson({ ...remote, id }) === canonicalJson(cur);
+}
+
+/* ---------------------------------------------------- H3：对方改动的识别与撤销 */
+
+/**
+ * 「本机见过的记录 id」集合（localStorage，`kind:id`）。
+ *
+ * 为什么需要它：本地删除是**硬删除**（业务表里没有墓碑表），所以「远端来了一条活行、
+ * 本地却没有」这一个条件分不清两件事：
+ * - 对方正常新记了一单 → 不该提示；
+ * - 我删掉的那单被对方撤销了 → 必须提示。
+ * 记住见过的 id 就能区分：见过的又回来了 = 复活；没见过的 = 对方新建。
+ *
+ * 上限只保留最近 `KNOWN_IDS_MAX` 条：它是「最近见过的账本」，不是审计日志；
+ * 被挤出窗口的老记录即使复活也不会提示（账本规模远小于上限，实际不会发生）。
+ */
+const KNOWN_IDS_KEY = 'yh-sync-known-ids';
+const KNOWN_IDS_MAX = 4000;
+
+function loadKnownIds(): Set<string> {
+  try {
+    const raw = localStorage.getItem(KNOWN_IDS_KEY);
+    if (!raw) return new Set();
+    const parsed = JSON.parse(raw) as unknown;
+    if (!Array.isArray(parsed)) return new Set();
+    return new Set(parsed.filter((v): v is string => typeof v === 'string'));
+  } catch {
+    // 存不下/解析失败只影响「复活」识别，绝不能阻断同步
+    return new Set();
+  }
+}
+
+function saveKnownIds(ids: Set<string>): void {
+  try {
+    // Set 保持插入顺序，slice(-MAX) 就是「保留最近见到的」
+    localStorage.setItem(KNOWN_IDS_KEY, JSON.stringify([...ids].slice(-KNOWN_IDS_MAX)));
+  } catch {
+    /* 同上：识别能力降级，但不影响数据 */
+  }
+}
+
+/** 快照只用于展示/撤销；必须是脱离 Dexie 对象的普通对象（避免引用被后续写入改掉） */
+function toSnapshot(value: unknown): Record<string, unknown> | undefined {
+  if (!isPlainObject(value)) return undefined;
+  try {
+    return JSON.parse(JSON.stringify(value)) as Record<string, unknown>;
+  } catch {
+    return { ...value };
+  }
+}
+
+/** 本地订单的「删除态」：整单作废。其它类型没有本地删除标记（删除即硬删） */
+function isDeletedState(kind: Kind, value: Record<string, unknown> | undefined): boolean {
+  return kind === 'order' && value?.voided === true;
+}
+
+/**
+ * 示例商品（`sample === true`）不算用户的账。
+ *
+ * 为什么必须单独排除：两台手机第一次打开时各自 seed 了同一批固定 id 的示例商品，
+ * 但 `createdAt/updatedAt` 是本机此刻生成的，于是「同一条记录内容不同」必然成立。
+ * 不排除的话，每台新设备首屏都会弹「另一台手机改了 8 条记录」，把真正的提示淹没。
+ * 用户改过任意字段后 `sample` 会被清掉（见 repo.updateProduct），所以真实的改价照报。
+ */
+function isSample(kind: Kind, value: Record<string, unknown> | undefined): boolean {
+  return kind === 'product' && value?.sample === true;
+}
+
+/**
+ * Toast / 角标里那个人能看懂的名字。
+ * 订单是「16:35 那单 ¥25.00」，商品是「大地红」，场次是「11/12 16:35 那场」；
+ * 取不到就退回类型名（例如「设置」），绝不给用户看 UUID。
+ */
+function changeLabel(kind: Kind, value: unknown): string {
+  const kindLabel = CONFLICT_KIND_LABEL[kind] ?? kind;
+  if (kind === 'product') {
+    const name = pickStr(value, 'name');
+    if (name) return `「${name}」`;
+  }
+  if (kind === 'order') {
+    const total = pickNum(value, 'totalFen');
+    const at = pickStr(value, 'createdAt');
+    if (at && total !== null) return `${isoToTime(at)} 那单 ¥${fenToStr(total)}`;
+    if (at) return `${isoToTime(at)} 那单`;
+    if (total !== null) return `¥${fenToStr(total)} 那单`;
+  }
+  if (kind === 'session') {
+    const at = pickStr(value, 'startedAt');
+    if (at) return `${isoToLocalDate(at)} ${isoToTime(at)} 那场`;
+  }
+  return kindLabel;
+}
+
+/**
+ * 判定一次 `take-remote` 是否要告诉用户。调用点已经确认「本地没有待推送改动」
+ * （pending 行在 applyRemoteBatch 之前就被跳过了），所以这里看到的就是「对方赢」。
+ */
+function collectTakeRemote(
+  impact: RemoteImpact,
+  kind: Kind,
+  recordId: string,
+  prev: unknown,
+  next: unknown,
+  knownIds: Set<string>
+): void {
+  // 明细跟着单走：单独报一条「改了明细」既看不懂又会和订单重复计数
+  if (kind === 'line') return;
+  if (kind === 'setting' && SKIP_SETTINGS.has(recordId)) return;
+
+  const local = toSnapshot(prev);
+  const remote = toSnapshot(next);
+  // 示例商品是两端各自 seed 的同一批固定 id，更新时间天然不同：不是「对方改了我的账」
+  if (isSample(kind, local) || isSample(kind, remote)) return;
+  const label = changeLabel(kind, remote ?? local);
+
+  if (!local) {
+    // 本地没有：只有「以前见过」才算复活，否则就是对方正常新记的单/初次拉取
+    if (!knownIds.has(`${kind}:${recordId}`)) return;
+    impact.restored.push({ type: 'restored', kind, recordId, label, remote });
+    return;
+  }
+  // 本地是作废态、远端是活行 = 对方撤销了作废/删除
+  if (isDeletedState(kind, local) && !isDeletedState(kind, remote)) {
+    impact.restored.push({ type: 'restored', kind, recordId, label, local, remote });
+    return;
+  }
+  // 内容相同：重叠窗口/重放把同一行重复应用了一遍，不是「对方改了」
+  // （settings 的主键是 key 而不是 id，不能套 `sameContentAsRemote` 的 id 归一化）
+  const same =
+    kind === 'setting'
+      ? local.value === remote?.value
+      : sameContentAsRemote(local, remote, recordId);
+  if (same) return;
+  impact.overwritten.push({ type: 'overwritten', kind, recordId, label, local, remote });
+}
+
+/** 判定一次远端墓碑是否要告诉用户：只有「本地原本有」才算被对方删掉 */
+function collectRemoved(
+  impact: RemoteImpact,
+  kind: Kind,
+  recordId: string,
+  prev: unknown
+): void {
+  if (kind === 'line') return;
+  if (kind === 'setting' && SKIP_SETTINGS.has(recordId)) return;
+  const local = toSnapshot(prev);
+  if (!local || isSample(kind, local)) return;
+  impact.removed.push({
+    type: 'removed',
+    kind,
+    recordId,
+    label: changeLabel(kind, local),
+    local
+  });
+}
+
+/**
+ * 撤销「被对方覆盖 / 被对方删除」：把本地旧快照写回业务表，并入队让云端收敛回本地版本。
+ *
+ * 为什么直接写快照而不是复用 `updateProduct/updateRecord`：
+ * - 被删的订单在本地已经不存在，`restoreOrder` 找不到行；只有快照能把它重建回来；
+ * - 覆盖可能发生在已结账的单/场次上，`updateRecord` 有「本场 open 才能改」的业务限制。
+ * 撤销是**用户主动行为**（不是自动回滚），写库 + 入队仍在同一事务里，本地优先不破。
+ */
+export async function restoreLocalSnapshot(change: RemoteChange): Promise<void> {
+  const snapshot = toSnapshot(change.local);
+  if (!snapshot) throw new Error('这条改动没有留下本地旧值，无法撤销');
+  const row: Record<string, unknown> =
+    change.kind === 'setting'
+      ? { key: change.recordId, value: snapshot.value }
+      : { ...snapshot, id: change.recordId };
+  const tables: Table<any, any>[] = [TABLE_BY_KIND[change.kind]];
+  const lines = (change.children ?? [])
+    .map((line) => toSnapshot(line))
+    .filter((line): line is Record<string, unknown> => Boolean(line));
+  // 订单被删时明细已被级联删除：撤销必须把明细一起写回，否则「单回来了、钱却没了」
+  if (change.kind === 'order' && lines.length > 0) tables.push(db.lines);
+  await db.transaction('rw', [...tables, db.outbox], async () => {
+    await TABLE_BY_KIND[change.kind].put(row);
+    if (change.kind === 'order' && lines.length > 0) {
+      await db.lines.bulkPut(lines as unknown as SaleLine[]);
+    }
+    await enqueueInTx([
+      { kind: change.kind, recordId: change.recordId },
+      ...(change.kind === 'order'
+        ? lines.map((line) => ({
+            kind: 'line' as const,
+            recordId: String(line.id),
+            op: 'upsert' as const
+          }))
+        : [])
+    ]);
+  });
+  syncWanted();
+}
+
+/** 撤销「被对方复活」时，把本地重新删掉（其它类型用；订单走 `voidOrder`，见 useSync） */
+export async function dropLocalRecord(kind: Kind, recordId: string): Promise<void> {
+  const table = TABLE_BY_KIND[kind];
+  await db.transaction('rw', [table, db.outbox], async () => {
+    await table.delete(recordId);
+    await enqueueInTx([{ kind, recordId, op: 'delete' }]);
+  });
+  syncWanted();
 }
 
 /** 节流表只在变大时清理过期键，避免长期运行后无界增长 */
@@ -933,14 +1196,19 @@ async function repushLocalVersions(candidates: RemotePlan['repush']): Promise<vo
  * 决策：把一页远端行算成「待写 / 待删 / 冲突」三张清单，纯内存，不落库。
  * 决策顺序与逐条应用完全一致。
  */
-function planRemoteChanges(knownRows: RemoteRow[], current: Map<string, unknown>): RemotePlan {
+function planRemoteChanges(
+  knownRows: RemoteRow[],
+  current: Map<string, unknown>,
+  knownIds: Set<string>
+): RemotePlan {
   const plan: RemotePlan = {
     puts: new Map(),
     deletes: new Map(),
     conflicts: [],
     unknownIds: [],
     repush: [],
-    invalid: 0
+    invalid: 0,
+    impact: emptyRemoteImpact()
   };
   const { puts, deletes, conflicts: conflictRows } = plan;
 
@@ -987,6 +1255,9 @@ function planRemoteChanges(knownRows: RemoteRow[], current: Map<string, unknown>
       // 删掉本机 deviceId 会让 ensureDeviceId 重新生成 UUID，正在进行中的场次立刻「找不到」，
       // getLastSession 也看不到原场次；deviceName / sync-unknown-kinds 同理只属于本机。
       if (row.kind === 'setting' && SKIP_SETTINGS.has(row.record_id)) continue;
+      // H3：先取本地旧值再删 —— 只有「本地原本有」才算「对方删掉了我的数据」
+      const prev = current.get(`${row.kind}:${row.record_id}`);
+      collectRemoved(plan.impact, row.kind, row.record_id, prev);
       if (row.kind === 'order') dropLinesOfOrder(row.record_id);
       deleteRow(row.kind, row.record_id);
       continue;
@@ -1035,6 +1306,7 @@ function planRemoteChanges(knownRows: RemoteRow[], current: Map<string, unknown>
           ? mergeSessionPair(cur as Session, { ...remote, id: row.record_id })
           : { ...remote, id: row.record_id };
         putRow('session', row.record_id, merged);
+        collectTakeRemote(plan.impact, 'session', row.record_id, cur, merged, knownIds);
         break;
       }
       case 'setting': {
@@ -1046,7 +1318,9 @@ function planRemoteChanges(knownRows: RemoteRow[], current: Map<string, unknown>
           break;
         }
         // 设置只认 key/value 两个字段，其余字段一律不落库
-        putRow('setting', row.record_id, { key: row.record_id, value: parsedSetting.value });
+        const nextSetting = { key: row.record_id, value: parsedSetting.value };
+        putRow('setting', row.record_id, nextSetting);
+        collectTakeRemote(plan.impact, 'setting', row.record_id, cur, nextSetting, knownIds);
         break;
       }
       default: {
@@ -1059,10 +1333,12 @@ function planRemoteChanges(knownRows: RemoteRow[], current: Map<string, unknown>
           break;
         }
         warnUnknownEnumRemote(row.kind, row.record_id, parsed);
-        putRow(row.kind, row.record_id, {
+        const next = {
           ...projectDeclaredFields(row.kind, parsed),
           id: row.record_id
-        });
+        };
+        putRow(row.kind, row.record_id, next);
+        collectTakeRemote(plan.impact, row.kind, row.record_id, cur, next, knownIds);
       }
     }
   }
@@ -1156,10 +1432,18 @@ async function saveConflicts(rows: SyncConflictRow[]): Promise<void> {
 interface ApplyResult {
   /** 真正写入/删除的业务行数（未知 kind 记入诊断键也算已处理） */
   applied: number;
+  /**
+   * 本页新写入的**订单**行数。
+   * 只在「新设备首次接入」提示里用（文案是「已下载 N 单」），
+   * 不能拿 `applied` 冒充单数 —— 那一轮还包含商品/批次/明细/场次行。
+   */
+  orders: number;
   /** 被「本地还有待推送改动」跳过的行数（不是错误，只是本轮不覆盖本地） */
   pending: number;
   /** 被入站校验判非法而跳过的行数 */
   invalid: number;
+  /** H3：本页相对本地真正改变了哪些记录（供同步结束后的提示/角标使用） */
+  impact: RemoteImpact;
 }
 
 /**
@@ -1177,9 +1461,16 @@ interface ApplyResult {
  */
 async function applyRemoteBatch(
   rows: RemoteRow[],
-  opts: { replay?: boolean } = {}
+  opts: { replay?: boolean; suppressRemoved?: boolean } = {}
 ): Promise<ApplyResult> {
-  if (rows.length === 0) return { applied: 0, pending: 0, invalid: 0 };
+  const empty = (): ApplyResult => ({
+    applied: 0,
+    orders: 0,
+    pending: 0,
+    invalid: 0,
+    impact: emptyRemoteImpact()
+  });
+  if (rows.length === 0) return empty();
 
   // 本地还有没推上去的改动时以本地为准
   const queued = await db.outbox.bulkGet(rows.map((r) => `${r.kind}:${r.record_id}`));
@@ -1189,17 +1480,19 @@ async function applyRemoteBatch(
   });
   const active = rows.filter((r) => !pendingIds.has(`${r.kind}:${r.record_id}`));
   const pending = rows.length - active.length;
-  if (active.length === 0) return { applied: 0, pending, invalid: 0 };
+  if (active.length === 0) return { ...empty(), pending };
 
   const knownRows = active.filter((r) => KNOWN_KINDS.has(r.kind));
   const unknownIds = active
     .filter((r) => !KNOWN_KINDS.has(r.kind))
     .map((r) => `${String(r.kind)}:${r.record_id}`);
   if (knownRows.length === 0 && unknownIds.length === 0) {
-    return { applied: 0, pending, invalid: 0 };
+    return { ...empty(), pending };
   }
 
-  const { plan, applied } = await db.transaction(
+  // H3：先取「本机见过的 id」快照，用来区分「对方新记的单」和「我删掉又被对方复活的单」
+  const knownIds = loadKnownIds();
+  const { plan, applied, newOrders } = await db.transaction(
     'rw',
     [...RECORD_TABLES, db.conflicts],
     async () => {
@@ -1216,19 +1509,60 @@ async function applyRemoteBatch(
         ids.forEach((id, i) => current.set(`${kind}:${id}`, locals[i]));
       }
 
-      const planned = planRemoteChanges(knownRows, current);
+      const planned = planRemoteChanges(knownRows, current, knownIds);
       planned.unknownIds = unknownIds;
       // 重放轮：冲突留痕不重记（同一条冲突增量轮已经记过，天天重记会让 conflicts 无界增长）
       if (opts.replay) planned.conflicts = [];
+      /*
+       * H3：撤销「被对方删除」需要把订单明细一起还回来。
+       * 明细会在 applyPlannedChanges 里被级联删掉，所以必须**先**读快照，再落库。
+       */
+      for (const change of planned.impact.removed) {
+        if (change.kind !== 'order') continue;
+        const children = await db.lines.where('orderId').equals(change.recordId).toArray();
+        change.children = children
+          .map((line) => toSnapshot(line))
+          .filter((line): line is Record<string, unknown> => Boolean(line));
+      }
       const appliedCount = await applyPlannedChanges(planned);
-      return { plan: planned, applied: appliedCount };
+      /*
+       * 首次接入的「已下载 N 单」要的是**本机原本没见过**的订单数：
+       * `plan.puts` 里同样可能是对已有订单的覆盖，直接数 puts 会把改价也算成新单。
+       * 判据用 `knownIds`（每次应用远端行后落盘的「本机见过的 id」）：
+       * 它在本次 apply 之前取快照，新设备首轮为空 → 全部算新单；
+       * 之后的增量轮里，老订单早已在集合里 → 不会每轮重复报数。
+       */
+      let added = 0;
+      for (const id of planned.puts.get('order')?.keys() ?? []) {
+        if (!knownIds.has(`order:${id}`)) added += 1;
+      }
+      return { plan: planned, applied: appliedCount, newOrders: added };
     }
   );
+
+  /*
+   * 清空账本触发的全量重放：那些墓碑是「清空」本身，不是「对方悄悄删你的单」。
+   * 如果照样报「删掉了 N 条」，一次清空就会把真正需要看的提示顶掉；而且给「撤销」
+   * 等于让用户一键回滚自己刚做的绝对操作。所以清空轮只收「覆盖 / 复活」。
+   */
+  if (opts.suppressRemoved) plan.impact.removed = [];
+
+  // 记住见过的 id：下次「本地没有 + 远端活行」才能判成复活（行内不记 line，明细不单独提示）
+  let added = 0;
+  for (const row of knownRows) {
+    if (row.kind === 'line') continue;
+    const key = `${row.kind}:${row.record_id}`;
+    if (!knownIds.has(key)) {
+      knownIds.add(key);
+      added += 1;
+    }
+  }
+  if (added > 0) saveKnownIds(knownIds);
 
   // 回推放在事务提交之后：db.outbox 不在本事务范围内，且入队是 best-effort
   // （回推失败不能让「已经应用的远端行」被回滚，更不能让本轮同步报错）。
   await repushLocalVersions(plan.repush);
-  return { applied, pending, invalid: plan.invalid };
+  return { applied, orders: newOrders, pending, invalid: plan.invalid, impact: plan.impact };
 }
 
 /** 拉取游标：(updated_at, id) 复合水位，避免同毫秒记录在翻页时被永久跳过 */
@@ -1387,13 +1721,15 @@ async function readClearMark(cfg: SyncConfig): Promise<number> {
  * 这一步只在本地水位 > 0 时打探针（水位为 0 时本来就要全量拉，不需要标记），
  * 且 syncNow 会把返回值直接交给 `pull`，一轮同步只探一次。
  */
-async function resolvePullStart(cfg: SyncConfig): Promise<PullCursor> {
+async function resolvePullStart(
+  cfg: SyncConfig
+): Promise<{ cursor: PullCursor; cleared: boolean }> {
   const local: PullCursor = { ts: lastPullAt(), id: lastPullId() };
   // 水位为 0 时本来就要全量拉取，不必多打一次探针
-  if (local.ts <= 0) return local;
+  if (local.ts <= 0) return { cursor: local, cleared: false };
 
   const mark = await readClearMark(cfg);
-  if (mark <= 0 || mark === clearedMark()) return local;
+  if (mark <= 0 || mark === clearedMark()) return { cursor: local, cleared: false };
 
   // 先落盘再开拉：即使本轮中途失败，也不会反复重置、卡在同一份全量重放上
   setClearedMark(mark);
@@ -1405,7 +1741,8 @@ async function resolvePullStart(cfg: SyncConfig): Promise<PullCursor> {
   if (dropped > 0) {
     appendWarn(`清空账本：丢弃 ${dropped} 条清空前的待推送改动（它们属于被清掉的旧账本）`);
   }
-  return reset;
+  // cleared=true 让本轮 pull 不把「清空产生的墓碑」当成「对方删掉了你的单」（H3）
+  return { cursor: reset, cleared: true };
 }
 
 /**
@@ -1427,6 +1764,8 @@ async function dropOutboxQueuedBefore(clearedAt: number): Promise<number> {
 interface PullPassResult {
   /** 本轮实际应用（写入/删除/记为未知类型）的远端行数 */
   pulled: number;
+  /** 本轮**新增**的订单数（B3：新设备首屏「已下载 N 单」，与 pulled 行数不是一个口径） */
+  pulledOrders: number;
   /** 页数配额用光，且**确认后面还有数据**（探测页非空） */
   capped: boolean;
   /** 本轮扫到的最后一个位置：capped 时据此续扫，避免下一轮从 0 重来 */
@@ -1435,6 +1774,8 @@ interface PullPassResult {
   skippedPending: number;
   /** 被入站校验判非法而跳过的行数 */
   skippedInvalid: number;
+  /** H3：本轮被远端覆盖 / 删除 / 复活的记录 */
+  impact: RemoteImpact;
 }
 
 /**
@@ -1454,16 +1795,30 @@ async function pullOnce(
   cfg: SyncConfig,
   start: PullCursor,
   replayAll: boolean,
-  opts: { persistCursor: boolean; replay: boolean }
+  opts: {
+    persistCursor: boolean;
+    replay: boolean;
+    suppressRemoved?: boolean;
+    /**
+     * B3 进度回调：每应用完一页就报一次「本轮累计已拉行数」。
+     * 只用于新设备首次接入的「正在下载历史…（已拉 N 条）」提示，
+     * 不参与任何落库判断（回调抛错也不会中断同步）。
+     */
+    onPull?: (pulled: number) => void;
+  }
 ): Promise<PullPassResult> {
   // 持久化游标：只按真实行尾推进（绝不写入回退后的起点）
   let cursor = start;
   // 请求游标：本轮第一页叠加重叠窗口，后续页从真实游标继续翻
   let requestCursor = pullStartCursor(start);
   let pulled = 0;
+  let pulledOrders = 0;
   let capped = false;
   let skippedPending = 0;
   let skippedInvalid = 0;
+  const impact = emptyRemoteImpact();
+  // 清空账本触发的重放：本轮的墓碑属于「清空」本身，不是「对方删你的单」（见 applyRemoteBatch）
+  let suppressRemoved = opts.suppressRemoved === true;
 
   for (let page = 0; page < MAX_PAGES; page++) {
     const rows = await fetchRemotePage(cfg, requestCursor);
@@ -1473,16 +1828,31 @@ async function pullOnce(
       const mark = rows
         .filter(isClearMarkerRow)
         .reduce((max, row) => Math.max(max, clearMarkValue(row)), 0);
-      if (mark > 0 && mark !== clearedMark()) setClearedMark(mark);
+      if (mark > 0 && mark !== clearedMark()) {
+        setClearedMark(mark);
+        // 本轮之后的行都跟着这次清空走：即使水位检查时没探到标记，这里也能兜住
+        suppressRemoved = true;
+      }
     }
 
     // 标记行只用来对齐「清空」状态：既不写业务表，也不进未知 kind 诊断
     const dataRows = rows.filter((row) => !isClearMarkerRow(row));
     if (dataRows.length > 0) {
-      const applied = await applyRemoteBatch(dataRows, { replay: opts.replay });
+      const applied = await applyRemoteBatch(dataRows, {
+        replay: opts.replay,
+        suppressRemoved
+      });
       pulled += applied.applied;
+      pulledOrders += applied.orders;
       skippedPending += applied.pending;
       skippedInvalid += applied.invalid;
+      mergeRemoteImpact(impact, applied.impact);
+      // B3：进度只影响提示文案，回调异常绝不能打断同步（同步语义不变）
+      try {
+        opts.onPull?.(pulled);
+      } catch {
+        /* 忽略：进度提示失败不影响数据落库 */
+      }
     }
     // 先落库再推进游标：中途失败时下次仍会重放同一页，不会留下空洞
     cursor = nextCursor(rows, cursor);
@@ -1498,7 +1868,7 @@ async function pullOnce(
     const probe = await fetchRemotePage(cfg, cursor, 1);
     capped = probe.length > 0;
   }
-  return { pulled, capped, cursor, skippedPending, skippedInvalid };
+  return { pulled, pulledOrders, capped, cursor, skippedPending, skippedInvalid, impact };
 }
 
 /**
@@ -1519,7 +1889,7 @@ async function pullOnce(
  *   （重放幂等，重复扫只是多花几次请求，不会写坏数据）。本摊账本远小于
  *   `MAX_PAGES × PAGE_SIZE`（1 万行），所以正常规模下一轮就能扫完。
  */
-async function dailyReplay(cfg: SyncConfig): Promise<void> {
+async function dailyReplay(cfg: SyncConfig): Promise<RemoteImpact> {
   // 上一轮若因页数配额中断，从续扫游标接着扫；否则从 0 开始（见 LS.lastReplayCursor）
   const resume = lastReplayCursor();
   console.info(resume.ts > 0 ? '[sync] 今日全量重放（续扫）' : '[sync] 今日首次同步做全量重放');
@@ -1534,30 +1904,57 @@ async function dailyReplay(cfg: SyncConfig): Promise<void> {
     setLastReplayCursor(pass.cursor);
     console.warn(`[sync] 全量重放未扫完（已扫至 ${pass.cursor.ts}），下次同步继续补`);
     warnReplayIncomplete(pass.cursor.ts);
-    return;
+    return pass.impact;
   }
   clearLastReplayCursor();
   clearWarnByPrefix(WARN_REPLAY_PREFIX);
   setLastReplayDate(localDate());
   console.info(`[sync] 全量重放完成，已应用 ${pass.pulled} 行`);
+  return pass.impact;
 }
 
-async function pull(cfg: SyncConfig, start?: PullCursor): Promise<number> {
+/** 一轮 pull 的结果：行数（诊断）+ H3 的「对方改动」 */
+interface PullOutcome {
+  pulled: number;
+  /** 本轮新增订单数（B3 首次接入提示「已下载 N 单」用） */
+  pulledOrders: number;
+  impact: RemoteImpact;
+}
+
+async function pull(
+  cfg: SyncConfig,
+  start?: PullCursor,
+  cleared = false,
+  onPull?: (pulled: number) => void
+): Promise<PullOutcome> {
   // syncNow 在 push 之前已经做过清空标记检查（H1）；这里复用那次的起点，
   // 避免一轮同步为同一条标记打两次探针。
-  const from = start ?? (await resolvePullStart(cfg));
+  let from: PullCursor;
+  let clearedThisRound = cleared;
+  if (start) {
+    from = start;
+  } else {
+    const resolved = await resolvePullStart(cfg);
+    from = resolved.cursor;
+    clearedThisRound = resolved.cleared;
+  }
   // 本轮是否从 0 全量重放（首次 / 清空账本后）：全量时看到标记行即可直接对齐，不必多打探针
   const replayAll = from.ts <= 0;
+  const impact = emptyRemoteImpact();
 
   // 增量轮：起点叠加重叠窗口，持久化水位按真实行尾推进
   const incremental = await pullOnce(cfg, from, replayAll, {
     persistCursor: true,
-    replay: false
+    replay: false,
+    suppressRemoved: clearedThisRound,
+    onPull
   });
   const pulled = incremental.pulled;
+  const pulledOrders = incremental.pulledOrders;
+  mergeRemoteImpact(impact, incremental.impact);
   warnSkippedRows(incremental.skippedPending, incremental.skippedInvalid);
 
-  if (lastReplayDate() === localDate()) return pulled;
+  if (lastReplayDate() === localDate()) return { pulled, pulledOrders, impact };
 
   // 水位本来就是 0：增量轮已经是一次完整全量，不必再叠一层，补落标记即可
   if (replayAll) {
@@ -1567,11 +1964,11 @@ async function pull(cfg: SyncConfig, start?: PullCursor): Promise<number> {
       clearLastReplayCursor();
       setLastReplayDate(localDate());
     }
-    return pulled;
+    return { pulled, pulledOrders, impact };
   }
 
-  await dailyReplay(cfg);
-  return pulled;
+  mergeRemoteImpact(impact, await dailyReplay(cfg));
+  return { pulled, pulledOrders, impact };
 }
 
 /* ------------------------------------------------- 冲突查看与「用云端」 */
@@ -1749,9 +2146,20 @@ export async function adoptRemoteConflict(id: number): Promise<void> {
 export interface SyncResult {
   pushed: number;
   pulled: number;
+  /** B3：本轮**新增**的订单数（新设备首次接入时提示「已下载 N 单」） */
+  pulledOrders: number;
+  /** H3：本轮被远端覆盖 / 删除 / 复活的记录（供 useSync 合成一条可撤销 Toast） */
+  impact: RemoteImpact;
 }
 
-export async function syncNow(cfg: SyncConfig): Promise<SyncResult> {
+/**
+ * @param onPull B3 进度回调：每应用完一页报一次累计行数。
+ *   只是给「正在下载历史…（已拉 N 条）」用的旁路信号，不改变 push/pull 顺序与落库语义。
+ */
+export async function syncNow(
+  cfg: SyncConfig,
+  onPull?: (pulled: number) => void
+): Promise<SyncResult> {
   if (!navigator.onLine) throw new Error('当前离线');
   const deviceId = (await db.settings.get('deviceId'))?.value ?? '';
   // H1：清空标记检查必须在 push 之前。否则本机（B）断网期间的旧改动会先落云，
@@ -1760,10 +2168,10 @@ export async function syncNow(cfg: SyncConfig): Promise<SyncResult> {
   // 清空之后的新改动不受影响，会在下面的 pushOutbox 里正常补发。
   const start = await resolvePullStart(cfg);
   const pushed = await pushOutbox(cfg, deviceId);
-  const pulled = await pull(cfg, start);
+  const { pulled, pulledOrders, impact } = await pull(cfg, start.cursor, start.cleared, onPull);
   localStorage.setItem(LS.lastSync, String(Date.now()));
   localStorage.removeItem(LS.error);
-  return { pushed, pulled };
+  return { pushed, pulled, pulledOrders, impact };
 }
 
 export async function testSyncConfig(cfg: SyncConfig): Promise<void> {

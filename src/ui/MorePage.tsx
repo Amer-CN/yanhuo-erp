@@ -26,19 +26,30 @@ export default function MorePage({
     syncing: boolean;
     pending: number;
     error: string | null;
+    /** B3：新设备首轮「下载历史」状态；running 时不能再显示「已连接」骗人 */
+    initialSync: 'idle' | 'running' | 'done';
+    /** B3：首轮已拉到的行数（不是单数，文案写「条」） */
+    pulledCount: number;
   };
   onOpen: (p: Exclude<SubPage, null>) => void;
   onCloseSession: () => void;
 }) {
+  /*
+   * B3：新设备首次接入时账本看着是空的（历史还在下载），
+   * 这一行原来直接写「已连接 · 待推送 0 条」，等于告诉用户「没有历史」。
+   * 首轮 pull 期间优先显示下载进度，拉完才回落到常规文案。
+   */
   const syncText = !sync.configured
     ? '未开启（点设置与同步）'
-    : !sync.online
-      ? '离线，联网后自动同步'
-      : sync.syncing
-        ? '同步中…'
-        : sync.error
-          ? '同步出错'
-          : `已连接 · 待推送 ${sync.pending} 条`;
+    : sync.initialSync === 'running'
+      ? `正在下载历史…（已拉 ${sync.pulledCount} 条）`
+      : !sync.online
+        ? '离线，联网后自动同步'
+        : sync.syncing
+          ? '同步中…'
+          : sync.error
+            ? '同步出错'
+            : `已连接 · 待推送 ${sync.pending} 条`;
 
   return (
     <div className="page-stack">

@@ -878,20 +878,26 @@ body {
 }
 
 /*
- * 报表页的单品表：**只做横向滚动，纵向交给 .app-main**（M-02）。
+ * 报表页的单品表：**整张表纵向交给 .app-main，表头真吸顶**（M6，2026-11-12）。
  *
- * 老写法是 `max-height:60dvh; overflow:auto`，于是页面上同时存在两条纵向滚动条：
- * 表格自己一条、.app-main 一条。表格内滚到底时 `overscroll-behavior:contain`
- * 还会把滚动链断掉 —— 用户在表格上方怎么滑页面都不动，以为界面卡死。
- * 现在去掉 max-height：表格高度=内容高度，纵向不会溢出，自然不会出现第二条滚动条。
- * 代价：表头（.glass-table thead th 的 sticky）改为随页面一起滚走 —— 这是
- * 拿「表头常驻」换掉「滚不动/两条滚动条」，对一屏几十行的单品表更划算。
- * 横向仍然要滚：390px 宽放不下 7 列。
+ * 历史：M-02 为了干掉「表格内滚动条 + 页面滚动条」两条并存的假死感，去掉了
+ * max-height，但保留了 `overflow-x: auto; overflow-y: hidden`。
+ * 只要这一层有**任何** overflow（哪怕是 hidden），`thead th` 的 sticky 就会相对
+ * 这个「纵向不滚的盒子」定位：它永远没机会真的粘住，页面滚到 900px 时实测
+ * thTop = -48（表头已滚出视口，8 行数据看不到列名）。
+ *
+ * 为什么 390 宽根本不需要横向滚动容器（这是删掉 overflow 的依据）：
+ * 窄屏下「让利 / 赠品」两列走 `.hide-narrow` 直接不渲染，实测 390×844 时
+ * `.glass-table-wrap` 的 scrollWidth = clientWidth = 328，横向滚动条从来没出现过；
+ * 宽屏列更多但可用宽度也更大，同样不溢出。为一个不存在的溢出保留 overflow，
+ * 代价却是表头永远吸不住，明显不划算。
+ *
+ * 所以这里改成 overflow: visible：纵向滚动回到 .app-main（唯一滚动容器），
+ * sticky 相对它生效；万一将来真多一列溢出，也应该用 min-width / 列宽约束解决，
+ * 不要再给这一层打开 overflow —— 那会让表头再次静默失效。
  */
 .glass-table-wrap {
-  overflow-x: auto;
-  overflow-y: hidden; /* 显式声明：永远不在这层纵向滚，避免溢出时冒出第二条滚动条 */
-  overscroll-behavior-x: contain;
+  overflow: visible;
 }
 
 .glass-table thead th {
@@ -901,6 +907,49 @@ body {
   background: var(--yh-canvas);
   border-bottom: 0;
   box-shadow: inset 0 -1px 0 var(--gl-border-medium);
+}
+
+/* ------------------------------------------- 报表页：场次切换浮胶囊（L1） */
+
+/*
+ * 场次切换原来在页面顶端（实测 y≈87），单手收摊时拇指够不到
+ * （390×844 的拇指舒适区在 y > 562）。改成吸底胶囊：
+ *   底边 = 96px（.app-main 给浮动底栏预留的那条）+ 安全区
+ * 实测底栏浮起后占 763..828，胶囊 44px 高、底边落在 748，与底栏留 15px 呼吸位，
+ * 中心 y≈726 —— 正好落在拇指区，且不占内容区高度。
+ * 顶端只留一行只读的「统计范围」文字，不再放可点控件。
+ */
+.report-session-fab {
+  position: fixed;
+  right: var(--yh-page-pad);
+  bottom: calc(96px + env(safe-area-inset-bottom, 0px));
+  z-index: var(--yh-z-dock);
+  min-height: var(--yh-touch-min);
+  max-width: calc(100% - var(--yh-space-8));
+  padding: 0 var(--yh-space-3);
+  display: inline-flex;
+  align-items: center;
+  gap: var(--yh-gap-tight);
+  border-radius: var(--yh-radius-pill);
+  background: linear-gradient(to bottom, var(--gl-surface-4), var(--gl-surface-3));
+  border: var(--yh-border-width) solid var(--gl-border-strong);
+  box-shadow: var(--yh-shadow-dock);
+  color: var(--gl-color-text-heading);
+  font-size: var(--yh-text-sm);
+  font-weight: var(--yh-weight-semibold);
+  white-space: nowrap;
+  cursor: pointer;
+  backdrop-filter: blur(var(--gl-blur));
+  -webkit-backdrop-filter: blur(var(--gl-blur));
+}
+
+.report-session-fab svg {
+  flex: 0 0 auto;
+}
+
+/* 浮在内容之上，滚到底时最后一屏给胶囊让出位置（否则表格末行右侧会被盖住） */
+.report-session-fab-gap {
+  height: calc(var(--yh-touch-min) + var(--yh-space-2));
 }
 
 .mini-card {

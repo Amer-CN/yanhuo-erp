@@ -59,7 +59,8 @@ export default function App() {
   };
   const boot = useBoot(toastCtl.showToast);
   const data = useLiveQuery(() => loadAll(), []);
-  const sync = useSync();
+  // H3：同步结束时若「对方动了你的数据」，由 useSync 合成一条可撤销 Toast
+  const sync = useSync(toastCtl.showToast);
 
   const settings = useMemo(() => {
     const m: Record<string, string> = {};

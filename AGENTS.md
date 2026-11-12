@@ -14,7 +14,7 @@
 pnpm install
 pnpm dev      # http://localhost:5173
 pnpm build    # tsc --noEmit && vite build
-pnpm test     # 12 个测试文件 / 134 个用例（134 通过 / 0 失败 / 0 skip）
+pnpm test     # 13 个测试文件 / 140 个用例（140 通过 / 0 失败 / 0 skip）
 ```
 
 端到端（需要 Playwright + Chromium）：
