@@ -19,7 +19,14 @@ import {
   type SnapshotRow
 } from '../../db/backup';
 import { SETTING_KEYS, type Product, type Setting } from '../../db/types';
-import { afterMerge, clearCloud, getSyncConfig } from '../../db/sync';
+import {
+  adoptRemoteConflict,
+  afterMerge,
+  clearCloud,
+  getSyncConfig,
+  loadConflicts,
+  type ConflictView
+} from '../../db/sync';
 import SyncPanel from '../SyncPanel';
 import type { SyncApi } from '../useSync';
 import type { Theme } from '../AppShell';
@@ -340,6 +347,10 @@ function SnapshotSection({
   const [restoreTarget, setRestoreTarget] = useState<SnapshotRow | null>(null);
   const [snapshotBusy, setSnapshotBusy] = useState(false);
   const [helpOpen, setHelpOpen] = useState(false);
+  // 冲突列表：null = 加载中（打开 Sheet 时先置 null，避免把「还没读出来」误显示成「没有冲突」）
+  const [conflictOpen, setConflictOpen] = useState(false);
+  const [conflictRows, setConflictRows] = useState<ConflictView[] | null>(null);
+  const [conflictBusy, setConflictBusy] = useState<number | null>(null);
 
   useEffect(() => {
     void listSnapshots()
@@ -384,6 +395,34 @@ function SnapshotSection({
   };
 
   const restoreStats = restoreTarget ? snapshotStats(restoreTarget) : null;
+
+  /** 打开冲突列表：先显示加载态，再替换成列表或空态 */
+  const openConflicts = async () => {
+    setConflictOpen(true);
+    setConflictRows(null);
+    try {
+      setConflictRows(await loadConflicts());
+    } catch {
+      setConflictRows([]);
+    }
+  };
+
+  /**
+   * 「用云端」：把该条冲突的云端快照写回本地，成功后这一条从列表和 conflicts 表一起消失。
+   * 失败必须如实告知（校验不通过 / 事务失败），否则用户以为已经采用了云端值。
+   */
+  const takeRemoteVersion = async (row: ConflictView) => {
+    setConflictBusy(row.id);
+    try {
+      await adoptRemoteConflict(row.id);
+      setConflictRows(await loadConflicts());
+      onDone('已用云端版本覆盖本地');
+    } catch (e) {
+      onDone(`没采用云端版本：${e instanceof Error ? e.message : String(e)}`, 'error');
+    } finally {
+      setConflictBusy(null);
+    }
+  };
 
   return (
     <>
@@ -454,8 +493,18 @@ function SnapshotSection({
           <p className="muted-text" style={{ marginTop: 8 }}>
             待核对 {conflictCount} 条。两台设备改过同一条记录时会出现；本地记录已保留，没有自动覆盖。
           </p>
+          <Btn block variant="secondary" style={{ marginTop: 10 }} onClick={() => void openConflicts()}>
+            查看
+          </Btn>
         </Card>
-      ) : null}
+      ) : (
+        <Card>
+          <h2 className="section-title">同步冲突</h2>
+          <p className="muted-text" style={{ marginTop: 8 }}>
+            没有冲突。两台手机改过同一条记录时，会在这里列出来。
+          </p>
+        </Card>
+      )}
 
       <Card>
         <h2 className="section-title">装到手机桌面</h2>
@@ -470,6 +519,46 @@ function SnapshotSection({
           </span>
         </Btn>
       </Card>
+
+      {conflictOpen ? (
+        <Sheet
+          title="同步冲突"
+          subtitle={conflictRows ? `${conflictRows.length} 条` : undefined}
+          onClose={() => setConflictOpen(false)}
+        >
+          <div className="page-stack">
+            {conflictRows === null ? (
+              <p className="muted-text">正在读取…</p>
+            ) : conflictRows.length === 0 ? (
+              <p className="muted-text">没有冲突，已经全部处理完了。</p>
+            ) : (
+              conflictRows.map((row) => (
+                <div key={row.id} className="glass-status" style={{ display: 'block' }}>
+                  <div className="cart-line__name">{row.title}</div>
+                  <p className="tiny-text" style={{ margin: '4px 0' }}>
+                    {row.at.slice(0, 16).replace('T', ' ')} · {row.recordId}
+                  </p>
+                  <p className="tiny-text" style={{ margin: '2px 0' }}>
+                    本地：{row.localText}
+                  </p>
+                  <p className="tiny-text" style={{ margin: '2px 0' }}>
+                    云端：{row.remoteText}
+                  </p>
+                  <Btn
+                    block
+                    variant="secondary"
+                    style={{ marginTop: 8 }}
+                    disabled={conflictBusy !== null}
+                    onClick={() => void takeRemoteVersion(row)}
+                  >
+                    {conflictBusy === row.id ? '处理中…' : '用云端'}
+                  </Btn>
+                </div>
+              ))
+            )}
+          </div>
+        </Sheet>
+      ) : null}
 
       {helpOpen ? (
         <Sheet title="添加到主屏幕" onClose={() => setHelpOpen(false)}>

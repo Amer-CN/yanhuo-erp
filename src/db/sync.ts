@@ -14,7 +14,8 @@ import {
 import { DEFAULT_SYNC } from './syncDefaults';
 import { mergeSessionPair } from './sessionLogic';
 import { businessTime, resolveRemote } from './syncResolve';
-import { localDate } from './util';
+import { canonicalJson } from './canonical';
+import { fenToStr, isoToLocalDate, isoToTime, localDate } from './util';
 import type { OutboxRow, SyncConflictRow } from './db';
 import type { Table } from 'dexie';
 import type { SaleLine, Session } from './types';
@@ -874,22 +875,10 @@ export function __resetSyncFlagsForTest(): void {
 }
 
 /**
- * 规范化 JSON：键排序 + 丢掉 `undefined`，只用于「内容是否相同」的比较。
- * 直接用 `JSON.stringify` 会把键顺序差异当成内容差异，导致两端反复回推同一条记录。
+ * 远端 data 与本地记录内容是否相同（远端主键在 `record_id` 里，不在 data 里）。
+ * 比较口径与冲突决策共用 `canonicalJson`：两处若分叉，会一边判冲突、一边判无需回推，
+ * 结果云端不收敛、冲突每轮重记（见 H2.1）。
  */
-function canonicalJson(value: unknown): string {
-  if (Array.isArray(value)) return `[${value.map(canonicalJson).join(',')}]`;
-  if (value !== null && typeof value === 'object') {
-    const entries = Object.entries(value as Record<string, unknown>)
-      .filter(([, v]) => v !== undefined)
-      .sort(([a], [b]) => (a < b ? -1 : a > b ? 1 : 0))
-      .map(([k, v]) => `${JSON.stringify(k)}:${canonicalJson(v)}`);
-    return `{${entries.join(',')}}`;
-  }
-  return JSON.stringify(value) ?? 'null';
-}
-
-/** 远端 data 与本地记录内容是否相同（远端主键在 `record_id` 里，不在 data 里） */
 function sameContentAsRemote(cur: unknown, remote: unknown, id: string): boolean {
   if (!isPlainObject(remote)) return false;
   return canonicalJson({ ...remote, id }) === canonicalJson(cur);
@@ -1137,9 +1126,30 @@ async function applyPlannedChanges(plan: RemotePlan): Promise<number> {
       applied += map.size;
     }
   }
-  if (plan.conflicts.length > 0) await db.conflicts.bulkAdd(plan.conflicts);
+  if (plan.conflicts.length > 0) await saveConflicts(plan.conflicts);
   await mergeUnknownKinds(plan.unknownIds);
   return applied + plan.unknownIds.length;
+}
+
+/**
+ * 冲突留痕按 `(kind, recordId)` 去重（H2.2，v5 复合索引）。
+ *
+ * 为什么不能 `bulkAdd`：同一条记录只要两端内容仍不同，每一轮同步都会再判一次冲突；
+ * 原来每轮新增一行，设置页「待核对 N 条」只增不减，真正的冲突也被噪音淹没。
+ * 这里复用已有行的自增主键原地更新 `at/local/remote`，一条记录永远只占一行。
+ */
+async function saveConflicts(rows: SyncConflictRow[]): Promise<void> {
+  for (const row of rows) {
+    const existing = await db.conflicts
+      .where('[kind+recordId]')
+      .equals([row.kind, row.recordId])
+      .first();
+    if (existing && typeof existing.id === 'number') {
+      await db.conflicts.put({ ...row, id: existing.id });
+    } else {
+      await db.conflicts.add(row);
+    }
+  }
 }
 
 /** 一页应用结果（诊断口径，见 L-4） */
@@ -1367,6 +1377,15 @@ async function readClearMark(cfg: SyncConfig): Promise<number> {
  * 换了值就把游标重置为 0 做一次全量重放（重放幂等，代价只是多拉一轮），
  * 这样「清空」不再依赖两台设备的时钟水位：即使对方时钟偏快、
  * 或者 tombstone 与本地水位落在同一毫秒，也能完整清掉并自愈。
+ *
+ * H1：标记变新时**先丢弃清空前的待推送改动**（`queuedAt < clearedAt`）。
+ * 清空是绝对操作：对方断网期间改过的单如果还留在发件箱，会先被 push 落云
+ * （syncNow 以前是 push 先于 pull），随后清空标记触发的全量重放又把它当活行保留，
+ * 「已清空」就被悄悄撤销了。这里在 push 之前丢掉这些旧改动；
+ * 清空**之后**产生的新改动 `queuedAt >= clearedAt` 不受影响，照常推送（本地优先不破）。
+ *
+ * 这一步只在本地水位 > 0 时打探针（水位为 0 时本来就要全量拉，不需要标记），
+ * 且 syncNow 会把返回值直接交给 `pull`，一轮同步只探一次。
  */
 async function resolvePullStart(cfg: SyncConfig): Promise<PullCursor> {
   const local: PullCursor = { ts: lastPullAt(), id: lastPullId() };
@@ -1380,7 +1399,28 @@ async function resolvePullStart(cfg: SyncConfig): Promise<PullCursor> {
   setClearedMark(mark);
   const reset: PullCursor = { ts: 0, id: '' };
   setLastPullCursor(reset);
+
+  // 先作废「清空前的旧改动」，再进入推送/重放
+  const dropped = await dropOutboxQueuedBefore(mark);
+  if (dropped > 0) {
+    appendWarn(`清空账本：丢弃 ${dropped} 条清空前的待推送改动（它们属于被清掉的旧账本）`);
+  }
   return reset;
+}
+
+/**
+ * 丢弃 `queuedAt < clearedAt` 的待推送条目，返回条数。
+ *
+ * 边界必须严格小于：清空与改动可能落在同一毫秒，`>= clearedAt` 一律视为
+ * 「清空之后的新改动」保留下来 —— 宁可多推一条，也不能把用户清空后新记的单吞掉。
+ * 只删发件箱、不碰业务表：真正删除本地旧记录仍由远端墓碑（全量重放）完成，
+ * 这样即使丢弃后拉取失败，本机账本也还在，不会变成「数据凭空消失」。
+ */
+async function dropOutboxQueuedBefore(clearedAt: number): Promise<number> {
+  const stale = await db.outbox.where('queuedAt').below(clearedAt).primaryKeys();
+  if (stale.length === 0) return 0;
+  await db.outbox.bulkDelete(stale);
+  return stale.length;
 }
 
 /** 一轮拉取循环的结果 */
@@ -1502,13 +1542,15 @@ async function dailyReplay(cfg: SyncConfig): Promise<void> {
   console.info(`[sync] 全量重放完成，已应用 ${pass.pulled} 行`);
 }
 
-async function pull(cfg: SyncConfig): Promise<number> {
-  const start = await resolvePullStart(cfg);
+async function pull(cfg: SyncConfig, start?: PullCursor): Promise<number> {
+  // syncNow 在 push 之前已经做过清空标记检查（H1）；这里复用那次的起点，
+  // 避免一轮同步为同一条标记打两次探针。
+  const from = start ?? (await resolvePullStart(cfg));
   // 本轮是否从 0 全量重放（首次 / 清空账本后）：全量时看到标记行即可直接对齐，不必多打探针
-  const replayAll = start.ts <= 0;
+  const replayAll = from.ts <= 0;
 
   // 增量轮：起点叠加重叠窗口，持久化水位按真实行尾推进
-  const incremental = await pullOnce(cfg, start, replayAll, {
+  const incremental = await pullOnce(cfg, from, replayAll, {
     persistCursor: true,
     replay: false
   });
@@ -1532,6 +1574,176 @@ async function pull(cfg: SyncConfig): Promise<number> {
   return pulled;
 }
 
+/* ------------------------------------------------- 冲突查看与「用云端」 */
+
+/** 设置页「同步冲突」列表的一条（已格式化，UI 只管渲染） */
+export interface ConflictView {
+  id: number;
+  at: string;
+  kind: string;
+  recordId: string;
+  /** 单号/商品名等一眼能认出的标题 */
+  title: string;
+  /** 本地值摘要（金额、支付方式、时间等关键字段） */
+  localText: string;
+  /** 云端值摘要 */
+  remoteText: string;
+}
+
+const CONFLICT_KIND_LABEL: Record<string, string> = {
+  order: '订单',
+  line: '明细',
+  product: '商品',
+  batch: '进货',
+  adjustment: '库存调整',
+  session: '场次',
+  setting: '设置'
+};
+
+const PAY_LABEL: Record<string, string> = {
+  cash: '现金',
+  wechat: '微信',
+  alipay: '支付宝'
+};
+
+function safeParse(json: string): unknown {
+  try {
+    return JSON.parse(json) as unknown;
+  } catch {
+    return null;
+  }
+}
+
+function pickStr(obj: unknown, key: string): string | null {
+  if (!isPlainObject(obj)) return null;
+  const v = obj[key];
+  return typeof v === 'string' && v ? v : null;
+}
+
+function pickNum(obj: unknown, key: string): number | null {
+  if (!isPlainObject(obj)) return null;
+  const v = obj[key];
+  return typeof v === 'number' && Number.isFinite(v) ? v : null;
+}
+
+/** 列表标题：订单用时间、商品用名称，其余退回 `类型 id` */
+function conflictTitle(kind: string, recordId: string, local: unknown, remote: unknown): string {
+  const label = CONFLICT_KIND_LABEL[kind] ?? kind;
+  if (kind === 'order') {
+    const at = pickStr(local, 'createdAt') ?? pickStr(remote, 'createdAt');
+    if (at) return `${label} ${isoToLocalDate(at)} ${isoToTime(at)}`;
+  }
+  if (kind === 'product') {
+    const name = pickStr(local, 'name') ?? pickStr(remote, 'name');
+    if (name) return `${label} ${name}`;
+  }
+  return `${label} ${recordId}`;
+}
+
+/** 本地值 / 云端值的摘要：只展示会被摊主感知的字段 */
+function conflictValueText(kind: string, raw: unknown): string {
+  if (!isPlainObject(raw)) return '（空）';
+  const parts: string[] = [];
+  switch (kind) {
+    case 'order': {
+      const total = pickNum(raw, 'totalFen');
+      if (total !== null) parts.push(`¥${fenToStr(total)}`);
+      const pay = pickStr(raw, 'payMethod');
+      if (pay) parts.push(PAY_LABEL[pay] ?? pay);
+      if (raw.voided === true) parts.push('已作废');
+      const at = pickStr(raw, 'createdAt') ?? pickStr(raw, 'updatedAt');
+      if (at) parts.push(`${isoToLocalDate(at)} ${isoToTime(at)}`);
+      break;
+    }
+    case 'product': {
+      const name = pickStr(raw, 'name');
+      if (name) parts.push(name);
+      const price = pickNum(raw, 'priceList');
+      if (price !== null) parts.push(`标价 ¥${fenToStr(price)}`);
+      const unit = pickStr(raw, 'unitBase');
+      if (unit) parts.push(`单位 ${unit}`);
+      break;
+    }
+    case 'line': {
+      const qty = pickNum(raw, 'qtyBase');
+      if (qty !== null) parts.push(`数量 ${qty}`);
+      const amount = pickNum(raw, 'amountFen');
+      if (amount !== null) parts.push(`¥${fenToStr(amount)}`);
+      break;
+    }
+    default: {
+      const text = JSON.stringify(raw);
+      return text.length > 80 ? `${text.slice(0, 77)}…` : text;
+    }
+  }
+  return parts.length > 0 ? parts.join(' · ') : '（无关键字段）';
+}
+
+/**
+ * 读取冲突列表（设置页「查看」用）。
+ * 只读 `conflicts` 表，不触发任何网络请求；按时间倒序，最新的冲突排在最上面。
+ */
+export async function loadConflicts(): Promise<ConflictView[]> {
+  const rows = await db.conflicts.orderBy('at').reverse().toArray();
+  return rows.map((row) => {
+    const local = safeParse(row.local);
+    const remote = safeParse(row.remote);
+    return {
+      id: row.id ?? 0,
+      at: row.at,
+      kind: row.kind,
+      recordId: row.recordId,
+      title: conflictTitle(row.kind, row.recordId, local, remote),
+      localText: conflictValueText(row.kind, local),
+      remoteText: conflictValueText(row.kind, remote)
+    };
+  });
+}
+
+/**
+ * 采用云端版本（设置页「用云端」）：把冲突行里的 `remote` 快照写回本地，然后删掉这条冲突。
+ *
+ * 为什么直接写库而不是复用 pull：冲突行已经保存了完整的远端快照，单条重放要重造
+ * 分页/游标/校验一整套上下文；这里走与入站落库**同一套**校验（parseRemoteRecord）
+ * 和字段投影，既简单又不会把脏字段写进业务表。
+ *
+ * 不额外入队：写进去的就是云端现有版本，本地与云端已经一致；再推一次只会多一轮写放大。
+ * 写入放在事务里，冲突删除与业务写入同生共死 —— 中途失败时冲突行仍在，用户可以重试。
+ */
+export async function adoptRemoteConflict(id: number): Promise<void> {
+  const row = await db.conflicts.get(id);
+  if (!row) return;
+  if (!KNOWN_KINDS.has(row.kind as Kind)) throw new Error(`未知记录类型：${row.kind}`);
+  const kind = row.kind as Kind;
+
+  const remote = safeParse(row.remote);
+  if (!isPlainObject(remote)) throw new Error('云端快照是空的，没有采用');
+  const parsed = parseRemoteRecord(kind, remote);
+  if (!parsed) throw new Error('云端快照没通过校验，没有采用');
+
+  await db.transaction('rw', [TABLE_BY_KIND[kind], db.conflicts], async () => {
+    if (kind === 'setting') {
+      const value = parsed.value;
+      if (typeof value !== 'string') throw new Error('云端设置值不合法，没有采用');
+      await db.settings.put({ key: row.recordId, value });
+    } else if (kind === 'session') {
+      // 场次沿用既有合并口径：采用云端不等于无条件覆盖本机补记
+      const remoteSession = projectDeclaredFields('session', parsed) as unknown as Session;
+      const cur = await db.sessions.get(row.recordId);
+      const merged = cur
+        ? mergeSessionPair(cur, { ...remoteSession, id: row.recordId })
+        : { ...remoteSession, id: row.recordId };
+      await db.sessions.put(merged);
+    } else {
+      await TABLE_BY_KIND[kind].put({
+        ...projectDeclaredFields(kind, parsed),
+        id: row.recordId
+      });
+    }
+    await db.conflicts.delete(id);
+  });
+}
+
 /* ------------------------------------------------------------------ 对外 */
 
 export interface SyncResult {
@@ -1542,8 +1754,13 @@ export interface SyncResult {
 export async function syncNow(cfg: SyncConfig): Promise<SyncResult> {
   if (!navigator.onLine) throw new Error('当前离线');
   const deviceId = (await db.settings.get('deviceId'))?.value ?? '';
+  // H1：清空标记检查必须在 push 之前。否则本机（B）断网期间的旧改动会先落云，
+  // 清空标记触发的全量重放随后又把这些「复活」的行当成正常数据保留下来。
+  // resolvePullStart 在标记变新时会丢弃 `queuedAt < clearedAt` 的发件箱条目；
+  // 清空之后的新改动不受影响，会在下面的 pushOutbox 里正常补发。
+  const start = await resolvePullStart(cfg);
   const pushed = await pushOutbox(cfg, deviceId);
-  const pulled = await pull(cfg);
+  const pulled = await pull(cfg, start);
   localStorage.setItem(LS.lastSync, String(Date.now()));
   localStorage.removeItem(LS.error);
   return { pushed, pulled };

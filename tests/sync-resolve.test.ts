@@ -6,7 +6,7 @@ import {
   type ResolveDecision,
   type SyncKind
 } from '../src/db/syncResolve';
-import { makeBatch, makeOrder, makeProduct, makeSession } from './helpers';
+import { T0, makeBatch, makeOrder, makeProduct, makeSession } from './helpers';
 
 const T = '2026-11-01T10:00:00.000Z';
 const T_MS = Date.parse(T);
@@ -52,6 +52,44 @@ describe('resolveRemote（表驱动）', () => {
       kind: 'order',
       local: localOrder,
       remote: remoteEdited,
+      remoteTime: T_MS,
+      want: 'conflict'
+    },
+    {
+      // H2.1：普通订单 {id,totalFen,...} 与键序完全不同的同一份数据必须判「相同」。
+      // 回归来源：syncResolve 原先用 JSON.stringify，而回推判断用键序无关比较，
+      // 于是一边判冲突、一边判无需回推 → 每轮同步多一条假冲突，云端永不收敛。
+      name: '内容相同但 JSON 键序不同（id 位置不同）→ 不冲突，保留本地',
+      kind: 'order',
+      local: localOrder,
+      remote: {
+        updatedAt: T,
+        sessionId: 's1',
+        totalFen: 1000,
+        payMethod: 'cash',
+        createdAt: T0,
+        operator: '我',
+        deviceId: 'dev-test',
+        id: 'o1'
+      },
+      remoteTime: T_MS,
+      want: 'keep-local'
+    },
+    {
+      // 反证：键序无关比较只忽略顺序，不能把不同的值也判成相同
+      name: '键序同样不同但金额不同 → 仍然是真冲突',
+      kind: 'order',
+      local: localOrder,
+      remote: {
+        updatedAt: T,
+        sessionId: 's1',
+        totalFen: 2000,
+        payMethod: 'cash',
+        createdAt: T0,
+        operator: '我',
+        deviceId: 'dev-test',
+        id: 'o1'
+      },
       remoteTime: T_MS,
       want: 'conflict'
     },

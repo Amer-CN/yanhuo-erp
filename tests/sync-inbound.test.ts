@@ -20,6 +20,8 @@ let pullUrls: string[];
 let pushBodies: Record<string, unknown>[][];
 /** 拉取请求往返期间执行一次副作用：用于模拟「推送完成后、拉取途中用户又改了一笔」的竞态 */
 let onPull: (() => Promise<void>) | null;
+/** 远端的「清空账本」标记值（0 = 没有标记，探针返回空） */
+let clearMark: number;
 
 function jsonResponse(data: unknown): Response {
   return new Response(JSON.stringify(data), {
@@ -62,6 +64,7 @@ beforeEach(async () => {
   pullUrls = [];
   pushBodies = [];
   onPull = null;
+  clearMark = 0;
 
   vi.stubGlobal('localStorage', {
     getItem: (key: string) => store.get(key) ?? null,
@@ -81,9 +84,16 @@ beforeEach(async () => {
         if (status >= 400) return new Response('boom', { status });
         return new Response('', { status: 201 });
       }
-      // 「清空账本」标记探针（已有水位时才会发出）：本文件一律当作没有标记，
-      // 否则它会消费掉页队列、把拉取用例的期望值整体错位。
-      if (u.includes('id=eq.')) return jsonResponse([]);
+      // 「清空账本」标记探针（已有水位时才会发出）：clearMark=0 时当作没有标记，
+      // 否则返回标记行，用来测 H1「清空 vs 本地待推送改动」。
+      if (u.includes('id=eq.')) {
+        if (clearMark > 0) {
+          return jsonResponse([
+            { id: '__ledger_cleared__:led-1', updated_at: clearMark, data: { clearedAt: clearMark } }
+          ]);
+        }
+        return jsonResponse([]);
+      }
       pullUrls.push(u);
       if (onPull) await onPull();
       return jsonResponse(pages.shift() ?? []);
@@ -157,6 +167,95 @@ describe('入站冲突', () => {
     expect((await db.orders.get('o1'))?.totalFen).toBe(1000);
     // 冲突同时登记回推：让云端收敛到本地版本（否则换机重装会看到对方那一版）
     expect(await db.outbox.get('order:o1')).toBeTruthy();
+  });
+});
+
+describe('入站冲突去重（H2.2）', () => {
+  it('同一单连续 3 轮同步：conflicts 只留 1 条，重复冲突原地更新', async () => {
+    const AT = '2026-11-02T10:00:00.000Z';
+    await db.orders.put(makeOrder('o1', 1000, 's1', { updatedAt: AT }));
+    const remote = remoteOrderRow('o1', 2000, { updatedAt: AT, recordUpdatedAt: Date.parse(AT) });
+    // 三轮各拉到同一份远端数据（回推不会改变假后端的内容）
+    pages = [[remote], [remote], [remote]];
+
+    await syncNow(CFG);
+    await syncNow(CFG);
+    await syncNow(CFG);
+
+    // 原先每轮 bulkAdd 一行 → 3 条，设置页「待核对 N 条」只增不减
+    expect(await db.conflicts.count()).toBe(1);
+    const row = (await db.conflicts.toArray())[0];
+    expect(row.kind).toBe('order');
+    expect(row.recordId).toBe('o1');
+    expect(JSON.parse(row.local).totalFen).toBe(1000);
+    expect(JSON.parse(row.remote).totalFen).toBe(2000);
+    // 冲突只留痕，本地值始终不被覆盖
+    expect((await db.orders.get('o1'))?.totalFen).toBe(1000);
+  });
+});
+
+describe('清空账本 vs 本地待推送改动（H1）', () => {
+  /** 远端清空后只剩墓碑：全量重放会据此把本机旧单删掉 */
+  const CLEARED_AT = 2000;
+
+  function orderTombstone(id: string): Record<string, unknown> {
+    return {
+      id: `order:${id}`,
+      record_id: id,
+      kind: 'order',
+      data: {},
+      updated_at: CLEARED_AT,
+      deleted: true
+    };
+  }
+
+  /** 已有水位才会打「清空标记」探针（与线上一致） */
+  function setWatermark(): void {
+    store.set('yh-sync-last-pull', '5000');
+    store.set('yh-sync-last-pull-id', 'order:prev');
+  }
+
+  it('清空前入队的改动被丢弃：不再推回云端，本地旧单随墓碑删除', async () => {
+    await db.orders.put(makeOrder('o1', 1000, 's1'));
+    await db.outbox.put({
+      id: 'order:o1',
+      kind: 'order',
+      recordId: 'o1',
+      op: 'upsert',
+      queuedAt: CLEARED_AT - 1
+    });
+    setWatermark();
+    clearMark = CLEARED_AT;
+    pages = [[orderTombstone('o1')]];
+
+    await syncNow(CFG);
+
+    // 关键回归：push 发生在 pull 之前时，这一条会先落云，清空随即被「复活」
+    expect(pushBodies).toHaveLength(0);
+    expect(await db.outbox.count()).toBe(0);
+    expect(await db.orders.get('o1')).toBeUndefined();
+    // 丢弃必须留下可排查的诊断
+    expect(store.get('yh-sync-warn') ?? '').toContain('清空账本');
+  });
+
+  it('清空之后的新改动（queuedAt > clearedAt）照常推送，不被误删', async () => {
+    await db.orders.put(makeOrder('o2', 3000, 's1'));
+    await db.outbox.put({
+      id: 'order:o2',
+      kind: 'order',
+      recordId: 'o2',
+      op: 'upsert',
+      queuedAt: CLEARED_AT + 1
+    });
+    setWatermark();
+    clearMark = CLEARED_AT;
+    pages = [[]]; // 云端清空后还没有新数据
+
+    await syncNow(CFG);
+
+    expect(pushBodies.flat().some((r) => r.record_id === 'o2')).toBe(true);
+    expect(await db.outbox.count()).toBe(0);
+    expect((await db.orders.get('o2'))?.totalFen).toBe(3000);
   });
 });
 
@@ -247,7 +346,8 @@ describe('回推与防回声', () => {
     const AT = '2026-11-02T10:00:00.000Z';
     const local = makeOrder('e1', 1000, 's1', { updatedAt: AT });
     await db.orders.put(local);
-    // 键顺序必须与 makeOrder 的产物一致：resolveRemote 的 sameRecord 是 JSON.stringify 直接比较
+    // 比较口径是键序无关的 canonicalJson（H2.1），所以这里即使键序与 makeOrder 不同，
+    // 也必须判成「内容相同」—— 否则回声会被当成冲突或回推候选。
     const echo = {
       id: 'e1',
       deviceId: local.deviceId,

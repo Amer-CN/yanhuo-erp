@@ -1,6 +1,7 @@
 // 同步冲突决策（纯函数，便于表驱动单测）：
 // 业务时间新者胜；时间相同/缺失时按记录类型兜底；无法判定时留冲突、本地不覆盖。
 
+import { canonicalJson } from './canonical';
 import { mergeSessionPair } from './sessionLogic';
 import type { Product, SalesOrder, Session } from './types';
 
@@ -34,9 +35,15 @@ function normalize(record: unknown, id: string): unknown {
   return record;
 }
 
+/**
+ * 内容是否相同。必须用 `canonicalJson`（键序无关），不能用 `JSON.stringify`：
+ * 本地记录的 `id` 由 `normalize` 追加在最后、远端 data 的 `id` 往往排在最前，
+ * 直接 stringify 会把「同一份数据」判成不同 → 假冲突（见 H2.1）。
+ * 回推判断（sync.ts 的 sameContentAsRemote）用的是同一份口径，两边必须一致。
+ */
 function sameRecord(a: unknown, b: unknown): boolean {
   try {
-    return JSON.stringify(a) === JSON.stringify(b);
+    return canonicalJson(a) === canonicalJson(b);
   } catch {
     return false;
   }
