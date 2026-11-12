@@ -498,6 +498,12 @@ export interface AppDataValue {
   sessionOrders: SalesOrder[];
   warnDays: number;
   editorInitial?: RecordDraft;
+  /**
+   * P5：今天最近一次已结账的场次（含结账时写入的快照）。
+   * 没有进行中场次时，记账页用它显示「上一场 … 结账」+ 撤销入口。
+   * 由 App 算好（只认当天结的），这里只透传，不在页面里重新挑场次。
+   */
+  lastClosed: { session: Session; summary: SessionSummary } | null;
   showToast: Done;
 }
 
@@ -512,6 +518,11 @@ export interface AppActionsValue {
   onPatchSession: (session: Session) => void;
   /** 报表页的「去记一笔」 */
   onGoRecord: () => void;
+  /**
+   * P5：撤销最近一场结账（记账页「上一场 … 结账」条上的按钮）。
+   * 失败原因（例如「下一场已经开始，不能撤销结账」）由实现方 Toast 出来。
+   */
+  onReopenLastClosed: () => Promise<void>;
 }
 
 const AppDataContext = createContext<AppDataValue | null>(null);
@@ -651,8 +662,8 @@ export function AppMain({ tab, sub, editor, theme, onToggleTheme }: AppMainProps
 
 /** 各 tab 的适配层：只负责把 Context 里的派生值交给页面，页面 props 保持不变 */
 function RecordTabPage() {
-  const { data, openSession, openSummary, sessionOrders, sync } = useAppData();
-  const { setEditor, setTab, setSub, onOpenCloseSession } = useAppActions();
+  const { data, openSession, openSummary, sessionOrders, sync, lastClosed } = useAppData();
+  const { setEditor, setTab, setSub, onOpenCloseSession, onReopenLastClosed } = useAppActions();
   return (
     <RecordPage
       session={openSession}
@@ -661,9 +672,13 @@ function RecordTabPage() {
       lines={data.lines}
       products={data.products}
       online={sync.online}
+      lastClosed={lastClosed}
       onNewRecord={() => setEditor({ mode: 'new' })}
       onOpenOrder={(id) => setEditor({ mode: 'edit', orderId: id })}
       onCloseSession={onOpenCloseSession}
+      onReopenLastClosed={onReopenLastClosed}
+      /* 「看本场」= 报表默认就停在本场 / 最近已结账那一场，切过去即可 */
+      onOpenLastReport={() => setTab('report')}
       onOpenHistory={() => {
         setTab('more');
         setSub('history');

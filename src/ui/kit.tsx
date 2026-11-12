@@ -309,6 +309,119 @@ function popSheet(token: symbol) {
   if (i >= 0) sheetStack.splice(i, 1);
 }
 
+/* ------------------------------------------------------- 返回键守卫（P7） */
+/**
+ * 为什么需要这一层：弹层没有自己的 URL，安卓返回键 / iOS 侧滑走的是浏览器历史，
+ * 于是「弹层开着时按返回」会把应用整个退掉（实测停在 about:blank）。草稿还在
+ * localStorage 里，但用户会以为刚才那一单丢了。
+ *
+ * 做法：每打开一层就往历史里 push 一条同名占位记录，返回键先吃掉它。
+ * 两个动作必须成对、且都被正确处理，缺一个就会连退或连关：
+ *
+ * ① 收到 popstate 且栈非空（用户按了返回）：**先 pushState 把位置补回来**，
+ *    再关栈顶那一层。补位是为了让「关这一层」与它的卸载清理 back() 一次刚好抵消；
+ *    不补位的话，用户每按一次返回都会真的往后走一格，几次之后退出应用。
+ * ② 弹层正常关闭（点 X / 完成 / Esc / 上面的 ①）：自己的清理里 back() 掉那条占位记录。
+ *    这一次 back() 同样会触发 popstate —— 必须用 suppressNextPop 标记跳过，
+ *    否则会被当成「用户又按了一次返回」，把下面那一层也关掉。
+ *
+ * 栈为空时什么都不做：此时返回键就该生效（退出应用 / 回上一页）。
+ * 监听器一直挂着，不随栈空摘除：摘掉后再挂会把 suppressNextPop 留在 true 上，
+ * 下一次真正的返回就被吞掉了。常驻一个空转的 popstate 回调代价可以忽略。
+ */
+const sheetHistory: symbol[] = [];
+/** token → 该层「像点关闭那样关掉」的回调 + 当前是否可关（dismissible 会随 busy 变化，所以存取值函数） */
+const sheetHistoryEntry = new Map<symbol, { close: () => void; dismissible: () => boolean }>();
+/** true = 下一次 popstate 是我们自己 back() 制造的，不能当成用户操作 */
+let suppressNextPop = false;
+let popGuardBound = false;
+/**
+ * 已经「欠」调用方几条历史记录待回收（推迟到下一轮事件循环再 back()）。
+ * 为什么要推迟：React StrictMode（仅 dev）会把 effect 跑成「挂载 → 清理 → 再挂载」。
+ * 如果清理里立刻 back()，这次后退会晚于第二次挂载的 pushState 落地，
+ * 结果弹层开着、历史里却已经没有它的占位记录 —— 下一次返回直接退出应用（实测如此）。
+ * 推迟一帧后，重挂载的 push 能先把这些待回收项「抵消」掉，位置就不会漂。
+ */
+let pendingPops = 0;
+let popTimer: number | undefined;
+
+function schedulePopFlush() {
+  if (popTimer !== undefined) return;
+  popTimer = window.setTimeout(flushPendingPops, 0);
+}
+
+function flushPendingPops() {
+  popTimer = undefined;
+  if (pendingPops <= 0) return;
+  const state = window.history.state as { __yhSheet?: boolean } | null;
+  if (!state?.__yhSheet) {
+    pendingPops = 0; // 当前历史项不是我们的，别乱退
+    return;
+  }
+  pendingPops -= 1;
+  suppressNextPop = true;
+  window.history.back();
+  if (pendingPops > 0) schedulePopFlush();
+}
+
+function onSheetPopState() {
+  if (suppressNextPop) {
+    suppressNextPop = false;
+    return;
+  }
+  const token = sheetHistory[sheetHistory.length - 1];
+  if (!token) return; // 没有弹层：这次后退就该生效
+
+  // 补回被吃掉的那一格（见上方 ①）
+  try {
+    window.history.pushState({ __yhSheet: true }, '');
+  } catch {
+    /* 极端环境（沙箱 iframe）不允许 pushState：退化成「只关层」，不影响主流程 */
+  }
+  const entry = sheetHistoryEntry.get(token);
+  // 忙碌中的弹层（结账中 / 保存中）不能被返回键关掉，但位置已经补回，历史不会漂
+  if (entry && entry.dismissible()) entry.close();
+}
+
+function ensurePopGuard() {
+  if (popGuardBound || typeof window === 'undefined') return;
+  window.addEventListener('popstate', onSheetPopState);
+  popGuardBound = true;
+}
+
+/** 打开一层：入栈 + 历史占位。close / dismissible 都是取值函数，随时反映最新状态 */
+function pushSheetHistory(token: symbol, close: () => void, dismissible: () => boolean) {
+  sheetHistory.push(token);
+  sheetHistoryEntry.set(token, { close, dismissible });
+  if (pendingPops > 0) {
+    /*
+     * 上一轮清理刚要求回收一条、同一轮里又开了新的一层（StrictMode 的重挂载正是这种）：
+     * 直接复用那条还没被 back() 掉的占位记录，不再 push —— 多推一条会让位置永久漂一格。
+     */
+    pendingPops -= 1;
+  } else {
+    try {
+      window.history.pushState({ __yhSheet: true }, '');
+    } catch {
+      /* 不允许 pushState 的环境：只做栈内记账，返回键回到原行为 */
+    }
+  }
+  ensurePopGuard();
+}
+
+/** 关闭一层：出栈 + 回收它那条历史占位（推迟一帧，见 pendingPops 的注释） */
+function popSheetHistory(token: symbol) {
+  const i = sheetHistory.lastIndexOf(token);
+  if (i < 0) return;
+  sheetHistory.splice(i, 1);
+  sheetHistoryEntry.delete(token);
+
+  const state = window.history.state as { __yhSheet?: boolean } | null;
+  if (!state?.__yhSheet) return; // 当前历史项不是我们的占位记录，不要乱退
+  pendingPops += 1;
+  schedulePopFlush();
+}
+
 export function Sheet({
   title,
   subtitle,
@@ -463,6 +576,24 @@ export function Sheet({
     if (closeTimer.current) window.clearTimeout(closeTimer.current);
     closeTimer.current = window.setTimeout(() => onCloseRef.current(), SHEET_CLOSE_MS);
   };
+
+  /*
+   * P7：返回键守卫。挂载时往历史里放一条占位记录，卸载时收回。
+   * closeRef 指向「与点 X 完全相同」的关闭动作（setActive(false) + 260ms 后再 onClose），
+   * 所以返回键关层不会绕过关闭动画，也不会绕开父组件的清理逻辑。
+   * dismissible 用取值函数传进去：忙碌态（结账中 / 保存中）会拒绝返回键。
+   */
+  const closeFnRef = useRef(close);
+  closeFnRef.current = close;
+  useEffect(() => {
+    const token = tokenRef.current!;
+    pushSheetHistory(
+      token,
+      () => closeFnRef.current(),
+      () => dismissibleRef.current
+    );
+    return () => popSheetHistory(token);
+  }, []);
 
   return (
     <div

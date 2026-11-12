@@ -34,9 +34,12 @@ export default function RecordPage({
   lines,
   products,
   online,
+  lastClosed,
   onNewRecord,
   onOpenOrder,
   onCloseSession,
+  onReopenLastClosed,
+  onOpenLastReport,
   onOpenHistory,
   onGoStock
 }: {
@@ -46,9 +49,18 @@ export default function RecordPage({
   lines: SaleLine[];
   products: Product[];
   online: boolean;
+  /**
+   * P5：今天最近一次已结账的场次（App 算好传进来，会计口径在那边定死）。
+   * 只有「没有进行中场次」时才用得上 —— 有场次时它一定是 null。
+   */
+  lastClosed: { session: Session; summary: SessionSummary } | null;
   onNewRecord: () => void;
   onOpenOrder: (id: string) => void;
   onCloseSession: () => void;
+  /** 撤销上一场结账；失败原因由 App 侧 Toast 出来（不在这里吞错） */
+  onReopenLastClosed: () => Promise<void>;
+  /** 「看本场」→ 报表（默认停在本场 / 最近已结账那一场） */
+  onOpenLastReport: () => void;
   onOpenHistory: () => void;
   onGoStock: () => void;
 }) {
@@ -70,6 +82,21 @@ export default function RecordPage({
    * (b) 本场卡片的 0 单区域里留一个 12px 文字链当常驻入口，不占独立一行、不压结算浮条。
    */
   const [stockHint, setStockHint] = useState<string | null>(null);
+  /**
+   * P5：撤销结账的进行中标记（局部状态，不上提）。
+   * 收摊是低频但不可逆的动作，点一下没反应比点两下更糟 —— 按钮要有「撤销中…」。
+   */
+  const [reopening, setReopening] = useState(false);
+
+  const handleReopen = async () => {
+    if (reopening) return;
+    setReopening(true);
+    try {
+      await onReopenLastClosed();
+    } finally {
+      setReopening(false);
+    }
+  };
 
   const productMap = useMemo(() => {
     const m = new Map<string, Product>();
@@ -256,6 +283,35 @@ export default function RecordPage({
           </div>
         )}
       </Card>
+
+      {/*
+        P5：上一场汇总条（只在「没有进行中场次」且今天刚结过账时出现）。
+        为什么需要它：撤销结账原来只活在结账流程的结果弹层里，点「完成」之后
+        全应用再没有入口；而收摊是每天一次的不可逆动作，「结完发现漏了一单」
+        必然发生。这里是那条逃生通道：一行文字 + 两个操作，≤56px，不做成大卡片
+        （它只在该出现的几分钟内有用，常驻大卡会把「记一笔」挤出首屏）。
+      */}
+      {!hasSession && lastClosed ? (
+        <div className="last-session-bar">
+          <span className="last-session-bar__text">
+            上一场 {isoToTime(lastClosed.session.closedAt ?? lastClosed.session.startedAt)} 结账 ·{' '}
+            {lastClosed.summary.orderCount} 单 ¥{fenToStr(lastClosed.summary.revenueFen)}
+          </span>
+          <button type="button" className="link-btn link-btn--xs last-session-bar__more" onClick={onOpenLastReport}>
+            看本场
+          </button>
+          <Btn
+            block={false}
+            size="sm"
+            variant="secondary"
+            disabled={reopening}
+            aria-label="撤销结账，让这一场回到进行中"
+            onClick={() => void handleReopen()}
+          >
+            {reopening ? '撤销中…' : '撤销结账'}
+          </Btn>
+        </div>
+      ) : null}
 
       <Card flush>
         <div className="form-head form-head--inset">

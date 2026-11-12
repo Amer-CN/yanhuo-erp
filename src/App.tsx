@@ -7,10 +7,11 @@ import {
   productAvgCostFen,
   sessionReport
 } from './db/calc';
-import { loadAll } from './db/repo';
+import { loadAll, reopenSession } from './db/repo';
 import { pickOpenSession } from './db/sessionLogic';
 import { SETTING_KEYS } from './db/types';
-import { fenToStr } from './db/util';
+import type { Session, SessionSummary } from './db/types';
+import { fenToStr, isoToLocalDate, localDate } from './db/util';
 import { useSync } from './ui/useSync';
 import { draftFromOrder, type RecordDraft } from './ui/recordDraft';
 import {
@@ -93,6 +94,25 @@ export default function App() {
     () => (editor?.orderId ? (data?.orders ?? []).find((o) => o.id === editor.orderId) : undefined),
     [editor, data]
   );
+
+  /**
+   * P5：上一场（今天最近一次结账）—— 没有进行中场次时，记账页靠它给一个「反悔」入口。
+   *
+   * 为什么只认「今天结的」：撤销结账是收摊后几分钟内的动作（发现漏记一单），
+   * 过了今天再撤，报表与流水的日期口径都会乱；而 db 层只保证「下一场开始前」可撤，
+   * 那是必要条件不是充分条件 —— 界面这一层再收紧到当天。
+   * summary 直接用 session 上已持久化的快照（repo 结账时写入、补记后重算），
+   * 不在这里重新算：账已经封存，重算反而会和报表对不上。
+   */
+  const lastClosed = useMemo<{ session: Session; summary: SessionSummary } | null>(() => {
+    if (openSession || !data) return null;
+    const today = localDate();
+    const closed = data.sessions
+      .filter((s) => s.status === 'closed' && s.closedAt && isoToLocalDate(s.closedAt) === today)
+      .sort((a, b) => ((a.closedAt ?? '') < (b.closedAt ?? '') ? 1 : -1));
+    const s = closed[0];
+    return s ? { session: s, summary: s.summary ?? emptySessionSummary() } : null;
+  }, [data, openSession]);
 
   const editorInitial = useMemo<RecordDraft | undefined>(() => {
     if (!editingOrder || !data) return undefined;
@@ -177,6 +197,7 @@ export default function App() {
             sessionOrders,
             warnDays,
             editorInitial,
+            lastClosed,
             showToast: toastCtl.showToast
           }
         : null,
@@ -194,6 +215,7 @@ export default function App() {
       sessionOrders,
       warnDays,
       editorInitial,
+      lastClosed,
       toastCtl.showToast
     ]
   );
@@ -212,9 +234,25 @@ export default function App() {
       onGoRecord: () => {
         setTab('record');
         setEditor({ mode: 'new' });
+      },
+      /*
+       * P5：撤销最近一场结账。db 层的 reopenSession 只认「下一场开始前可撤」
+       * （repo.ts:683 会抛 NEXT_SESSION_STARTED），跨设备/补记等边界都在它那里兜着，
+       * 这里**不重复判断、也不吞错**：失败就把原始原因原样弹出来，用户才知道
+       * 到底是「下一场已经开始了」还是数据已经不在本机。
+       */
+      onReopenLastClosed: async () => {
+        const target = lastClosed?.session;
+        if (!target) return;
+        try {
+          await reopenSession(target.id);
+          toastCtl.showToast('已撤销结账，这一场回到进行中');
+        } catch (e) {
+          toastCtl.showToast(`撤销失败：${msgOf(e)}`, 'error');
+        }
       }
     }),
-    [handleRecordSaved, openSession, closeFlow.setCloseOpen, setEditor, setSub, setTab]
+    [handleRecordSaved, openSession, closeFlow.setCloseOpen, setEditor, setSub, setTab, lastClosed, toastCtl.showToast]
   );
 
   return (

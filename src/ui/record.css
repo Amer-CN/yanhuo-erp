@@ -92,6 +92,47 @@
   color: var(--gl-color-text-muted);
 }
 
+/* ------------------------------------------------- 上一场汇总条（P5 撤销结账） */
+/*
+ * 为什么是一行而不是卡片：它只在「今天刚结完账、还没开下一场」的几分钟里有用，
+ * 常驻大卡会把「记一笔」挤出首屏。高度按住 ≤56px（44 的按钮 + 上下 6px），
+ * 文字超长时省略而不是换行（换行就把这条变成两行了）。
+ */
+.last-session-bar {
+  display: flex;
+  align-items: center;
+  gap: var(--yh-space-2);
+  min-height: 44px;
+  padding: var(--yh-space-1) var(--yh-space-3);
+  border-radius: var(--yh-radius-lg);
+  background: var(--gl-surface-2);
+  border: 1px solid var(--gl-border-subtle);
+  font-variant-numeric: tabular-nums;
+}
+
+.last-session-bar__text {
+  flex: 1 1 auto;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: var(--yh-text-xs);
+  color: var(--gl-color-text-muted);
+}
+
+/* 「看本场」比正文更轻：它只是看一眼，不是要改账 */
+.last-session-bar__more {
+  flex: 0 0 auto;
+  font-size: var(--yh-text-xs);
+  font-weight: var(--yh-weight-medium);
+}
+
+/* 撤销结账是小号按钮，但触控高度仍按 44 兜住 */
+.last-session-bar .glass-btn--sm {
+  flex: 0 0 auto;
+  min-height: var(--yh-touch-min, 44px);
+}
+
 .record-dock {
   gap: var(--yh-space-3);
 }
