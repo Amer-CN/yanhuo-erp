@@ -720,7 +720,11 @@
   pointer-events: auto;
 }
 
-/* 窄屏隐藏次要列（390 常见宽度下仍保留核心列） */
+/*
+ * 窄屏隐藏次要列（≤520 / 390 常见宽度）。
+ * 报表单品表只留核心列：商品 / 数量 / 销售额 / 成本 / 毛利 ——
+ * 「让利」总额在汇总卡里、「赠品」写在商品名下，而成本与毛利必须同屏可见。
+ */
 @media (max-width: 520px) {
   .hide-narrow {
     display: none;
@@ -777,6 +781,62 @@
   padding: var(--yh-space-3) 0 0;
   border-top: 1px solid var(--gl-border-subtle);
   margin-top: var(--yh-space-3);
+}
+
+/* ------------------------------------------------------------ 报表：今天合计卡（H1） */
+
+/* 「今天 · 已结账 2 场 · ¥405.50」这一行是收摊后的第一眼，字号比表头大一档 */
+.report-day-head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: var(--yh-space-2);
+  margin-bottom: var(--yh-gap-card);
+}
+
+.report-day-head__title {
+  font-size: var(--yh-text-lg);
+  font-weight: var(--yh-weight-semibold);
+  color: var(--gl-color-text-heading);
+  font-variant-numeric: tabular-nums;
+}
+
+/* 「还有 1 场进行中 · ¥16.00（不计入今天）」这类补充说明 */
+.report-note {
+  margin: var(--yh-space-2) 0 0;
+  font-size: var(--yh-text-xs);
+  color: var(--gl-color-text-muted);
+  font-variant-numeric: tabular-nums;
+}
+
+/* 「已排除 2 笔删除（¥83.00）· 点开看」：灰色小字，但可点 */
+.report-excluded {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--yh-space-2);
+  margin-top: var(--yh-space-3);
+  padding-top: var(--yh-space-2);
+  border-top: 1px solid var(--gl-border-subtle);
+  font-size: var(--yh-text-xs);
+  color: var(--gl-color-text-muted);
+  font-variant-numeric: tabular-nums;
+}
+
+/* 单品行下的标记区（赠品 / 成本待补），与「赠 1」同一位置 */
+.margin-flags {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--yh-space-1);
+  margin-top: 2px;
+}
+
+/* 删除单弹层里的金额：灰 + 删除线，别让它看着像有效收入 */
+.voided-amount {
+  color: var(--gl-color-text-muted);
+  text-decoration: line-through;
+  font-variant-numeric: tabular-nums;
 }
 
 /*

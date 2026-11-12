@@ -5,19 +5,33 @@ import {
   Copy,
   ChevronDown,
   PenLine,
-  CalendarRange
+  CalendarRange,
+  Ban,
+  Sun
 } from 'lucide-react';
-import type { Batch, Product, SaleLine, SalesOrder, Session, SessionSummary } from '../../db/types';
+import type { Batch, Product, SaleLine, SalesOrder, Session } from '../../db/types';
+import { PAY_LABEL } from '../../db/types';
 import type { FifoResult } from '../../db/calc';
 import {
+  dayReport,
   emptySessionSummary,
   expiryWarnings,
   productMarginsBySession,
   sessionReport,
+  type DayReport,
   type ExpiryWarning,
-  type ProductMargin
+  type ProductMargin,
+  type SessionReport
 } from '../../db/calc';
-import { DELETED_PRODUCT, fenToStr, isoToLocalDate, isoToTime, qtyToStr } from '../../db/util';
+import { restoreOrder } from '../../db/repo';
+import {
+  DELETED_PRODUCT,
+  fenToStr,
+  isoToLocalDate,
+  isoToTime,
+  localDate,
+  qtyToStr
+} from '../../db/util';
 import { pickOpenSession } from '../../db/sessionLogic';
 import { Btn, Card, Empty, Sheet, Stat, type Done } from '../kit';
 
@@ -38,7 +52,17 @@ function sessionLabel(s: Session): string {
   return `${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')} 场`;
 }
 
-/** 场次选择：本场 / 历史切换 + 历史场次下拉入口（弹层仍在容器末尾渲染） */
+/** 单据按时间倒序（删除单弹层用：最近删的排最前） */
+function newestFirst(list: SalesOrder[]): SalesOrder[] {
+  return [...list].sort((a, b) => (a.createdAt < b.createdAt ? 1 : -1));
+}
+
+/**
+ * 场次选择：进行中 / 历史场次切换 + 历史场次下拉入口（弹层仍在容器末尾渲染）。
+ *
+ * 2026-11-12（H1）：原来叫「本场」——收摊后它指的是**下一场**（22:00 新开、还没结账），
+ * 摊主首屏看到的 ¥16.00 就是这么来的。改名「进行中」，而「今天合计」固定在最上面。
+ */
 function SessionPicker({
   mode,
   onMode,
@@ -61,7 +85,7 @@ function SessionPicker({
           aria-pressed={mode === 'current'}
           onClick={() => onMode('current')}
         >
-          本场
+          进行中
         </button>
         <button
           type="button"
@@ -85,6 +109,169 @@ function SessionPicker({
   );
 }
 
+/** 「已排除 N 笔删除（¥X）· 点开看」：作废单不再等于没发生（M1） */
+function ExcludedLine({
+  count,
+  fen,
+  onOpen
+}: {
+  count: number;
+  fen: number;
+  onOpen: () => void;
+}) {
+  if (count === 0) return null;
+  return (
+    <div className="report-excluded">
+      <span>
+        已排除 {count} 笔删除（¥{fenToStr(fen)}）
+      </span>
+      <button type="button" className="link-btn" onClick={onOpen}>
+        点开看
+      </button>
+    </div>
+  );
+}
+
+/** 进行中那行说明：必须写明「不计入今天」，否则又会被当成今天的收入（H1） */
+function OpenSessionNote({ count, fen }: { count: number; fen: number }) {
+  if (count === 0) return null;
+  return (
+    <p className="report-note">
+      还有 {count} 场进行中 · ¥{fenToStr(fen)}（不计入今天）
+    </p>
+  );
+}
+
+/**
+ * 「今天」汇总卡：固定在最上面、不参与场次切换（H1）。
+ *
+ * 数据是 `dayReport()` 按 closedAt 落在今天的**已结账**场次累加的，
+ * 所以收摊后打开报表第一眼就是今天的账，不会跳到 22:00 新开的那一场。
+ */
+function TodayCard({ day, onOpenVoided }: { day: DayReport; onOpenVoided: () => void }) {
+  const hasClosed = day.sessionCount > 0;
+  return (
+    <Card>
+      <div className="report-day-head">
+        <div className="report-day-head__title">
+          {hasClosed ? (
+            <>
+              今天 · 已结账 {day.sessionCount} 场
+              <span className="brand"> · ¥{fenToStr(day.revenueFen)}</span>
+            </>
+          ) : (
+            '今天'
+          )}
+        </div>
+        <span className="tiny-text">{day.date}</span>
+      </div>
+
+      {hasClosed ? (
+        <>
+          <div className="hero-stats hero-stats--single">
+            <div className="stat stat--hero">
+              <div className="k">毛利{day.grossKnown ? '' : '（成本待补）'}</div>
+              <div className={`v ${day.grossKnown ? (day.grossFen >= 0 ? 'ok' : 'bad') : ''}`}>
+                {day.grossKnown ? `¥${fenToStr(day.grossFen)}` : '—'}
+              </div>
+            </div>
+          </div>
+
+          <div className="pay-rows">
+            <div className="pay-row">
+              <span>现金</span>
+              <span>¥{fenToStr(day.cashFen)}</span>
+            </div>
+            <div className="pay-row">
+              <span>微信</span>
+              <span>¥{fenToStr(day.wechatFen)}</span>
+            </div>
+            <div className="pay-row">
+              <span>支付宝</span>
+              <span>¥{fenToStr(day.alipayFen)}</span>
+            </div>
+          </div>
+
+          <div className="stat-grid stat-grid--compact">
+            <Stat k="单数" v={day.orderCount} />
+            <Stat k="让利" v={`¥${fenToStr(day.discountFen)}`} tone="bad" />
+            <Stat k="赠品成本" v={`¥${fenToStr(day.giftCostFen)}`} />
+          </div>
+
+          <ExcludedLine count={day.voidedCount} fen={day.voidedFen} onOpen={onOpenVoided} />
+
+          {!day.grossKnown ? (
+            <p className="report-note">
+              今天有 {day.costIncompleteSessions} 场成本待补（缺批次），补录进货后毛利会自动恢复。
+            </p>
+          ) : null}
+        </>
+      ) : (
+        <Empty icon={<Sun size={24} />} text="今天还没有已结账的场次" />
+      )}
+
+      <OpenSessionNote count={day.openSessionCount} fen={day.openRevenueFen} />
+    </Card>
+  );
+}
+
+/** 被删除的单据明细：时间 / 金额 / 行内「撤销」（M1） */
+function VoidedSheet({
+  title,
+  orders,
+  restoringId,
+  onUndo,
+  onClose
+}: {
+  title: string;
+  orders: SalesOrder[];
+  restoringId: string | null;
+  onUndo: (id: string) => void;
+  onClose: () => void;
+}) {
+  return (
+    <Sheet title={title} subtitle={`共 ${orders.length} 笔 · 不计入销售额`} onClose={onClose}>
+      {orders.length === 0 ? (
+        <Empty icon={<Ban size={24} />} text="没有被删除的单据" />
+      ) : (
+        <ul className="glass-list">
+          {orders.map((o) => (
+            <li key={o.id} className="glass-list__item">
+              <span className="glass-list__leading">
+                <Ban size={20} aria-hidden="true" />
+              </span>
+              <div className="glass-list__content">
+                <div className="glass-list__title-row">
+                  <div className="glass-list__title">
+                    {isoToTime(o.createdAt)} · {o.operator}
+                  </div>
+                  <span className="glass-badge">{PAY_LABEL[o.payMethod]}</span>
+                </div>
+                <div className="glass-list__subtitle">已删除 · 不计入合计</div>
+              </div>
+              <div
+                className="glass-list__trailing"
+                style={{ display: 'flex', alignItems: 'center', gap: 10 }}
+              >
+                <span className="voided-amount">¥{fenToStr(o.totalFen)}</span>
+                <button
+                  type="button"
+                  className="link-btn"
+                  aria-label={`撤销删除 ${isoToTime(o.createdAt)} 这一单`}
+                  disabled={restoringId === o.id}
+                  onClick={() => onUndo(o.id)}
+                >
+                  撤销
+                </button>
+              </div>
+            </li>
+          ))}
+        </ul>
+      )}
+    </Sheet>
+  );
+}
+
 /** 本场汇总卡内容（销售额 / 收款分项 / 毛利 / 让利 / 赠品） */
 function SessionSummaryCard({
   selected,
@@ -93,15 +280,17 @@ function SessionSummaryCard({
   payMismatch,
   costMissing,
   onPatchSession,
-  onGoRecord
+  onGoRecord,
+  onOpenVoided
 }: {
   selected?: Session;
-  summary: SessionSummary;
+  summary: SessionReport;
   payTotal: number;
   payMismatch: boolean;
   costMissing: boolean;
   onPatchSession: () => void;
   onGoRecord: () => void;
+  onOpenVoided: () => void;
 }) {
   if (!selected) {
     return (
@@ -174,6 +363,13 @@ function SessionSummaryCard({
         <Stat k="赠品成本" v={`¥${fenToStr(summary.giftCostFen)}`} />
       </div>
 
+      {/* M1：删除单以前被 filter 掉了，报表里像没发生过；这里如实写「已排除几笔、多少钱」 */}
+      <ExcludedLine
+        count={summary.voidedCount ?? 0}
+        fen={summary.voidedFen ?? 0}
+        onOpen={onOpenVoided}
+      />
+
       <p className="tiny-text" style={{ marginBottom: 0, marginTop: 12 }}>
         成本按批次先进先出算（FIFO）。毛利 = 销售额 − 成本。赠品金额 0、成本照算，单独列示。
       </p>
@@ -187,6 +383,7 @@ function MarginTable({
   productByName,
   selected,
   orderCount,
+  voidedCount,
   onCopy,
   onPatchSession,
   onGoRecord
@@ -195,6 +392,8 @@ function MarginTable({
   productByName: Map<string, Product>;
   selected?: Session;
   orderCount: number;
+  /** 本场被删除的单数：只有删除单的场次不能说成「还没卖东西」（M1） */
+  voidedCount: number;
   onCopy: () => void;
   onPatchSession: () => void;
   onGoRecord: () => void;
@@ -204,7 +403,9 @@ function MarginTable({
   const sortedMargins = useMemo(() => {
     const arr = [...margins];
     arr.sort((a, b) => {
-      if (Boolean(a.costIncomplete) !== Boolean(b.costIncomplete)) return a.costIncomplete ? 1 : -1;
+      // H3：缺成本的行排最前。它们的毛利是**估**出来的，藏在一堆正常行里
+      // 会被当成「真赚了」，排在最前 + 徽标才是安全的默认。
+      if (Boolean(a.costIncomplete) !== Boolean(b.costIncomplete)) return a.costIncomplete ? -1 : 1;
       if (sort === 'revenue') return b.revenueFen - a.revenueFen;
       if (sort === 'qty') return b.qtyBase - a.qtyBase;
       return b.grossFen - a.grossFen;
@@ -238,7 +439,13 @@ function MarginTable({
       {sortedMargins.length === 0 ? (
         <Empty
           icon={<TrendingUp size={24} />}
-          text={selected ? '这一场还没卖东西' : '还没有场次'}
+          text={
+            selected
+              ? voidedCount > 0
+                ? `这一场没有有效销售（${voidedCount} 笔已删除，可在上方「点开看」撤销）`
+                : '这一场还没卖东西'
+              : '还没有场次'
+          }
           action={
             selected && selected.status === 'closed' ? (
               <Btn block={false} size="sm" onClick={onPatchSession}>
@@ -263,9 +470,14 @@ function MarginTable({
                   </button>
                 </th>
                 {sortHeader('revenue', '销售额')}
-                <th className="glass-table__num hide-sm">让利</th>
+                {/*
+                  窄屏（≤520）只留「商品 / 数量 / 销售额 / 成本 / 毛利」五列：
+                  赠品信息已在商品名下写「赠 1」，让利总额在汇总卡里，
+                  而**成本**和**毛利**必须同屏可见——否则毛利会被右边缘切掉。
+                */}
+                <th className="glass-table__num hide-narrow">让利</th>
                 <th className="glass-table__num hide-narrow">赠品</th>
-                <th className="glass-table__num hide-narrow">成本</th>
+                <th className="glass-table__num">成本</th>
                 {sortHeader('gross', '毛利')}
               </tr>
             </thead>
@@ -276,27 +488,45 @@ function MarginTable({
                   <tr key={m.productId}>
                     <td>
                       <div>{m.name}</div>
-                      {m.giftQty ? (
-                        <div className="tiny-text">赠 {m.giftQty}</div>
+                      {m.giftQty || m.costIncomplete ? (
+                        <div className="margin-flags">
+                          {m.giftQty ? (
+                            <span className="tiny-text">赠 {m.giftQty}</span>
+                          ) : null}
+                          {m.costIncomplete ? (
+                            <span
+                              className="glass-badge glass-badge--warning"
+                              title={`本行 ${m.uncoveredQty ?? 0} 个（基本单位）没有进货批次，成本是估算值`}
+                            >
+                              成本待补
+                            </span>
+                          ) : null}
+                        </div>
                       ) : null}
                     </td>
                     <td className="glass-table__num">
                       {qtyToStr(m.qtyBase, p?.boxQty ?? 0, p?.unitBase ?? '个')}
                     </td>
                     <td className="glass-table__num">¥{fenToStr(m.revenueFen)}</td>
-                    <td className="glass-table__num hide-sm">¥{fenToStr(m.discountFen)}</td>
+                    <td className="glass-table__num hide-narrow">¥{fenToStr(m.discountFen)}</td>
                     <td className="glass-table__num hide-narrow">
                       {m.giftQty ? `${m.giftQty} · ¥${fenToStr(m.giftCostFen ?? 0)}` : '—'}
                     </td>
-                    <td className="glass-table__num hide-narrow">¥{fenToStr(m.costFen)}</td>
+                    <td className="glass-table__num">¥{fenToStr(m.costFen)}</td>
                     <td
                       className="glass-table__num"
                       style={{
-                        color: m.grossFen >= 0 ? 'var(--yh-ok-ink)' : 'var(--yh-bad-ink)',
+                        // 缺成本的行不许用「盈利绿」：数字后面加 ~，颜色降为次要文字
+                        color: m.costIncomplete
+                          ? 'var(--gl-color-text-muted)'
+                          : m.grossFen >= 0
+                            ? 'var(--yh-ok-ink)'
+                            : 'var(--yh-bad-ink)',
                         fontWeight: 'var(--yh-weight-semibold)'
                       }}
                     >
                       ¥{fenToStr(m.grossFen)}
+                      {m.costIncomplete ? '~' : ''}
                     </td>
                   </tr>
                 );
@@ -398,8 +628,11 @@ function ExpiryWarnings({
 }
 
 /**
- * 报表：按场次，不再按自然日。
- * 默认本场（进行中或最近一场）；历史场次按结账时间倒序。
+ * 报表：顶部固定「今天」合计，下面才是单场明细。
+ *
+ * 默认视图是「今天」卡（H1）：收摊后打开报表，第一眼必须是今天已结账场次的合计，
+ * 而不是 22:00 新开、还没结账的下一场。场次切换只影响下面的明细卡，
+ * 「进行中」= 当前这一场，「历史场次」= 已结账场次（按结账时间倒序）。
  */
 export default function ReportPage({
   products,
@@ -429,6 +662,11 @@ export default function ReportPage({
   const [mode, setMode] = useState<'current' | 'history'>('current');
   const [pickedId, setPickedId] = useState<string | null>(null);
   const [pickerOpen, setPickerOpen] = useState(false);
+  /** 删除单明细弹层：'today' = 今天已结账场次的删除单；'session' = 当前这一场 */
+  const [voidedSheet, setVoidedSheet] = useState<'today' | 'session' | null>(null);
+  /** 撤销删除的防连点（与流水页同一份守卫思路） */
+  const [restoring, setRestoring] = useState<string | null>(null);
+  const today = localDate();
 
   const productByName = useMemo(() => {
     const m = new Map<string, Product>();
@@ -456,6 +694,29 @@ export default function ReportPage({
     [deviceSessions]
   );
 
+  /**
+   * 今天合计（H1）：只算 closedAt 落在本地今天的**已结账**场次；
+   * 进行中的场次单独给场次与金额，界面写「不计入今天」。
+   */
+  const day = useMemo(
+    () => dayReport(sessions, orders, lines, fifo, today),
+    [sessions, orders, lines, fifo, today]
+  );
+
+  /** 今天已结账场次的 id：删除单弹层要用它过滤（口径必须与 dayReport 一致） */
+  const todayClosedIds = useMemo(() => {
+    const s = new Set<string>();
+    for (const x of sessions) {
+      if (x.status === 'closed' && x.closedAt && isoToLocalDate(x.closedAt) === today) s.add(x.id);
+    }
+    return s;
+  }, [sessions, today]);
+
+  const todayVoided = useMemo(
+    () => newestFirst(orders.filter((o) => o.voided && o.sessionId && todayClosedIds.has(o.sessionId))),
+    [orders, todayClosedIds]
+  );
+
   const selected =
     mode === 'current'
       ? (openSession ?? closed[0])
@@ -480,17 +741,59 @@ export default function ReportPage({
     [batches, fifo, warnDays, products]
   );
 
-  const costMissing = fifo.uncoveredQty > 0;
+  /** 当前这一场被删除的单（M1：报表里要能点开看，而不是只 filter 掉） */
+  const sessionVoided = useMemo(
+    () => (selected ? newestFirst(orders.filter((o) => o.voided && o.sessionId === selected.id)) : []),
+    [orders, selected]
+  );
+
+  /**
+   * H2：毛利「—」按**场次**判断，不再看全局 fifo.uncoveredQty。
+   *
+   * 为什么要按场次：全局口径下，只要昨天/下一场/任何一个商品缺一批货，
+   * 今天这一场的毛利也一起变成「—」，摊主会以为账坏了；而同一个页面的
+   * 「复制本场汇总」却照样打印金额 —— 两处口径打架，用户谁都不信。
+   * 现在只有**本场**有缺批次才隐藏毛利，提示条也只说本场缺多少。
+   */
+  const costMissing = summary.uncoveredQty > 0;
   const payTotal = summary.cashFen + summary.wechatFen + summary.alipayFen;
   const payMismatch = summary.orderCount > 0 && payTotal !== summary.revenueFen;
 
+  /**
+   * 撤销删除（M1）：报表的「已排除 N 笔删除」点开就能救回来。
+   * 守卫与流水页一致：先确认单据还在本机，再写库，失败如实报错。
+   */
+  const undoDelete = async (id: string) => {
+    if (restoring) return;
+    if (!orders.some((o) => o.id === id)) {
+      onDone('这一单已经不在了（可能被另一台手机清空过）', 'warning');
+      return;
+    }
+    setRestoring(id);
+    try {
+      await restoreOrder(id);
+      onDone('已撤销删除');
+    } catch {
+      onDone('撤销失败，请重试', 'error');
+    } finally {
+      setRestoring(null);
+    }
+  };
+
   const copySummary = async () => {
     if (!selected) return;
+    // 与 hero 用同一个 grossKnown（= costMissing）判断：禁止一处「—」一处金额
+    const grossText = costMissing
+      ? `毛利 —（成本待补：本场 ${summary.uncoveredQty} 个缺批次）`
+      : `毛利 ¥${fenToStr(summary.grossFen)}`;
     const text = [
       `本场 ${sessionRange(selected)}`,
       `销售额 ¥${fenToStr(summary.revenueFen)} · ${summary.orderCount} 单`,
       `现金 ¥${fenToStr(summary.cashFen)} · 微信 ¥${fenToStr(summary.wechatFen)} · 支付宝 ¥${fenToStr(summary.alipayFen)}`,
-      `毛利 ¥${fenToStr(summary.grossFen)} · 让利 ¥${fenToStr(summary.discountFen)} · 赠品成本 ¥${fenToStr(summary.giftCostFen)}`,
+      `${grossText} · 让利 ¥${fenToStr(summary.discountFen)} · 赠品成本 ¥${fenToStr(summary.giftCostFen)}`,
+      summary.voidedCount > 0
+        ? `已排除 ${summary.voidedCount} 笔删除（¥${fenToStr(summary.voidedFen)}）`
+        : '',
       selected.patchedCount > 0 ? `补过 ${selected.patchedCount} 单` : ''
     ]
       .filter(Boolean)
@@ -509,6 +812,9 @@ export default function ReportPage({
 
   return (
     <div className="page-stack">
+      {/* 今天合计：固定最上面、不参与场次切换（H1） */}
+      <TodayCard day={day} onOpenVoided={() => setVoidedSheet('today')} />
+
       <Card>
         <SessionPicker
           mode={mode}
@@ -526,6 +832,7 @@ export default function ReportPage({
           costMissing={costMissing}
           onPatchSession={patchSelected}
           onGoRecord={onGoRecord}
+          onOpenVoided={() => setVoidedSheet('session')}
         />
       </Card>
 
@@ -543,7 +850,8 @@ export default function ReportPage({
         <div className="glass-status">
           <TriangleAlert size={20} aria-hidden="true" />
           <p>
-            有 {fifo.uncoveredQty} 个（基本单位）销量没有对应的进货批次（漏录进货或超卖），这部分成本用均价估算，毛利先显示为「—」。
+            本场有 {summary.uncoveredQty} 个（基本单位）销量没有对应的进货批次（漏录进货或超卖），
+            这部分成本用均价估算，<strong>本场</strong>毛利先显示为「—」。
             去「进货」补录后会自动恢复。
           </p>
         </div>
@@ -554,12 +862,23 @@ export default function ReportPage({
         productByName={productByName}
         selected={selected}
         orderCount={summary.orderCount}
+        voidedCount={summary.voidedCount}
         onCopy={copySummary}
         onPatchSession={patchSelected}
         onGoRecord={onGoRecord}
       />
 
       <ExpiryWarnings warnings={warnings} warnDays={warnDays} productById={productByName} />
+
+      {voidedSheet ? (
+        <VoidedSheet
+          title={voidedSheet === 'today' ? '今天被删除的单' : '这一场被删除的单'}
+          orders={voidedSheet === 'today' ? todayVoided : sessionVoided}
+          restoringId={restoring}
+          onUndo={(id) => void undoDelete(id)}
+          onClose={() => setVoidedSheet(null)}
+        />
+      ) : null}
 
       {pickerOpen ? (
         <Sheet

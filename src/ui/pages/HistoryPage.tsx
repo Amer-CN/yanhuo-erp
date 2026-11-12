@@ -175,13 +175,18 @@ export default function HistoryPage({
         />
       ) : (
         grouped.map(([day, list]) => {
-          const total = list.filter((o) => !o.voided).reduce((s, o) => s + o.totalFen, 0);
+          // M5：单数与金额必须同一个口径。以前「20 单 · 合计 ¥405.50」
+          // 分子含 2 笔删除、分母不含，摊主拿 405.50 ÷ 20 算不出任何东西。
+          const active = list.filter((o) => !o.voided);
+          const voidedCount = list.length - active.length;
+          const total = active.reduce((s, o) => s + o.totalFen, 0);
           return (
             <div key={day}>
               <div className="day-header">
                 <span>{day}</span>
                 <span className="sub">
-                  {list.length} 单 · 合计 ¥{fenToStr(total)}
+                  {active.length} 单 · 合计 ¥{fenToStr(total)}
+                  {voidedCount > 0 ? `（另有 ${voidedCount} 笔已删除）` : ''}
                 </span>
               </div>
               <ul className="glass-list">
