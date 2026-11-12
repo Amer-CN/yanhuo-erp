@@ -493,16 +493,30 @@ body {
 }
 
 /*
- * P10：库存总件数改成净件数（可为负）后，顶卡补一句「含欠货 -15」。
- * 贴在卡片右下角：右上角是缺货角标（点击筛选），左下角是件数，谁都不挡。
- * 只在这一处用，所以不往 kit 的 Stat 上加 props（那是全站共用组件）。
+ * 「含欠货 -N」是卡片内的副标（2026-11-12）。
+ *
+ * 原来它绝对定位在卡片右下角（inset-block-end: 0），右上角还有「缺货 N」角标：
+ * 两个绝对定位元素 + 数字抢同一块地方，数字一长或卡片一窄就互相压。
+ * 现在改成**流内**元素，跟在数字下面单独占一行；只有角标留在右上角。
+ *
+ * .stat--stock 是「库存总件数」这张卡的专用包装（见 StockPage.tsx）：
+ * 它不用 kit 的 Stat 就为了能在数字下面塞这行副标。align-items: flex-start
+ * 让标题/数字/副标各自收缩到文字宽度，既不会被角标压住，也方便用
+ * getBoundingClientRect 验证三者互不相交。
  */
+.stat--stock {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  /* 比其它统计卡少 4px 上下内边距：多出来的一行副标只让卡片高约 7px */
+  padding-block: var(--yh-space-2);
+}
+
 .stat-sub {
-  position: absolute;
-  inset-block-end: 0;
-  inset-inline-end: 0;
-  padding: 0 var(--yh-space-1);
+  margin-top: var(--yh-space-0-5);
   font-size: var(--yh-text-xs);
+  /* 行高 1：副标只占它自己的 12px，卡片净增高度控制在 4-8px 区间内 */
+  line-height: 1;
   font-weight: var(--yh-weight-semibold);
   font-variant-numeric: tabular-nums;
   white-space: nowrap;
@@ -839,6 +853,17 @@ body {
   background: var(--gl-surface-4);
 }
 
+/*
+ * 按钮文案一律单行（2026-11-12）。
+ * .glass-btn 是 flex 容器，按钮文字是匿名 flex 项，white-space 默认是 normal：
+ * 窄屏（390）上被相邻内容一挤，「收摊结账」就折成「收摊结 / 账」。
+ * 这些按钮的文案都是固定短语，折行只会更难读，所以统一 nowrap；
+ * 真需要超长文案时应在调用处收字号或缩短文案，而不是让它折行。
+ */
+.glass-btn {
+  white-space: nowrap;
+}
+
 /* 弹层：内容超长时只滚 body，底部按钮始终可见 */
 .glass-sheet {
   display: flex;
@@ -849,6 +874,124 @@ body {
 .glass-sheet__body {
   overflow-y: auto;
   overscroll-behavior: contain;
+}
+
+/* ------------------------------------------------------------ 选商品：全屏 + 列表内滚 */
+/*
+ * 全屏选商品层（2026-11-12）。原来 Sheet 封顶 90dvh，顶部露出一条背景，
+ * 用户反馈「上方空着没用，浪费显示空间」；货多时还是整页在滚，
+ * 搜索框和「完成」会被滚出屏幕。
+ *
+ * 这里靠内容的 `.picker--full` 标记 + CSS `:has()` 选中承载它的面板，
+ * 不改 kit 的 Sheet 接口（Sheet 的焦点策略 / 滚动锁 / Esc 栈顶 / 返回键守卫
+ * 全部原样不变）。不支持 :has() 的浏览器退回 90dvh + body 滚动，仍可用。
+ *
+ * 结构：头部（不滚）→ 筛选（不滚）→ 列表（唯一滚动容器）→ 底部按钮（不滚）。
+ */
+.glass-sheet-overlay:has(.picker--full) .glass-sheet {
+  /* 100dvh：顶到状态栏，配合 safe-area 顶部留白，顶部不再露出背景 */
+  height: 100dvh;
+  max-height: 100dvh;
+  padding-top: calc(var(--gl-space-1, 4px) + env(safe-area-inset-top, 0px));
+  border-radius: 0;
+  /* GlassKit 的 .glass-sheet 自带 overflow:auto —— 必须关掉，
+     否则整块面板是可滚区域，会出现「列表内滚 + 面板滚」两条滚动条 */
+  overflow: hidden;
+}
+
+.glass-sheet-overlay:has(.picker--full) .glass-sheet__body {
+  display: flex;
+  flex-direction: column;
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow: hidden;
+}
+
+.glass-sheet-overlay:has(.picker--full) .glass-sheet__actions {
+  flex: 0 0 auto;
+}
+
+/* 弹层内容：上下两段固定，中间列表自己滚 */
+.picker {
+  display: flex;
+  flex-direction: column;
+  gap: var(--yh-gap-card);
+  flex: 1 1 auto;
+  min-height: 0;
+}
+
+.picker__filters {
+  flex: 0 0 auto;
+  display: flex;
+  flex-direction: column;
+  gap: var(--yh-space-2);
+}
+
+/*
+ * 唯一的滚动容器：flex:1 + min-height:0 才允许它在 flex 列里被压缩并产生滚动；
+ * overscroll-behavior: contain 阻止滚到底后把滚动传递给页面（iOS 橡皮筋串滚）。
+ */
+.picker__list {
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  -webkit-overflow-scrolling: touch;
+  padding-bottom: var(--yh-space-1);
+}
+
+/* ------------------------------------------------------------ 进货页：商品触发按钮 + 兼容值通道 */
+/*
+ * 触发按钮沿用 .glass-select 的外观（含右侧 chevron），
+ * 但它是按钮而不是原生下拉：点击打开 ProductPicker（有搜索和分类）。
+ */
+.picker-trigger {
+  display: flex;
+  align-items: center;
+  text-align: left;
+  font: inherit;
+  color: var(--gl-color-text);
+}
+
+.picker-trigger__text {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.picker-trigger.is-placeholder {
+  color: var(--gl-placeholder);
+}
+
+/* 已选商品用标题色 + 中等字重，避免和白底时代的占位文字糊成一片 */
+.picker-trigger:not(.is-placeholder) {
+  color: var(--gl-color-text-heading);
+  font-weight: var(--yh-weight-medium);
+}
+
+.picker-trigger:focus-visible {
+  border-color: var(--gl-border-focus);
+  box-shadow: var(--gl-shadow-focus), var(--gl-inset-medium);
+  outline: none;
+}
+
+/*
+ * 视觉隐藏的原生 select（值通道）：保留标准表单元素供外部脚本写值，
+ * 但用户摸不到、键盘 Tab 不到、读屏也读不到，手机上不会弹系统白底列表。
+ * 不写 display:none / visibility:hidden —— 那样脚本的 select_option 也点不到。
+ */
+.picker-compat {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  margin: -1px;
+  padding: 0;
+  border: 0;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+  clip-path: inset(50%);
+  white-space: nowrap;
 }
 
 /*

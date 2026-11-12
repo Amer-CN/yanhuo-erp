@@ -70,6 +70,24 @@
   border-radius: var(--yh-radius-sm);
 }
 
+/*
+ * 场次汇总卡头部：左列（本场开始时间 / 金额 / 单数）+ 右侧「收摊结账」。
+ * 左列必须允许收缩（min-width: 0），否则金额把按钮挤窄，四个字会折成两行。
+ * 按钮本身 flex: 0 0 auto + nowrap，宽度只由文案决定（全局 .glass-btn 已 nowrap，
+ * 这里再显式写一遍，防止将来有人给 .session-close-btn 单独覆写 padding 时回退）。
+ */
+.session-summary {
+  flex: 1 1 auto;
+  min-width: 0;
+}
+
+.session-close-btn {
+  flex: 0 0 auto;
+  width: auto;
+  min-width: fit-content;
+  white-space: nowrap;
+}
+
 .session-summary__revenue {
   font-size: var(--yh-text-2xl);
   font-weight: var(--yh-weight-semibold);

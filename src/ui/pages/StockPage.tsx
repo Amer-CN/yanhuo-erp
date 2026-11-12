@@ -170,19 +170,28 @@ export default function StockPage({
          * 直接改 kit 的 Stat 会波及别的页面；包一层只影响这一处。
          */}
         <div className="stat-slot">
-          <Stat k="库存总件数" v={totalQty} />
           {/*
-           * P10 的副标：净件数为负时说明「数里含着欠货」。
-           * 只加角标、不改 Stat 组件（那是全站共用的）。
+           * 这张卡不用 kit 的 <Stat>：需要把「含欠货 -N」放进卡片内部、数字下方，
+           * 而 Stat 不接受 children（那是全站共用组件，本次不动）。这里直接复用
+           * .stat / .k / .v 三个类，视觉与右边的「库存成本」完全一致。
+           *
+           * 排版：标题、数字、副标都在正常流里，右上角的「缺货 N」角标才是绝对定位。
+           * 原来副标也绝对定位在右下角（inset-block-end: 0），数字一大或卡片一窄，
+           * 副标、角标、数字三者就会挤在一起；改成流内副标后三者各占一行/一角，
+           * 卡片只比另一张高一点点，不会再互相压住。
            */}
-          {owedQty > 0 ? (
-            <span
-              className="stat-sub"
-              aria-label={`库存总件数含欠货 ${owedQty}，可在列表里点负库存商品查看`}
-            >
-              含欠货 -{owedQty}
-            </span>
-          ) : null}
+          <div className="stat stat--stock">
+            <div className="k">库存总件数</div>
+            <div className="v">{totalQty}</div>
+            {owedQty > 0 ? (
+              <span
+                className="stat-sub"
+                aria-label={`库存总件数含欠货 ${owedQty}，可在列表里点负库存商品查看`}
+              >
+                含欠货 -{owedQty}
+              </span>
+            ) : null}
+          </div>
           {lowCount > 0 ? (
             <button
               type="button"

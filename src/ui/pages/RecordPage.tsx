@@ -204,7 +204,12 @@ export default function RecordPage({
         {hasSession && session ? (
           <>
             <div className="row-between" style={{ alignItems: 'flex-start' }}>
-              <div>
+              {/*
+               * .session-summary 只做一件事：给左侧这列 min-width:0。
+               * 不加的话金额（¥1234.50）是不收缩的，右边按钮被挤窄后
+               * 「收摊结账」四个字会折成「收摊结 / 账」。
+               */}
+              <div className="session-summary">
                 <div className="session-head__line">
                   <span className="tiny-text">本场 · {startLabel(session)} 开始</span>
                   {/*
@@ -233,6 +238,7 @@ export default function RecordPage({
                 block={false}
                 size="sm"
                 variant="secondary"
+                className="session-close-btn"
                 disabled={empty}
                 onClick={onCloseSession}
                 title={empty ? '还没记单' : undefined}

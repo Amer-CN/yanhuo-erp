@@ -9,6 +9,7 @@ import {
   QTY_HINT_TOO_LONG
 } from '../quantityInput';
 import { Btn, Card, ConfirmSheet, Empty, Field, ProductFormModal, Sheet, rowProps, type Done } from '../kit';
+import ProductPicker from '../ProductPicker';
 
 /** 「今天已录」抽屉只显示最近这么多条；条数统计仍按全量算 */
 const TODAY_LIST_LIMIT = 30;
@@ -54,6 +55,15 @@ export default function PurchasePage({
   const { productId, qty, unit, cost, batchNo, produceDate, expiryDate, supplier, receivedAt } = form;
   const patchForm = (patch: Partial<PurchaseForm>) => setForm((f) => ({ ...f, ...patch }));
   const [newProduct, setNewProduct] = useState(false);
+  /**
+   * 选商品弹层（ProductPicker）。为什么进货页不再直接用原生 `<select>`：
+   * 手机上点开的是系统白底列表 + 单选圈，和这套深色玻璃界面完全不是一类；
+   * 而且原生 select 不能搜索，货一多只能一格格翻。改用与记账页同一个
+   * ProductPicker，既有搜索框和分类 chip，样式也统一。
+   */
+  const [pickerOpen, setPickerOpen] = useState(false);
+  /** 数量框：选完商品把焦点送到这里，摊位顺手就能输数量 */
+  const qtyRef = useRef<HTMLInputElement>(null);
   const [todayOpen, setTodayOpen] = useState(false);
   const [delBatchId, setDelBatchId] = useState<string | null>(null);
   // 删除失败的就地提示：已卖出的批次不能删（不能只用 toast，否则用户看不到原因）
@@ -120,6 +130,23 @@ export default function PurchasePage({
   const resetForm = () => {
     patchForm({ qty: '1', cost: '', batchNo: '', produceDate: '', expiryDate: '' });
     setErrors({});
+  };
+
+  /** 选中一个商品：回填商品字段并把单位重置为「按基本单位」（与原 select 口径一致） */
+  const changeProduct = (id: string) => {
+    patchForm({ productId: id, unit: 'base' });
+    setErrors((p) => ({ ...p, product: undefined }));
+  };
+
+  /**
+   * ProductPicker 的 'pick' 模式回调：选中即关弹层。
+   * 关闭后弹层卸载会先把焦点还给触发按钮（Sheet 的焦点归还），
+   * 所以下一帧再把焦点落到「数量」——用户接下来一定要输数量。
+   */
+  const pickProduct = (p: Product) => {
+    changeProduct(p.id);
+    setPickerOpen(false);
+    requestAnimationFrame(() => qtyRef.current?.focus({ preventScroll: true }));
   };
 
   const save = async () => {
@@ -205,25 +232,44 @@ export default function PurchasePage({
 
         <div className="page-stack" style={{ marginTop: 10 }}>
           <Field label="商品" error={errors.product}>
-            <select
-              className="glass-select"
-              value={productId}
-              onChange={(e) => {
-                patchForm({ productId: e.target.value });
-                patchForm({ unit: 'base' });
-                setErrors((p) => ({ ...p, product: undefined }));
-              }}
+            {/*
+             * 触发按钮做成 .glass-select 的外观，但点开的是 ProductPicker，
+             * 不再是系统原生列表。Field 会把 label 的 htmlFor 指到这个按钮上，
+             * 所以「点标签 ≈ 点按钮」与屏幕阅读器读到的名字都还在。
+             */}
+            <button
+              type="button"
+              className={`glass-select picker-trigger ${product ? '' : 'is-placeholder'}`}
+              aria-haspopup="dialog"
+              aria-expanded={pickerOpen}
+              onClick={() => setPickerOpen(true)}
             >
-              <option value="" disabled hidden>
-                选择商品…
-              </option>
-              {active.map((p) => (
-                <option key={p.id} value={p.id}>
-                  {p.name}
-                </option>
-              ))}
-            </select>
+              <span className="picker-trigger__text">{product ? product.name : '选择商品…'}</span>
+            </button>
           </Field>
+
+          {/*
+           * 兼容值通道（视觉隐藏，不可聚焦、不进无障碍树）：
+           * 旧版这里就是用户直接操作的原生 <select>，部分外部脚本 / 旧自动化仍按
+           * `select_option` 写值。保留一个标准 select 承接这类写入，触摸与键盘
+           * 都走上面的按钮 + ProductPicker，手机上不会再弹出系统白底列表。
+           */}
+          <select
+            className="picker-compat"
+            tabIndex={-1}
+            aria-hidden="true"
+            value={productId}
+            onChange={(e) => changeProduct(e.target.value)}
+          >
+            <option value="" disabled hidden>
+              选择商品…
+            </option>
+            {active.map((p) => (
+              <option key={p.id} value={p.id}>
+                {p.name}
+              </option>
+            ))}
+          </select>
 
           {product && product.boxQty > 1 ? (
             <div className="glass-segmented glass-segmented--full" role="group" aria-label="进货单位">
@@ -254,6 +300,7 @@ export default function PurchasePage({
               error={qtyHint || errors.qty}
             >
               <input
+                ref={qtyRef}
                 className="glass-input"
                 inputMode="numeric"
                 value={qty}
@@ -445,6 +492,25 @@ export default function PurchasePage({
             </div>
           )}
         </Sheet>
+      ) : null}
+
+      {/*
+       * 选商品：与记账页同一个 ProductPicker（mode='pick'）。
+       * 进货页没有 inv 数据源，所以不传 inv —— 组件会隐藏库存行，
+       * 而不是给每个货都显示误导性的「账面 0」。
+       */}
+      {pickerOpen ? (
+        <ProductPicker
+          mode="pick"
+          products={products}
+          onPick={pickProduct}
+          onDone={() => setPickerOpen(false)}
+          onCreate={() => {
+            // 空态里的「去建商品」：先关选货层，再开新建商品表单
+            setPickerOpen(false);
+            setNewProduct(true);
+          }}
+        />
       ) : null}
 
       {newProduct ? (
