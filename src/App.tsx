@@ -1,4 +1,4 @@
-import { useCallback, useMemo, useState } from 'react';
+import { useCallback, useMemo, useRef, useState } from 'react';
 import { useLiveQuery } from 'dexie-react-hooks';
 import {
   emptySessionSummary,
@@ -36,6 +36,27 @@ export default function App() {
 
   const toastCtl = useToast();
   const { theme, toggleTheme } = useTheme();
+  /**
+   * P9 的「意图」：只有「从开单页点去建商品」这一条路会把它置 true。
+   * 生命周期（写成 ref 是因为它只影响一次跳转，不该触发重渲染）：
+   *   置位 → onCreateProductForEditor（开单页去建商品）
+   *   清除 → ① onProductCreated（建好了：立刻消费掉，回开单页加行）
+   *          ② 从商品管理退出去（onBack）或切 tab —— 用户放弃了这条流程
+   * 不清就会变成永久跳转 bug：以后从「更多 → 商品管理」新建也会被弹回开单页。
+   */
+  const createProductIntentRef = useRef(false);
+  /**
+   * 建好、但还没被开单页消费掉的那个商品 id。
+   * 必须是 state 而不是 ref：RecordEditor 要等到 `data.products` 里出现它才加行
+   * （liveQuery 是异步刷新的，建完立刻回开单页时 products 可能还差这一条）。
+   */
+  const [pendingProductId, setPendingProductId] = useState<string | null>(null);
+  /** 任何「离开商品管理」的路径都要清意图，避免泄漏到下一次新建 */
+  const clearCreateIntent = () => {
+    createProductIntentRef.current = false;
+    // 一并清掉待加入的商品：用户已经放弃这条流程，下次进开单页不该再冒出一行
+    setPendingProductId(null);
+  };
   const boot = useBoot(toastCtl.showToast);
   const data = useLiveQuery(() => loadAll(), []);
   const sync = useSync();
@@ -250,6 +271,35 @@ export default function App() {
         } catch (e) {
           toastCtl.showToast(`撤销失败：${msgOf(e)}`, 'error');
         }
+      },
+      /* P9：开单页「去建商品」—— 置意图后切到商品管理 */
+      onCreateProductForEditor: () => {
+        createProductIntentRef.current = true;
+        setEditor(null);
+        setSub('products');
+      },
+      /*
+       * P9：商品管理「新建」保存成功。
+       * 命中意图 → 一次性消费掉，直接回开单页，并把新商品 id 交给 RecordEditor
+       * （挂载后加一行：数量 1、按标价，复用 useRecordDraft.addProduct 的口径）。
+       * 没命中（更多 → 商品管理）→ 什么都不做，用户留在列表页。
+       *
+       * ⚠️ 意图必须在这里立刻清掉：漏清就会变成「以后每次新建商品都被弹回开单页」的
+       * 永久跳转 bug —— 这是这类「建完回原页」功能最常见的翻车点。
+       */
+      onProductCreated: (productId) => {
+        if (!createProductIntentRef.current) return;
+        createProductIntentRef.current = false;
+        setSub(null);
+        setPendingProductId(productId);
+        setEditor({ mode: 'new' });
+      },
+      /*
+       * P9：RecordEditor 把 pendingProductId 加进草稿后回调这里清空。
+       * 清空后这一轮流程彻底结束：刷新 / 重渲染 / 再开新单都不会重复加行。
+       */
+      onPendingProductConsumed: () => {
+        setPendingProductId(null);
       }
     }),
     [handleRecordSaved, openSession, closeFlow.setCloseOpen, setEditor, setSub, setTab, lastClosed, toastCtl.showToast]
@@ -264,8 +314,13 @@ export default function App() {
         sub={sub}
         tab={tab}
         sync={sync}
-        onBack={() => setSub(null)}
+        onBack={() => {
+          // P9：离开商品管理＝放弃「建完回开单页」这条流程，意图必须立刻清掉
+          clearCreateIntent();
+          setSub(null);
+        }}
         onSelectTab={(t) => {
+          clearCreateIntent();
           setTab(t);
           setSub(null);
         }}
@@ -280,7 +335,14 @@ export default function App() {
       >
         {data && appData ? (
           <AppDataProvider value={appData} actions={appActions}>
-            <AppMain tab={tab} sub={sub} editor={editor} theme={theme} onToggleTheme={toggleTheme} />
+            <AppMain
+              tab={tab}
+              sub={sub}
+              editor={editor}
+              pendingProductId={pendingProductId}
+              theme={theme}
+              onToggleTheme={toggleTheme}
+            />
           </AppDataProvider>
         ) : null}
       </AppShell>

@@ -8,11 +8,18 @@ import { Btn, ConfirmSheet, Empty, ProductFormModal, rowProps, type Done } from 
 export default function ProductsPage({
   products,
   inv,
-  onDone
+  onDone,
+  onCreated
 }: {
   products: Product[];
   inv: Map<string, number>;
   onDone: Done;
+  /**
+   * P9：新建成功后的回调（只在「新建」这条路上触发，编辑/停用不触发），参数是新建商品 id。
+   * 由上层决定要不要跳回开单页并把这个商品加进本单 ——
+   * 从「更多 → 商品管理」进来时上层没有意图，什么也不做，就停在这一页。
+   */
+  onCreated?: (productId: string) => void;
 }) {
   const [q, setQ] = useState('');
   const [editing, setEditing] = useState<Product | 'new' | null>(null);
@@ -39,13 +46,17 @@ export default function ProductsPage({
     setSaving(true);
     try {
       if (editing === 'new') {
-        await createProduct(input);
+        // createProduct 返回完整的新商品（repo.ts:134），这里只把 id 交给上层
+        const created = await createProduct(input);
         onDone('商品已建');
+        // 先关表单（路径 B 要留在本页看列表），再按意图决定是否跳回开单页
+        setEditing(null);
+        onCreated?.(created.id);
       } else if (editing) {
         await updateProduct(editing.id, input);
         onDone('已保存');
+        setEditing(null);
       }
-      setEditing(null);
     } finally {
       // 失败不 catch：抛回 ProductFormModal，由表单就地显示原因（不关框）
       setSaving(false);

@@ -523,6 +523,18 @@ export interface AppActionsValue {
    * 失败原因（例如「下一场已经开始，不能撤销结账」）由实现方 Toast 出来。
    */
   onReopenLastClosed: () => Promise<void>;
+  /**
+   * P9：开单页「去建商品」—— 置上「建完回开单页并把商品加进本单」的意图。
+   */
+  onCreateProductForEditor: () => void;
+  /**
+   * P9：商品管理里「新建」保存成功（参数是新建商品 id）。
+   * App 只在上面那条意图成立时回开单页；否则（更多 → 商品管理 → 新建）什么都不做，
+   * 用户仍然留在列表页。意图是一次性的，消费/离开时立刻清掉。
+   */
+  onProductCreated: (productId: string) => void;
+  /** P9：RecordEditor 已把 pendingProductId 加进草稿，App 可以清空它了 */
+  onPendingProductConsumed: () => void;
 }
 
 const AppDataContext = createContext<AppDataValue | null>(null);
@@ -561,12 +573,17 @@ export interface AppMainProps {
   tab: Tab;
   sub: SubPage;
   editor: EditorState | null;
+  /**
+   * P9：刚建好、尚未加进草稿的商品 id（由 App 持有，见 App.onProductCreated）。
+   * 只有「从开单页去建商品」那一次会非空，RecordEditor 消费后回调清空。
+   */
+  pendingProductId: string | null;
   theme: Theme;
   onToggleTheme: () => void;
 }
 
 /** 主内容区：按 tab / sub / editor 原样路由到各页面 */
-export function AppMain({ tab, sub, editor, theme, onToggleTheme }: AppMainProps) {
+export function AppMain({ tab, sub, editor, pendingProductId, theme, onToggleTheme }: AppMainProps) {
   const {
     data,
     inv,
@@ -578,7 +595,8 @@ export function AppMain({ tab, sub, editor, theme, onToggleTheme }: AppMainProps
     sync,
     showToast
   } = useAppData();
-  const { setEditor, setSub, setTab, onSaved } = useAppActions();
+  const { setEditor, setSub, setTab, onSaved, onCreateProductForEditor, onPendingProductConsumed } =
+    useAppActions();
   // 首屏渲染完成后再空闲预取其余页面，切 tab / 开单时不等待下载。
   useEffect(() => {
     const canIdle = typeof window.requestIdleCallback === 'function';
@@ -633,12 +651,13 @@ export function AppMain({ tab, sub, editor, theme, onToggleTheme }: AppMainProps
             }
             /* P4：开单页没有顶栏（整页编辑），离线状态要靠这一页自己显示 */
             online={sync.online}
+            /* P9：从「去建商品」回来的那一次，把刚建好的商品 id 带进来（只在新单里用） */
+            pendingProductId={editor.mode === 'new' ? pendingProductId : null}
+            onPendingProductConsumed={onPendingProductConsumed}
             onSaved={onSaved}
             onCancel={() => setEditor(null)}
-            onCreateProduct={() => {
-              setEditor(null);
-              setSub('products');
-            }}
+            /* P9：去建商品时置「建完回开单页」的意图，回来时自动加进本单 */
+            onCreateProduct={onCreateProductForEditor}
             onOpenHistory={() => {
               setEditor(null);
               setTab('report');
@@ -754,7 +773,16 @@ function MoreTabPage() {
 
 function ProductsSubPage() {
   const { data, inv, showToast } = useAppData();
-  return <ProductsPage products={data.products} inv={inv} onDone={showToast} />;
+  const { onProductCreated } = useAppActions();
+  return (
+    <ProductsPage
+      products={data.products}
+      inv={inv}
+      onDone={showToast}
+      /* P9：新建成功后交给 App 判断要不要回开单页（意图只在「从开单页跳来」时置位） */
+      onCreated={onProductCreated}
+    />
+  );
 }
 
 function HistorySubPage() {

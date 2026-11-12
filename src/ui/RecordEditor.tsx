@@ -63,6 +63,8 @@ export default function RecordEditor({
   initial,
   sessionOrderCount,
   online,
+  pendingProductId,
+  onPendingProductConsumed,
   onSaved,
   onCancel,
   onCreateProduct,
@@ -85,6 +87,14 @@ export default function RecordEditor({
    * 原来没有任何离线标记 —— 摊主看不出「这单到底存没存上云」。
    */
   online: boolean;
+  /**
+   * P9：刚在「商品管理」里建好、要自动带进本单的商品 id。
+   * 只有「从开单页点去建商品」那一次会非空（见 App.onProductCreated），
+   * 由下面的 effect 消费一次后回调 onPendingProductConsumed 清空。
+   */
+  pendingProductId?: string | null;
+  /** P9：已把这个商品加进草稿，App 可以把 pendingProductId 清掉了 */
+  onPendingProductConsumed?: () => void;
   onSaved: (order: SalesOrder, andNext: boolean, undo?: () => Promise<void>) => void;
   onCancel: () => void;
   onCreateProduct: () => void;
@@ -142,6 +152,28 @@ export default function RecordEditor({
    * 把「刚才那一下点多了」说成一条错误，反而更像页面出错。
    */
   const swallowSubmitRef = useRef(false);
+  /**
+   * P9：把「刚在商品管理里建好」的那个商品加进本单（只吃一次）。
+   *
+   * 三个必须遵守的点：
+   * 1. **等 products 里真的出现这个 id 再加**：liveQuery 是异步刷新的，建完立刻回来时
+   *    data.products 可能还差这一条；这时不能把 id 丢掉，等下一轮渲染再试。
+   * 2. **加完立刻 onPendingProductConsumed()**：由 App 把 pendingProductId 清空。
+   *    不清的话，之后每次 re-render / 重新挂载都会再加一行 —— 这是最典型的重复加行 bug。
+   *    consumedPendingRef 是本地兜底（即使外层回调没接上也不会重复消费）。
+   * 3. **走 hook 的 addProduct**：同商品同价 +1、否则新建一行，行 key 由 newLineKey 生成。
+   *    不要在 effect 里直接 setLines 绕过 useRecordDraft，否则已有行（路径 C 里数量 7
+   *    的「大地红」）的 key / 数量与草稿落盘都会被搅乱。
+   */
+  const consumedPendingRef = useRef<string | null>(null);
+  useEffect(() => {
+    if (!pendingProductId || consumedPendingRef.current === pendingProductId) return;
+    const p = productById.get(pendingProductId);
+    if (!p) return;
+    consumedPendingRef.current = pendingProductId;
+    onPendingProductConsumed?.();
+    addProduct(p);
+  }, [pendingProductId, productById, addProduct, onPendingProductConsumed]);
 
   useEffect(
     () => () => {
