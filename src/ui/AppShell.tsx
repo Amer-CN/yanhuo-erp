@@ -34,6 +34,7 @@ import {
 import type { FifoResult } from '../db/calc';
 import { Btn, Card, Empty, Toast, type Done, type ToastTone } from './kit';
 import { ErrorBoundary, PageErrorFallback } from './ErrorBoundary';
+import { ActionSlotProvider } from './actionSlot';
 import UpdateBar from './UpdateBar';
 import MorePage from './MorePage';
 import RecordPage from './pages/RecordPage';
@@ -902,6 +903,13 @@ export function AppShell({
    * 不需要 display:none 保活页面（2000 单时那会把 DOM 全留在内存里）。
    */
   const mainRef = useRef<HTMLElement | null>(null);
+  /*
+   * 动作行（网格第 4 行）的 DOM 节点。
+   * 必须是 state 而不是 ref：页面（consumer）要用它作为 portal 目标，
+   * 拿到新节点必须触发一次重渲染，否则第一批动作条会留在流内。
+   * ref 回调里 setState 由 React 在提交阶段同步处理，不会画出中间态。
+   */
+  const [actionSlot, setActionSlot] = useState<HTMLDivElement | null>(null);
   // Map 放 ref：滚动是高频事件，进 state 会把整壳重渲染一遍
   const scrollMemo = useRef(new Map<string, number>());
   // 恢复时是我们自己写 scrollTop，这几次滚动不能当成「用户滚到了这里」
@@ -1024,13 +1032,13 @@ export function AppShell({
    *   iOS 弹软键盘会改 100dvh，锁高一屏会让整张单据跳一下，这是硬约束。
    * - app-main--split：库存页「固定区 + 列表区自己滚」，.app-main 本身不滚，
    *   保证只有一个滚动条。
-   * - app-main--dock：记账页底部有 fixed 的结算浮条，底部留白要留到 172px。
+   * （原来的 app-main--dock 已删除：记账页的结算浮条改成 portal 到网格第 4 行，
+   *  不再需要 172px 的底部硬留白，见 src/ui/actionSlot.tsx 的说明。）
    */
   const shellClass = editor ? 'app-shell app-shell--editor' : 'app-shell';
   const mainClass = [
     'app-main',
     editor ? 'app-main--editor' : '',
-    !editor && tab === 'record' && !sub ? 'app-main--dock' : '',
     !editor && tab === 'stock' && !sub ? 'app-main--split' : ''
   ]
     .filter(Boolean)
@@ -1071,13 +1079,31 @@ export function AppShell({
            * 而记账页首屏是摊位上最贵的空间（浮条 + 本场金额 + 本场流水都在抢）。
            */}
 
-          {children}
+          {/*
+           * 动作行槽只在 shell 内部有意义：页面用 useActionSlot() 取到它再 portal 进来。
+           * Provider 只包住 {children}（页面）—— 槽节点本身由 AppShell 的 state 持有，
+           * 页面通过 context 拿到节点即可，槽不需要包在 Provider 里。
+           */}
+          <ActionSlotProvider value={actionSlot}>{children}</ActionSlotProvider>
         </main>
 
         {/*
-         * 底栏在 shell 里（不是玻璃背景的兄弟）：它是网格第 4 行的真实占位，
+         * 动作行：网格第 4 行（底栏顺延为第 5 行）。
+         * 进货页的保存栏、记账页的结算浮条都用 createPortal 渲染到这里
+         * （见 src/ui/actionSlot.tsx）。它是**真实占位**，内容区的滚动视口
+         * 到这一行上沿为止，所以动作条与内容不可能相交 —— 这是 fixed/sticky
+         * 加多少 padding 都换不来的结构保证。
+         *
+         * 没有动作条的页面这一行没有子元素：`:empty { display:none }` 让它
+         * 高度为 0（否则 padding 会平白多出 22px）。编辑态（.app-shell--editor，
+         * 是 flex 布局且不渲染底栏）同理，也是 0 高，不会挤占单据。
+         */}
+        <div className="app-actionbar" ref={setActionSlot} />
+
+        {/*
+         * 底栏在 shell 里（不是玻璃背景的兄弟）：它是网格第 5 行的真实占位，
          * 内容区滚到底就结束。`.app-shell--editor` 与 `sub` 页没有底栏，
-         * 第 4 行没有子元素、高度为 0，不会多出一条空白。
+         * 该行没有子元素、高度为 0，不会多出一条空白。
          */}
         {!sub && !editor ? <TabBar tab={tab} onSelect={onSelectTab} /> : null}
       </div>

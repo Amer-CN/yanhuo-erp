@@ -10,6 +10,7 @@ import {
 } from '../quantityInput';
 import { Btn, Card, ConfirmSheet, Empty, Field, ProductFormModal, Sheet, rowProps, type Done } from '../kit';
 import ProductPicker from '../ProductPicker';
+import { ActionBar } from '../actionSlot';
 
 /** 「今天已录」抽屉只显示最近这么多条；条数统计仍按全量算 */
 const TODAY_LIST_LIMIT = 30;
@@ -219,7 +220,7 @@ export default function PurchasePage({
   };
 
   return (
-    <div className="page-stack page-stack--fixed-bar">
+    <div className="page-stack">
       <Card>
         <div className="form-head">
           <h2>录入进货</h2>
@@ -382,14 +383,21 @@ export default function PurchasePage({
       {/*
        * 保存按钮移出卡片流（三.8）：原来夹在「进价」和「批次信息」折叠面板之间，
        * 页面一滚按钮就跑到屏幕上方，单手拇指够不到。
-       * 复用开单页底栏样式，加 --above-dock 变体抬到浮动 Tab Bar 之上；
-       * saving 的禁用态一起带过来，避免同一批货连点两遍改坏 FIFO 成本。
+       *
+       * 2026-11-12：从 `sticky; bottom: 0` 改成 portal 到 shell 的**动作行**
+       * （网格第 4 行，底栏顺延为第 5 行）。sticky 的本质是浮在内容上，
+       * 只有滚到底那一帧不会盖住「今天已录 N 条」卡（实测 0% 处 1 处
+       * 11269.1px²、25% 处 6 处 8649.8px²）；动作行是真实占位，结构上恒 0。
+       * 事件与状态不搬家：save / saving 仍由本组件持有，portal 只换 DOM 位置。
+       * 没有槽（单测、弹层）时 ActionBar 原地渲染，样式已不是 fixed，不会盖人。
        */}
-      <div className="record-actions record-actions--above-dock">
-        <Btn block onClick={save} disabled={saving}>
-          {saving ? '保存中…' : '保存这一条'}
-        </Btn>
-      </div>
+      <ActionBar>
+        <div className="record-actions">
+          <Btn block onClick={save} disabled={saving}>
+            {saving ? '保存中…' : '保存这一条'}
+          </Btn>
+        </div>
+      </ActionBar>
 
       <ul className="glass-list">
         <li

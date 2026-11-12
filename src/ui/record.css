@@ -150,14 +150,13 @@
 }
 
 /*
- * 记账页的结算浮条（.checkout-dock record-dock）。它现在是 .app-main 里
- * `position: sticky; bottom: 0` 的流内元素：
- * 内容比一屏短时（0 单 / 1 单）没有可吸的距离，会停在最后一张卡下面、
- * 悬在屏幕中间 —— margin-top:auto 把它压到页面根（.page-stack）的底部，
- * 配合 `.app-main--dock > .page-stack { flex: 1 1 auto }` 就还是「贴底常驻」。
+ * 记账页结算浮条（.checkout-dock record-dock）的补充样式。
+ * 2026-11-12 第二批起它由 RecordPage portal 到 `.app-actionbar`（shell 网格
+ * 第 4 行），是那一行的唯一子节点 —— 不再需要 `margin-top:auto` 把它压到
+ * 页面根底部（那是 sticky 时代「内容短于一屏时也要贴底」的手法，现在整行
+ * 本来就是独立轨道，与内容长短无关）。
  */
 .record-dock {
-  margin-top: auto;
   gap: var(--yh-space-3);
 }
 
@@ -465,32 +464,43 @@
 }
 
 /*
- * 底部动作栏（合计 + 只保存 / 保存并记下一单）。**只用于整页编辑视图**
- * （RecordEditor 的「记一笔 / 改这一单 / 补这一场」），实测证据 2026-11-12：
- *   - 该视图的 shell 是 `.app-shell--editor`，AppShell 里 `{!sub && !editor ? <TabBar/> : null}`，
- *     所以 DOM 里 `.glass-tab-bar-dock` / `.glass-tab-bar` 数量都是 0（不是被盖住，是没渲染），
- *     `.app-shell` 的第 4 行高度为 0 —— 它和底栏**不存在同屏的可能**，
- *     实测 intersecting area = null（无可相交对象），不是「算出来 0」。
- *   - 进货页也用这个类，但带 `--above-dock` 变体，那里已经改成 sticky（见文件下方）。
- *   - 弹层（Sheet）里没有任何 `.record-actions`：实测打开「今天录入」Sheet 后
- *     `.glass-sheet-overlay` z-index=1000、面板 390×247 完全盖住胶囊（coversBar=true），
- *     而弹层内 `.record-actions` 计数为 0。
- * 所以这里保持 fixed：编辑视图没有底栏可叠，改成 sticky 反而要依赖「文档滚动 +
- * 内容短于一屏时靠 flex 生长链把栏顶到底边」这一串假设，回归面比收益大。
- * 若要改，必须先让编辑视图也有底栏 —— 那是产品决策，不是这次的安全带改造。
+ * 底部动作栏（合计 + 只保存 / 保存并记下一单）。**同一个类，两种定位**，
+ * 2026-11-12 第二批拆开写，改一种不会带走另一种：
+ *
+ * 1) 页面动作条（进货页的保存栏）：`<ActionBar>` portal 到 `.app-actionbar`
+ *    （shell 网格第 4 行，底栏顺延第 5 行），所以这里只是普通块 ——
+ *    不定位、不画背景、不加 safe-area；左右留白与上下的间距全由槽那一层给。
+ *    为什么不是 sticky/fixed：浮层本质就是「盖在内容上」，padding 只能护住
+ *    滚到底那一帧（改前实测盖住「今天已录 N 条」卡 0% 处 1 处 11269.1px²、
+ *    25% 处 6 处 8649.8px²）。真实占位才是结构上恒 0 的解。
+ *
+ * 2) 整页编辑视图（RecordEditor 的「记一笔 / 改这一单 / 补这一场」）：
+ *    见下面 `.app-shell--editor .record-actions`，那边保持 fixed 亮片。
+ *    为什么编辑态不改：该视图的 shell 是 `.app-shell--editor`，AppShell 里
+ *    `{!sub && !editor ? <TabBar/> : null}` —— DOM 里底栏数量是 0（不是被盖住，
+ *    是没渲染），不存在可叠的胶囊；它又是**文档滚动**，改成 sticky/流内要依赖
+ *    「内容短于一屏时靠 flex 生长链把栏顶到底边」一串假设，回归面比收益大。
+ *    用 `.app-shell--editor` 作用域而不是改 RecordEditor 的 className：
+ *    编辑态的唯一入口就是这个 shell，作用域等价，且不用动组件。
+ *    弹层（Sheet）里没有任何 `.record-actions`（2026-11-12 实测计数为 0），
+ *    不存在「弹层内被 fixed 栏盖住」的情况。
  */
 .record-actions {
+  width: 100%;
+  display: flex;
+  /* 允许换行：合计独占一行（见 .record-actions__total），按钮在第二行并排 */
+  flex-wrap: wrap;
+  gap: var(--yh-space-2);
+}
+
+/* 编辑态专用：整页单据底部的 fixed 动作栏（视觉与 2026-11-12 改前逐像素一致） */
+.app-shell--editor .record-actions {
   position: fixed;
   left: 50%;
   transform: translateX(-50%);
   bottom: 0;
   z-index: var(--yh-z-dock);
-  width: 100%;
   max-width: var(--yh-page-max);
-  display: flex;
-  /* 允许换行：合计独占一行（见 .record-actions__total），按钮在第二行并排 */
-  flex-wrap: wrap;
-  gap: var(--yh-space-2);
   padding: var(--yh-space-3) var(--yh-page-pad)
     calc(var(--yh-space-3) + env(safe-area-inset-bottom, 0px));
   background: linear-gradient(
@@ -676,54 +686,11 @@
 }
 
 /*
- * 进货页的保存底栏。2026-11-12：fixed → sticky，与记账页的结算浮条同一套
- * 做法（原因：底栏已改成 .app-shell 的第 4 行，fixed 的「bottom = 16 + 74 +
- * 安全区」这套硬算出来的数值全部作废；而且 fixed 期间它会盖住表单最后一行）。
- * 中间滚动时它吸在滚动视口底边（= 底栏带的上沿），既不压底栏也不被底栏压。
- *
- * ⚠ `position: sticky; bottom: 0` 的语义是「不许越过滚动视口下沿」，**不是**
- * 「永远贴住下沿」：只有当它的静止位置在视口下方时才会被顶上来。这一页的
- * DOM 顺序是「表单卡 → 本底栏 → 今天已录列表 → Sheet」，底栏后面还有兄弟节点，
- * 所以滚到底时它停在静止位置 —— 实测 390×844：底栏 bottom=651.8，离底栏带
- * 上沿还有 103.2px，保存按钮漂到屏幕中间（fixed 时代它一直贴在最下面）。
- * 因此必须同时把它排到视觉流最后（见下面的 order）。
+ * 进货页保存栏的历史变体 `.record-actions--above-dock` 与 `.page-stack--fixed-bar`
+ * 已在 2026-11-12 第二批删除：保存栏改成 portal 到 shell 的 `.app-actionbar`
+ * （网格第 4 行），占位由轨道提供，不再需要 sticky / order / 负外边距 /
+ * flex-grow 这一整套「让它看起来贴底」的手法。
  */
-.record-actions--above-dock {
-  position: sticky;
-  left: auto;
-  transform: none;
-  bottom: 0;
-  /*
-   * 排到视觉流最后：`.page-stack` 是 flex column，兄弟节点默认 order:0，
-   * 给 1 就让底栏渲染在「今天已录」列表之后 —— 与 fixed 时代「按钮永远在
-   * 屏幕最下面」的观感一致；键盘 Tab 顺序仍按 DOM 走（表单 → 保存 → 列表），
-   * 这个顺序本来就更顺：填完就能按到保存。
-   */
-  order: 1;
-  /*
-   * 全幅出血：.record-actions 原本 width:100% 量的是视口（390），左右再留
-   * 16px 内边距；进了 .app-main 的内容盒（358）之后，用负外边距换回 390，
-   * 分隔线和渐变底的左右边缘才和改前一致，按钮的横向位置也才不变。
-   */
-  width: calc(100% + 2 * var(--yh-page-pad));
-  max-width: none;
-  margin-inline: calc(var(--yh-page-pad) * -1);
-  /* 内容比一屏短时把底栏压到底（.page-stack--fixed-bar 会 flex-grow 吃掉余高） */
-  margin-top: auto;
-  /* 安全区由底栏那一行承担，这里不再加第二次 */
-  padding-bottom: var(--yh-space-3);
-  border-radius: var(--yh-radius-lg) var(--yh-radius-lg) 0 0;
-}
-
-/*
- * 进货页的页面根：底栏现在是流内 sticky（见下一条），最后一行滚到底时就在
- * 它上面，所以**不再需要**原来那 80px 的硬留白。
- * 改成 flex-grow 吃掉剩余高度：内容比一屏短时底栏仍贴着底边，
- * 不会悬在屏幕中间。
- */
-.page-stack--fixed-bar {
-  flex: 1 1 auto;
-}
 
 /*
  * 「已加 N」从「左侧绝对定位角标」改成元信息行里的行内小胶囊（2026-11-11）：

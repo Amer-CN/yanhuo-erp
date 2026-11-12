@@ -4,6 +4,7 @@ import type { Product, SaleLine, SalesOrder, Session, SessionSummary } from '../
 import { PAY_LABEL } from '../../db/types';
 import { fenToStr, isoToLocalDate, isoToTime, localDate } from '../../db/util';
 import { Btn, Card, Empty, Sheet, Toast, rowProps } from '../kit';
+import { ActionBar } from '../actionSlot';
 
 function startLabel(session: Session): string {
   const d = new Date(session.startedAt);
@@ -370,17 +371,27 @@ export default function RecordPage({
       {/* 常驻的「账面没货？去库存看看」已收进本场卡片的 0 单区域（见上），
           不再单独占一行 44px 的 link-btn */}
 
-      <div className="checkout-dock record-dock">
-        <div className="checkout-dock__total" style={{ textAlign: 'left', marginLeft: 0 }}>
-          <div className="k">本场已记 {summary.orderCount} 单</div>
-          <div className="v">¥{fenToStr(summary.revenueFen)}</div>
+      {/*
+       * 结算浮条：portal 到 shell 的动作行（网格第 4 行，底栏第 5 行）。
+       * 2026-11-12 之前它是 `position: sticky; bottom: 0` + `margin-top: auto`，
+       * 盖住页脚说明文字（实测 0% 7846.4 / 25% 8102.4 / 50% 7844.1px²）。
+       * sticky 只能保证「滚到底」那一帧不越界，滚动中间照样浮在内容上；
+       * 动作行是真实占位，所以相交面积结构上恒为 0。
+       * 合计金额 / 单数 / 回调都还在本组件里，portal 只改 DOM 落点。
+       */}
+      <ActionBar>
+        <div className="checkout-dock record-dock">
+          <div className="checkout-dock__total" style={{ textAlign: 'left', marginLeft: 0 }}>
+            <div className="k">本场已记 {summary.orderCount} 单</div>
+            <div className="v">¥{fenToStr(summary.revenueFen)}</div>
+          </div>
+          <Btn block={false} onClick={onNewRecord}>
+            <span className="icon-text">
+              <Sparkles size={18} aria-hidden="true" /> 记一笔
+            </span>
+          </Btn>
         </div>
-        <Btn block={false} onClick={onNewRecord}>
-          <span className="icon-text">
-            <Sparkles size={18} aria-hidden="true" /> 记一笔
-          </span>
-        </Btn>
-      </div>
+      </ActionBar>
 
       {/*
         跨天未结的处理面板。复用 kit 里的 Sheet，不另造组件。
