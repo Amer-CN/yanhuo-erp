@@ -489,7 +489,7 @@ const RECORD_TABLES = [
   db.settings
 ];
 
-/** 一次事务内按类型批量读取本地记录；缺失的 id 不放进结果。 */
+/** 在调用方的事务内按类型批量读取本地记录；缺失的 id 不放进结果。 */
 async function getLocalMany(
   rows: { kind: Kind; recordId: string }[]
 ): Promise<Map<string, unknown>> {
@@ -502,15 +502,12 @@ async function getLocalMany(
   }
 
   const found = new Map<string, unknown>();
-  if (idsByKind.size === 0) return found;
-  await db.transaction('r', RECORD_TABLES, async () => {
-    for (const [kind, ids] of idsByKind) {
-      const locals = await TABLE_BY_KIND[kind].bulkGet(ids);
-      ids.forEach((id, i) => {
-        if (locals[i] !== undefined) found.set(`${kind}:${id}`, locals[i]);
-      });
-    }
-  });
+  for (const [kind, ids] of idsByKind) {
+    const locals = await TABLE_BY_KIND[kind].bulkGet(ids);
+    ids.forEach((id, i) => {
+      if (locals[i] !== undefined) found.set(`${kind}:${id}`, locals[i]);
+    });
+  }
   return found;
 }
 
@@ -631,19 +628,28 @@ async function postWithSchemaFallback(cfg: SyncConfig, payload: PushRow[]): Prom
 }
 
 async function pushOutbox(cfg: SyncConfig, deviceId: string): Promise<number> {
-  const rows = await db.outbox.orderBy('queuedAt').limit(OUTBOX_BATCH).toArray();
+  // 队列版本与业务快照必须一起读：两次独立事务会把旧 op 与新业务值拼成错误 payload。
+  const { rows, locals } = await db.transaction('r', [db.outbox, ...RECORD_TABLES], async () => {
+    const rows = await db.outbox.orderBy('queuedAt').limit(OUTBOX_BATCH).toArray();
+    const locals = await getLocalMany(rows.filter((row) => row.op !== 'delete'));
+    return { rows, locals };
+  });
   if (rows.length === 0) return 0;
 
-  // 一次事务批量取本地记录（原来是逐条 get，最多 300 次串行往返）
-  const locals = await getLocalMany(
-    rows
-      .filter((row) => row.op !== 'delete')
-      .map((row) => ({ kind: row.kind, recordId: row.recordId }))
-  );
-
+  // HTTP 在事务外等待；期间本地仍可修改并以同一 id 登记新 revision。
   const payload = buildPushPayload(rows, locals, cfg, deviceId);
   await postWithSchemaFallback(cfg, payload);
-  await db.outbox.bulkDelete(rows.map((r) => r.id));
+  await db.transaction('rw', db.outbox, async () => {
+    const current = await db.outbox.bulkGet(rows.map((row) => row.id));
+    const acknowledged = rows.filter((sent, i) => {
+      const row = current[i];
+      if (!row) return false;
+      if (sent.revision !== undefined) return row.revision === sent.revision;
+      // legacy 行无版本：仅清掉仍是同一 queuedAt/op 的 legacy 行，新 revision 绝不受影响。
+      return row.revision === undefined && row.queuedAt === sent.queuedAt && row.op === sent.op;
+    });
+    await db.outbox.bulkDelete(acknowledged.map((row) => row.id));
+  });
   return payload.length;
 }
 
@@ -1472,30 +1478,25 @@ async function applyRemoteBatch(
   });
   if (rows.length === 0) return empty();
 
-  // 本地还有没推上去的改动时以本地为准
-  const queued = await db.outbox.bulkGet(rows.map((r) => `${r.kind}:${r.record_id}`));
-  const pendingIds = new Set<string>();
-  queued.forEach((r) => {
-    if (r) pendingIds.add(r.id);
-  });
-  const active = rows.filter((r) => !pendingIds.has(`${r.kind}:${r.record_id}`));
-  const pending = rows.length - active.length;
-  if (active.length === 0) return { ...empty(), pending };
-
-  const knownRows = active.filter((r) => KNOWN_KINDS.has(r.kind));
-  const unknownIds = active
-    .filter((r) => !KNOWN_KINDS.has(r.kind))
-    .map((r) => `${String(r.kind)}:${r.record_id}`);
-  if (knownRows.length === 0 && unknownIds.length === 0) {
-    return { ...empty(), pending };
-  }
-
   // H3：先取「本机见过的 id」快照，用来区分「对方新记的单」和「我删掉又被对方复活的单」
   const knownIds = loadKnownIds();
-  const { plan, applied, newOrders } = await db.transaction(
+  const { plan, applied, newOrders, knownRows, pending } = await db.transaction(
     'rw',
-    [...RECORD_TABLES, db.conflicts],
+    [...RECORD_TABLES, db.conflicts, db.outbox],
     async () => {
+      // pending 检查与读业务/决策/落库共用事务，本地写入不能插进检查与应用之间。
+      const queued = await db.outbox.bulkGet(rows.map((r) => `${r.kind}:${r.record_id}`));
+      const pendingIds = new Set(queued.filter((r): r is OutboxRow => Boolean(r)).map((r) => r.id));
+      const active = rows.filter((r) => !pendingIds.has(`${r.kind}:${r.record_id}`));
+      const pending = rows.length - active.length;
+      const knownRows = active.filter((r) => KNOWN_KINDS.has(r.kind));
+      if (active.length === 0) {
+        return { plan: null, applied: 0, newOrders: 0, knownRows, pending };
+      }
+      const unknownIds = active
+        .filter((r) => !KNOWN_KINDS.has(r.kind))
+        .map((r) => `${String(r.kind)}:${r.record_id}`);
+
       // 批量读当前状态，后续判断都在内存里完成
       const current = new Map<string, unknown>();
       const idsByKind = new Map<Kind, string[]>();
@@ -1536,9 +1537,10 @@ async function applyRemoteBatch(
       for (const id of planned.puts.get('order')?.keys() ?? []) {
         if (!knownIds.has(`order:${id}`)) added += 1;
       }
-      return { plan: planned, applied: appliedCount, newOrders: added };
+      return { plan: planned, applied: appliedCount, newOrders: added, knownRows, pending };
     }
   );
+  if (!plan) return { ...empty(), pending };
 
   /*
    * 清空账本触发的全量重放：那些墓碑是「清空」本身，不是「对方悄悄删你的单」。
@@ -1559,8 +1561,8 @@ async function applyRemoteBatch(
   }
   if (added > 0) saveKnownIds(knownIds);
 
-  // 回推放在事务提交之后：db.outbox 不在本事务范围内，且入队是 best-effort
-  // （回推失败不能让「已经应用的远端行」被回滚，更不能让本轮同步报错）。
+  // 回推仍放在事务提交之后：入队是 best-effort，失败不能让已应用的远端行回滚。
+  // outbox 虽已纳入 pending 检查的事务范围，回推本身不属于入站落库。
   await repushLocalVersions(plan.repush);
   return { applied, orders: newOrders, pending, invalid: plan.invalid, impact: plan.impact };
 }

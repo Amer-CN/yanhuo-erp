@@ -16,6 +16,8 @@ export interface OutboxRow {
   recordId: string;
   op: 'upsert' | 'delete';
   queuedAt: number;
+  /** 每次入队的唯一版本；旧行缺省，兼容现有 schema，无需索引。 */
+  revision?: string;
 }
 
 /** 同步冲突留痕：同一记录两端都改过、又无法按业务时间判定时，保留双方快照 */

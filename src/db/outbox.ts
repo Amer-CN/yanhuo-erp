@@ -2,6 +2,7 @@
 // 离线时只写本地 + 这里，联网后自动补发。
 
 import { db, type OutboxRow } from './db';
+import { uuid } from './util';
 
 export type SyncKind = OutboxRow['kind'];
 
@@ -56,7 +57,8 @@ function buildRows(rows: OutboxItem[], now: number = Date.now()): OutboxRow[] {
       kind: r.kind,
       recordId: r.recordId,
       op: r.op ?? 'upsert',
-      queuedAt: now + i
+      queuedAt: now + i,
+      revision: uuid()
     }));
 }
 
@@ -65,7 +67,9 @@ export async function enqueue(
   recordId: string,
   op: 'upsert' | 'delete' = 'upsert'
 ): Promise<void> {
-  await db.outbox.put(buildRows([{ kind, recordId, op }])[0]);
+  const row = buildRows([{ kind, recordId, op }])[0];
+  if (!row) return;
+  await db.outbox.put(row);
   syncWanted();
 }
 
