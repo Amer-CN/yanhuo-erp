@@ -7,13 +7,13 @@
 
 ⚠️ 本脚本是**全仓唯一不设 `yh-sync-disabled=1` 的脚本**：它就是要真的发同步请求。
 - 默认（不设 SYNC_*）跑本地假 Supabase（scripts/mock-supabase.mjs），不会碰真实账本；
-- 真实模式（设 SYNC_URL / SYNC_KEY / SYNC_LEDGER）必须使用**测试专用账本**：
+- 真实模式（设 SYNC_URL / SYNC_KEY / SYNC_LEDGER 并显式 SYNC_TEST_ONLY=1）必须使用**测试专用账本**：
   `cleanup_cloud()` 会把整个账本 PATCH 成 `deleted=true`，那是对账本的破坏性操作。
   若 SYNC_LEDGER 等于内置生产账本码（src/db/syncDefaults.ts），脚本会直接退出。
 """
 
+import json
 import os
-import re
 import subprocess
 import sys
 import time
@@ -22,6 +22,7 @@ sys.stdout.reconfigure(encoding="utf-8", errors="replace", line_buffering=True)
 
 from playwright.sync_api import sync_playwright
 
+from e2e_sync_guard import UnsafeSyncConfiguration, validate_sync_run_config
 from e2e_util import wait_for_save_receipt
 
 ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
@@ -31,39 +32,27 @@ MOCK = os.path.join(ROOT, "scripts", "mock-supabase.mjs")
 OUT = os.path.join(ROOT, "docs", "screenshots", "e2e")
 os.makedirs(OUT, exist_ok=True)
 
-# 不设 SYNC_URL 就用本地假 Supabase；设了就跑真实项目（跑完清理测试账本）
-REAL_URL = os.environ.get("SYNC_URL")
-REAL_KEY = os.environ.get("SYNC_KEY")
-REAL_LEDGER = os.environ.get("SYNC_LEDGER")
-USE_MOCK = not (REAL_URL and REAL_KEY and REAL_LEDGER)
-
-# 内置（生产）账本码：从源码读，避免这里硬编码后与 src/db/syncDefaults.ts 漂移
+# 三项全部未设置才允许假后端；真实模式必须显式声明“测试专用账本”，且护栏不可失效。
 SYNC_DEFAULTS = os.path.join(ROOT, "src", "db", "syncDefaults.ts")
 
-errors: list[str] = []
-
-
-def builtin_ledger_key() -> str:
-    """读取内置生产账本码；读不到就返回空串（只影响护栏，不影响正常跑测试）。"""
+def load_builtin_source() -> str | None:
     try:
-        with open(SYNC_DEFAULTS, encoding="utf-8") as f:
-            text = f.read()
+        with open(SYNC_DEFAULTS, encoding="utf-8") as source_file:
+            return source_file.read()
     except OSError:
-        return ""
-    m = re.search(r"ledgerKey:\s*'([^']+)'", text)
-    return m.group(1) if m else ""
+        return None
 
+try:
+    RUN_CONFIG = validate_sync_run_config(os.environ, load_builtin_source())
+except UnsafeSyncConfiguration as exc:
+    raise SystemExit(f"E2E 配置被安全护栏拒绝：{exc}") from exc
 
-def guard_production_ledger() -> None:
-    """真实模式下拒绝用内置生产账本：cleanup_cloud() 会把整本账软删。"""
-    if USE_MOCK:
-        return
-    prod = builtin_ledger_key()
-    if prod and REAL_LEDGER == prod:
-        sys.exit(
-            "拒绝用生产账本跑 E2E：SYNC_LEDGER 等于内置生产账本码，"
-            "cleanup_cloud() 会把真账本整体软删。请改用测试专用账本。"
-        )
+USE_MOCK = RUN_CONFIG.use_mock
+REAL_URL = RUN_CONFIG.url
+REAL_KEY = RUN_CONFIG.key
+REAL_LEDGER = RUN_CONFIG.ledger
+
+errors: list[str] = []
 
 
 def config():
@@ -74,11 +63,8 @@ def config():
 
 def init_script():
     url, key, ledger = config()
-    return f"""
-      localStorage.setItem('yh-sync-url', '{url}');
-      localStorage.setItem('yh-sync-anon', '{key}');
-      localStorage.setItem('yh-sync-ledger', '{ledger}');
-    """
+    values = json.dumps({"yh-sync-url": url, "yh-sync-anon": key, "yh-sync-ledger": ledger})
+    return f"Object.entries({values}).forEach(([key,value]) => localStorage.setItem(key,value));"
 
 
 def cleanup_cloud():
@@ -201,8 +187,7 @@ def wait_history(page, want: str, timeout: int = 35) -> bool:
 
 
 def main() -> int:
-    # 第一行护栏：真实模式下绝不允许对着内置生产账本跑（cleanup_cloud 会整体软删）
-    guard_production_ledger()
+    # 配置已在模块入口 fail closed，启动浏览器/假后端之前完成验证。
     mock = None
     if USE_MOCK:
         mock = subprocess.Popen(

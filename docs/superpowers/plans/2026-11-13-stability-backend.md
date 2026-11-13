@@ -35,7 +35,7 @@
 
 ## B01 — 回归基础与假后端契约
 
-**优先级：先行；Files:** 修改 `scripts/e2e-merge.py`、`scripts/mock-supabase.mjs`、`scripts/e2e-sync.py`、`scripts/e2e_util.py`；新建 `tests/mock-supabase.test.ts`、`scripts/e2e-sync-recovery.py` 的安全启动骨架；复用 `tests/helpers.ts`。
+**优先级：先行；Files:** 修改 `scripts/e2e-merge.py`、`scripts/mock-supabase.mjs`、`scripts/e2e-sync.py`；新建 `tests/mock-supabase.test.ts`、`scripts/mock-supabase.d.mts`（仅当TS需要外部模块声明）；复用 `scripts/e2e_util.py` 和 `tests/helpers.ts`。恢复专项脚本由B05按实际场景一次建成，不创建未实现的占位脚本。
 
 - [ ] **1. 固化已实测失败条件。** 将临时 `ACK_RACE`、`ORDER_UNDO`、`FIRST_SYNC_PAGES`、`INBOUND_MISSING_DISCOUNT` 场景分别搬进 B02/B03/B04 的测试文件。先保存坏版本的执行结果；不要将“确认当前 bug 存在”的断言混成修复后的长期断言。长期预期分别为：新 delete 仍 pending、整单恢复、合法 line 最终存在、所有汇总有限数值。
 - [ ] **2. 修 e2e-merge 过期回执。**
@@ -51,7 +51,7 @@ page.get_by_role('button', name='完成（回单据）', exact=True).click()
 
 导出/合并完成仍等待其真实 Toast；新增相同文件二次导入，订单/明细/商品不重复。修改循环注释中30ms旧延迟。生产账本 guard 读取不到内置码时，对真实模式 fail closed；默认不允许用真实模式跑。
 - [ ] **3. mock 拒绝不符合 RLS 的整批写。** `POST` 在改 Map 前先验证所有行：header ledger 非空、payload ledger 匹配、现存同 id 他账本不可覆盖。任一非法行整批返回 403，Map 不变；不能边循环边写一半再报错。GET 同时应用 `ledger`/`id=eq`/`record_id=in`/kind/cursor/order/limit 的实现子集，不识别过滤式返回 400 而非放行。DELETE 默认 403，不能假装新版策略允许物理删除。
-- [ ] **4. 可控故障。** 把服务器初始化抽成导出 `createMockServer(options)`，默认端口/命令行为不变；测试注入请求 gate、响应失败和请求日志。v1 模式全表 id 唯一，v2 模式按 ledger+id；RPC 由 B06 补。只在初始化参数启用测试控制，不能提供远程无鉴权清空真实服务的路由。
+- [ ] **4. 可控故障。** 把服务器初始化抽成导出 `createMockServer(options)`，默认端口/命令行为不变；测试注入请求 gate、响应失败和请求日志。v1 代表旧单列约束，v2允许同一id分属两个ledger并按ledger+id唯一；不要把v1默认行为误当成B07阶段一（单列约束与复合唯一并存）的实际数据库。RPC由B06补。只在初始化参数启用测试控制，不能提供远程无鉴权清空真实服务的路由。
 
 ```ts
 // tests/mock-supabase.test.ts 核心验收
