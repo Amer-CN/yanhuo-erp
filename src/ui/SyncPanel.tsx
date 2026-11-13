@@ -12,26 +12,7 @@ import {
 import type { SyncApi } from './useSync';
 import { Btn, Card, ConfirmSheet, Field, Sheet, type Done } from './kit';
 import { localDate } from '../db/util';
-
-const SQL = `create table if not exists public.yh_records (
-  id text primary key,
-  record_id text not null,
-  ledger text not null,
-  kind text not null,
-  data jsonb not null default '{}'::jsonb,
-  updated_at bigint not null,
-  device_id text not null default '',
-  deleted boolean not null default false
-);
-create index if not exists yh_records_ledger_updated
-  on public.yh_records (ledger, updated_at);
-alter table public.yh_records enable row level security;
-grant select, insert, update, delete on public.yh_records to anon;
-drop policy if exists "yh ledger access" on public.yh_records;
-create policy "yh ledger access" on public.yh_records
-  for all to anon
-  using (ledger = coalesce(current_setting('request.headers', true)::json->>'x-ledger-key', ''))
-  with check (ledger = coalesce(current_setting('request.headers', true)::json->>'x-ledger-key', ''));`;
+import schemaSql from '../../supabase/schema.sql?raw';
 
 function fmtTime(ts: number | null): string {
   if (!ts) return '还没同步过';
@@ -236,15 +217,18 @@ export default function SyncPanel({ sync, onDone }: { sync: SyncApi; onDone: Don
               </p>
             </div>
             <div>
-              <div className="cart-line__name">2. 在 SQL Editor 里执行下面的 SQL</div>
-              <pre className="sql-block">{SQL}</pre>
+              <div className="cart-line__name">2. 新项目在 SQL Editor 里执行下面的 SQL</div>
+              <p className="muted-text">
+                已有账本升级时，先按仓库《云同步设置》的迁移步骤补列并备份，不要清表重建。
+              </p>
+              <pre className="sql-block">{schemaSql}</pre>
               <Btn
                 block
                 variant="secondary"
                 size="sm"
                 onClick={async () => {
                   try {
-                    await navigator.clipboard.writeText(SQL);
+                    await navigator.clipboard.writeText(schemaSql);
                     onDone('SQL 已复制');
                   } catch {
                     onDone('复制失败，长按选中复制', 'warning');
@@ -270,8 +254,7 @@ export default function SyncPanel({ sync, onDone }: { sync: SyncApi; onDone: Don
             </div>
             <div className="glass-status">
               <p>
-                如果提示连接失败：确认 SQL 已执行、项目没有被暂停；还不行就改用「单人账本」策略（只在
-                Supabase 项目里自己可见时用）：把建 policy 那两句换成 using (true) with check (true)。
+                不要放开 RLS。连接失败时先核对项目 URL、key、项目是否暂停和迁移步骤；仍失败先导出备份，再联系维护者。
               </p>
             </div>
             <Btn block onClick={() => setHelp(false)}>
