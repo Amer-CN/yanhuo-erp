@@ -779,6 +779,43 @@ body {
   text-decoration: line-through;
 }
 
+/* 历史行的详情与撤销各自聚焦，沿用原列表的间距、颜色与触控密度。 */
+.history-item {
+  cursor: default;
+}
+
+.history-item__detail {
+  display: flex;
+  align-items: center;
+  gap: var(--gl-space-sm);
+  flex: 1 1 0;
+  min-width: 0;
+  min-height: 44px;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  text-align: start;
+  cursor: pointer;
+}
+
+.history-item__detail:focus-visible {
+  outline: 2px solid var(--gl-border-focus);
+  outline-offset: 2px;
+  border-radius: var(--gl-radius-btn);
+}
+
+.history-item__amount {
+  font-weight: var(--yh-weight-semibold);
+  font-variant-numeric: tabular-nums;
+}
+
+.history-item__undo {
+  align-self: center;
+  flex-shrink: 0;
+}
+
 /* ------------------------------------------------------------ 结算浮条 */
 /*
  * 2026-11-12 第二批：`sticky; bottom: 0` → 普通块，由 RecordPage 用

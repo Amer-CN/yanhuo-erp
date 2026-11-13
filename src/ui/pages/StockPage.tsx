@@ -48,6 +48,7 @@ export default function StockPage({
   const [dir, setDir] = useState<'loss' | 'more'>('loss');
   // 写库中禁点：盘亏重复提交会连记两笔调整
   const [saving, setSaving] = useState(false);
+  const submitting = useRef(false);
   /**
    * 调整数量的即时提示（P2）：与进货页、开单行共用 quantityInput 的口径。
    * 老实现 `replace(/\D/g,'')` 会把 1.5 静默变成 15（盘亏一次多记十几件）。
@@ -67,6 +68,25 @@ export default function StockPage({
     },
     []
   );
+
+  const resetAdjustment = () => {
+    setAdjust('');
+    setReason('');
+    setDir('loss');
+    setAdjustHint('');
+    if (hintTimer.current !== undefined) window.clearTimeout(hintTimer.current);
+    hintTimer.current = undefined;
+  };
+  const openAdjustment = (id: string) => {
+    if (submitting.current) return;
+    resetAdjustment();
+    setOpenId(id);
+  };
+  const closeAdjustment = () => {
+    if (submitting.current) return;
+    setOpenId(null);
+    resetAdjustment();
+  };
 
   const list = useMemo(() => {
     const kw = q.trim().toLowerCase();
@@ -118,7 +138,7 @@ export default function StockPage({
   const adjustGap = openStock - batchRemainingTotal;
 
   const submitAdjust = async () => {
-    if (!open || saving) return;
+    if (!open || submitting.current) return;
     const n = Number(adjust);
     if (!Number.isFinite(n) || n === 0) {
       onDone('填个非 0 的数，方向点上面「少了 / 多了」', 'error');
@@ -126,6 +146,7 @@ export default function StockPage({
     }
     // 输入框只收正数，符号由分段决定：少了 → 负库存调整，多了 → 盘盈修正
     const signed = dir === 'loss' ? -Math.abs(n) : Math.abs(n);
+    submitting.current = true;
     setSaving(true);
     try {
       await createAdjustment(
@@ -138,15 +159,13 @@ export default function StockPage({
         deviceId
       );
       onDone(dir === 'loss' ? '已记盘亏' : '已记盘盈');
-      setAdjust('');
-      setAdjustHint('');
-      setReason('');
-      setDir('loss');
-      setOpenId(null);
+      submitting.current = false;
+      closeAdjustment();
     } catch (e) {
       // 写失败必须说一声，否则用户以为盘亏已经记上了
       onDone(`没记上：${e instanceof Error ? e.message : '未知错误'}`, 'error');
     } finally {
+      submitting.current = false;
       setSaving(false);
     }
   };
@@ -278,7 +297,7 @@ export default function StockPage({
                 <li
                   key={p.id}
                   className="glass-list__item glass-list__item--interactive list-item"
-                  {...rowProps(() => setOpenId(p.id))}
+                  {...rowProps(() => openAdjustment(p.id))}
                 >
                   <span className="glass-list__leading">
                     {stock < 0 ? (
@@ -319,7 +338,7 @@ export default function StockPage({
       </div>
 
       {open ? (
-        <Sheet title={open.name} onClose={() => setOpenId(null)}>
+        <Sheet title={open.name} onClose={closeAdjustment} dismissible={!saving}>
           <div className="page-stack">
             <div className="row-between">
               <span className="muted-text">当前库存</span>
@@ -400,6 +419,7 @@ export default function StockPage({
                     type="button"
                     className="glass-segmented__item"
                     aria-pressed={dir === 'loss'}
+                    disabled={saving}
                     onClick={() => setDir('loss')}
                   >
                     少了（盘亏 / 摔坏）
@@ -408,6 +428,7 @@ export default function StockPage({
                     type="button"
                     className="glass-segmented__item"
                     aria-pressed={dir === 'more'}
+                    disabled={saving}
                     onClick={() => setDir('more')}
                   >
                     多了（盘盈）
@@ -421,6 +442,7 @@ export default function StockPage({
                     className="glass-input"
                     inputMode="numeric"
                     value={adjust}
+                    disabled={saving}
                     onChange={(e) => {
                       /*
                        * P2：与开单行 / 进货页共用 quantityInput 的口径。
@@ -444,6 +466,7 @@ export default function StockPage({
                   <input
                     className="glass-input"
                     value={reason}
+                    disabled={saving}
                     onChange={(e) => setReason(e.target.value)}
                     placeholder="摔坏 / 数错"
                   />
