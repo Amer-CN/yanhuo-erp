@@ -263,7 +263,7 @@ export function sessionReport(
       giftQty += l.qtyBase;
     } else {
       // 赠品行即使历史数据里带了 discountFen，也不计入让利
-      discount += l.discountFen;
+      discount += l.discountFen ?? 0;
     }
   }
 
@@ -339,7 +339,7 @@ export function productMarginsBySession(
       cur.giftQty = (cur.giftQty ?? 0) + l.qtyBase;
       cur.giftCostFen = (cur.giftCostFen ?? 0) + (lineCost ?? 0);
     } else {
-      cur.discountFen += l.discountFen;
+      cur.discountFen += l.discountFen ?? 0;
     }
     m.set(l.productId, cur);
   }

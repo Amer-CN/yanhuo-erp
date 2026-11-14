@@ -67,15 +67,13 @@ export async function enqueue(
   recordId: string,
   op: 'upsert' | 'delete' = 'upsert'
 ): Promise<void> {
-  const row = buildRows([{ kind, recordId, op }])[0];
-  if (!row) return;
-  await db.outbox.put(row);
-  syncWanted();
+  if (kind === 'setting' && SKIP_SETTINGS.has(recordId)) return;
+  await enqueueMany([{ kind, recordId, op }]);
 }
 
 export async function enqueueMany(rows: OutboxItem[]): Promise<void> {
   if (rows.length === 0) return;
-  await db.outbox.bulkPut(buildRows(rows));
+  await db.transaction('rw', [db.outbox, db.syncMeta], () => enqueueInTx(rows));
   syncWanted();
 }
 
@@ -93,7 +91,10 @@ export async function enqueueMany(rows: OutboxItem[]): Promise<void> {
  */
 export async function enqueueInTx(rows: OutboxItem[]): Promise<void> {
   if (rows.length === 0) return;
-  await db.outbox.bulkPut(buildRows(rows));
+  const binding = await db.table<{ key: string; scope: string; clearEpoch: number }, string>('syncMeta').get('sync-binding');
+  await db.outbox.bulkPut(buildRows(rows).map((row) => ({ ...row,
+    ...(binding ? { scope: binding.scope, clearEpoch: binding.clearEpoch } : { clearEpoch: 0 })
+  })));
 }
 
 export async function pendingCount(): Promise<number> {

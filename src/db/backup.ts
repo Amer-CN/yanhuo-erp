@@ -3,7 +3,8 @@
 
 import Dexie, { type Table } from 'dexie';
 import { db, SCHEMA_VERSION } from './db';
-import { exportBackup, replaceAll, type BackupFile } from './merge';
+import { exportBackup, type BackupFile } from './merge';
+import { restoreLocalBackup } from './dataRecovery';
 import { ensureDeviceId } from './repo';
 import {
   SETTING_KEYS,
@@ -18,7 +19,7 @@ import {
   type Setting
 } from './types';
 
-export type SnapshotReason = 'close' | 'manual' | 'pre-migrate';
+export type SnapshotReason = 'close' | 'manual' | 'pre-migrate' | 'pre-recovery';
 
 export interface SnapshotRow {
   id?: number;
@@ -41,10 +42,10 @@ class BackupDB extends Dexie {
 
 export const backupDb = new BackupDB();
 
-/** 生成一份快照并落库；调用方负责把失败转成非阻断提示 */
-export async function createSnapshot(reason: SnapshotReason): Promise<SnapshotRow> {
-  const deviceId = await ensureDeviceId();
-  const file = await exportBackup(deviceId);
+/** 生成并持久保存快照；恢复路径传入维护中捕获的 file，避开业务写入守门。 */
+export async function createSnapshot(reason: SnapshotReason, captured?: BackupFile): Promise<SnapshotRow> {
+  const deviceId = captured?.deviceId ?? await ensureDeviceId();
+  const file = captured ?? await exportBackup(deviceId);
   const row: SnapshotRow = {
     at: new Date().toISOString(),
     reason,
@@ -82,6 +83,10 @@ export async function pruneSnapshots(): Promise<number> {
     if (row.id != null) keep.add(row.id);
   }
   if (latestPreMigrate?.id != null) keep.add(latestPreMigrate.id);
+  // 自增 id 表示真实保存顺序，设备时间回拨也不会误删最新恢复安全快照。
+  const latestRecovery = all.filter((row) => row.reason === 'pre-recovery')
+    .reduce<SnapshotRow | undefined>((latest, row) => !latest || (row.id ?? 0) > (latest.id ?? 0) ? row : latest, undefined);
+  if (latestRecovery?.id != null) keep.add(latestRecovery.id);
 
   const remove = all
     .filter((row) => row.id != null && !keep.has(row.id))
@@ -97,12 +102,7 @@ export async function pruneSnapshots(): Promise<number> {
 export async function restoreSnapshot(id: number): Promise<SnapshotRow> {
   const row = await backupDb.snapshots.get(id);
   if (!row) throw new Error('找不到这份本地备份');
-  await replaceAll(row.file);
-  try {
-    if (typeof localStorage !== 'undefined') localStorage.setItem('yh-sync-disabled', '1');
-  } catch {
-    // 单测（Node）没有 localStorage，忽略即可
-  }
+  await restoreLocalBackup(row.file);
   return row;
 }
 

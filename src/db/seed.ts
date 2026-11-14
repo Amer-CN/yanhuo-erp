@@ -53,7 +53,7 @@ export async function seedIfEmpty(): Promise<boolean> {
 
   let planted = false;
   // 事务内再检查一次：StrictMode 会把 effect 跑两遍，避免重复种入
-  await db.transaction('rw', [db.products, db.settings, db.outbox], async () => {
+  await db.transaction('rw', [db.products, db.settings, db.outbox, db.syncMeta], async () => {
     const seeded = await db.settings.get(SETTING_KEYS.seeded);
     if (seeded?.value === 'yes') return;
     const count = await db.products.count();

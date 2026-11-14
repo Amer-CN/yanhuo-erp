@@ -135,6 +135,17 @@ describe('本地备份', () => {
     expect(list[0].id).toBe(second.id);
   });
 
+  it('设备时间回拨时刚保存的恢复前安全快照不会被日期清理删掉', async () => {
+    for (const day of ['2099-01-01', '2099-01-02', '2099-01-03']) {
+      await backupDb.snapshots.add({ at: `${day}T10:00:00.000Z`, reason: 'manual',
+        schemaVersion: db.verno, deviceId: 'dev-test', file: emptyFile() });
+    }
+    const safe = await createSnapshot('pre-recovery', emptyFile());
+    expect(await backupDb.snapshots.get(safe.id!)).toBeTruthy();
+    await pruneSnapshots();
+    expect(await backupDb.snapshots.get(safe.id!)).toBeTruthy();
+  });
+
   it('prune 只保留最近 3 个日期 + 1 份 pre-migrate（≤4 条）', async () => {
     const days = ['2026-11-01', '2026-11-02', '2026-11-03', '2026-11-04', '2026-11-05'];
     for (const day of days) {

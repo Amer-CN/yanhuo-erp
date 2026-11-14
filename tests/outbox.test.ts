@@ -42,7 +42,7 @@ describe('outbox', () => {
     const initial = await db.outbox.orderBy('queuedAt').toArray();
     expect(initial.map((row) => row.id)).toEqual(['order:o1', 'line:l1']);
     expect(initial.map((row) => row.queuedAt)).toEqual([1000, 1001]);
-    await db.transaction('rw', db.outbox, () => enqueueInTx([
+    await db.transaction('rw', [db.outbox, db.syncMeta], () => enqueueInTx([
       { kind: 'order', recordId: 'o1' }, { kind: 'line', recordId: 'l1' }
     ]));
     const replaced = await db.outbox.orderBy('queuedAt').toArray();

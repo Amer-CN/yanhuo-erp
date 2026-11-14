@@ -106,6 +106,8 @@ export interface SalesOrder {
   voided?: boolean;
   /** 业务修改时间（同步冲突判定用）；旧数据缺失时用 createdAt 兜底 */
   updatedAt?: string;
+  /** 新格式订单的完整明细清单；旧订单缺失时只能查看，不能自动整单撤销。 */
+  lineIds?: string[];
 }
 
 /** 销售明细 */

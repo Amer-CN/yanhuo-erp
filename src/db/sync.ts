@@ -2,13 +2,12 @@
 // 后端：Supabase（PostgREST）。配置只存 localStorage，不写进会被同步的设置表。
 
 import { db } from './db';
-import { loadAll } from './repo';
+import { loadAll, refreshClosedSessionSummaryAfterRemoteUndo } from './repo';
 import {
   SKIP_SETTINGS,
   UNKNOWN_KINDS_KEY,
   enqueueAllLocal,
   enqueueInTx,
-  enqueueMany,
   pendingCount,
   syncWanted
 } from './outbox';
@@ -16,16 +15,25 @@ import { DEFAULT_SYNC } from './syncDefaults';
 import { mergeSessionPair } from './sessionLogic';
 import { businessTime, resolveRemote } from './syncResolve';
 import { canonicalJson } from './canonical';
+import { assertLeaseCurrent, assertWritable, pauseSync, readSyncControl, resumeSync, runMaintenance, runSyncExclusive } from './syncControl';
+import { clearLedgerRpc, finishClearOperation, pendingClear, protocolScope, readProtocol, storeProtocol, type ClearReceipt, type SyncProtocol } from './syncProtocol';
+import { clearLocalSafely, completeRecoveryCleanup } from './dataRecovery';
+import { pushReconnectBaseline } from './syncReconcile';
+import type { SyncLease } from './syncTypes';
 import { fenToStr, isoToLocalDate, isoToTime, localDate } from './util';
-import type { OutboxRow, SyncConflictRow } from './db';
+import type { OutboxRow, RemotePendingLine, SyncConflictRow } from './db';
 import type { Table } from 'dexie';
-import type { SaleLine, Session } from './types';
+import type { SaleLine, SalesOrder, Session } from './types';
+import {
+  compareLineSetAndTotal,
+  nextUndoUpdatedAt,
+  orderLineFingerprint,
+  remoteOrderVersionKey,
+  type RemoteOrderUndoRow
+} from './remoteOrderUndo';
 
-export interface SyncConfig {
-  url: string;
-  anonKey: string;
-  ledgerKey: string;
-}
+export type { SyncConfig } from './syncTypes';
+import type { SyncConfig } from './syncTypes';
 
 export interface SyncStatus {
   configured: boolean;
@@ -63,6 +71,11 @@ export interface RemoteChange {
   remote?: Record<string, unknown>;
   /** 被删订单的明细快照：撤销删除时一并还原，否则单回来了、钱却没了 */
   children?: Record<string, unknown>[];
+  /** 完整订单撤销能力；旧订单/不完整明细只允许查看。 */
+  canUndo?: boolean;
+  undoDisabledReason?: string;
+  undoVersionKey?: string;
+  afterFingerprint?: string;
 }
 
 /** 一轮同步里三类「对方改动」的集合 */
@@ -107,6 +120,10 @@ const LS = {
    * 前 1 万行每轮白扫一遍，第 1 万行之后的旧数据永远轮不到（见 H-1）。有它就能跨轮续扫。
    */
   lastReplayCursor: 'yh-sync-last-replay-cursor',
+  /** 缺父补查轮转点：长期缺失的前 100 个父单不能饿死后续待决。 */
+  parentLookupAfter: 'yh-sync-parent-lookup-after',
+  /** 首次下载跨页配额/待决时保持未完成，重启也不能用 lastSync 冒充完成。 */
+  initialPending: 'yh-sync-initial-pending',
   lastSync: 'yh-sync-last-sync',
   error: 'yh-sync-error',
   warn: 'yh-sync-warn',
@@ -120,8 +137,6 @@ const LS = {
  * 所以清空后额外写一条固定 id 的标记行，其它设备看到标记值变化就整库重放一次。
  */
 const CLEAR_MARKER_PREFIX = '__ledger_cleared__';
-/** 标记行的 kind：不属于任何业务类型，pull 侧会整行过滤，不会写进业务表 */
-const CLEAR_MARKER_KIND = 'ledger';
 
 // 设备身份 / 本机操作人 / 设备级诊断不参与云同步：名单见 `outbox.SKIP_SETTINGS`。
 // 放在 outbox 是为了让入队处也能用同一份名单（L-2：不该同步的键连发件箱都不进）。
@@ -134,6 +149,11 @@ const MAX_ATTEMPTS = 4;
 const MAX_PAGES = 20;
 /** 拉取分页的页大小 */
 const PAGE_SIZE = 500;
+/** 一轮（含每日重放）最多补查这些不同父单，每个请求最多 50 个。 */
+const PARENT_LOOKUP_MAX = 100;
+const PARENT_LOOKUP_BATCH = 50;
+/** 待决容量只保护存储，不允许超限静默丢行。 */
+const PENDING_LINES_MAX = 10_000;
 /** 错误响应文本的截断长度 */
 const ERROR_SNIPPET_LEN = 300;
 /** 单次 HTTP 请求的超时（毫秒）：弱网下避免连接挂住、把 busy 锁死在「同步中」 */
@@ -179,7 +199,12 @@ const REPUSH_MAX_PER_PASS = 200;
 export function getSyncConfig(): SyncConfig | null {
   try {
     if (localStorage.getItem(LS.disabled) === '1') return null;
+    return getStoredSyncConfig();
+  } catch { return null; }
+}
 
+export function getStoredSyncConfig(): SyncConfig | null {
+  try {
     const url = localStorage.getItem(LS.url)?.trim().replace(/\/+$/, '');
     const anonKey = localStorage.getItem(LS.anonKey)?.trim();
     const ledgerKey = localStorage.getItem(LS.ledger)?.trim();
@@ -209,22 +234,38 @@ export function isDefaultSyncConfig(): boolean {
   );
 }
 
-export function saveSyncConfig(cfg: SyncConfig): void {
+export async function saveSyncConfig(cfg: SyncConfig): Promise<void> {
+  const current = getStoredSyncConfig();
+  const control = await readSyncControl();
+  const cap = await readProtocol(cfg);
+  if (current && protocolScope(current) !== protocolScope(cfg) && !cap.ledgerScoped) {
+    throw new Error('云端账本隔离迁移尚未完成，暂不能切换账本');
+  }
+  const paused = await db.transaction('rw', db.syncMeta, async () => {
+    const latest = await readSyncControl();
+    if (latest.generation !== control.generation || latest.maintenance || (latest.paused && latest.reason !== 'user')) {
+      throw new Error('同步暂停状态已改变，请先预览并确认重新连接的数据差异');
+    }
+    return pauseSync('user');
+  });
   localStorage.setItem(LS.url, cfg.url.trim().replace(/\/+$/, ''));
   localStorage.setItem(LS.anonKey, cfg.anonKey.trim());
   localStorage.setItem(LS.ledger, cfg.ledgerKey.trim());
   localStorage.removeItem(LS.disabled);
+  await resumeSync(paused.generation);
 }
 
-export function clearSyncConfig(): void {
-  localStorage.removeItem(LS.url);
-  localStorage.removeItem(LS.anonKey);
-  localStorage.removeItem(LS.ledger);
+export async function clearSyncConfig(): Promise<void> {
+  await db.transaction('rw', db.syncMeta, async () => {
+    if (!(await readSyncControl()).paused) await pauseSync('user');
+  });
   localStorage.removeItem(LS.lastPull);
   localStorage.removeItem(LS.lastPullId);
   localStorage.removeItem(LS.clearedAt);
   localStorage.removeItem(LS.lastReplay);
   localStorage.removeItem(LS.lastReplayCursor);
+  localStorage.removeItem(LS.parentLookupAfter);
+  localStorage.removeItem(LS.initialPending);
   localStorage.removeItem(LS.lastSync);
   localStorage.removeItem(LS.error);
   localStorage.setItem(LS.disabled, '1');
@@ -421,12 +462,56 @@ export function lastSyncError(): string | null {
 
 /* ------------------------------------------------------------------ REST */
 
+const runLeases = new WeakMap<SyncConfig, SyncLease>();
+const runProtocols = new WeakMap<SyncConfig, SyncProtocol>();
+interface SyncBinding { key: 'sync-binding'; scope: string; clearEpoch: number }
+const bindings = db.table<SyncBinding, string>('syncMeta');
+
+async function negotiateProtocol(cfg: SyncConfig, lease: SyncLease): Promise<void> {
+  const cap = await readProtocol(cfg, lease.signal);
+  await assertLeaseCurrent(lease);
+  const scope = protocolScope(cfg);
+  const stale = await db.transaction('rw', [db.outbox, db.syncMeta], async () => {
+    await assertLeaseCurrent(lease);
+    const binding = await bindings.get('sync-binding');
+    const queued = await db.outbox.toArray();
+    if ((binding && binding.scope !== scope) || queued.some((row) =>
+      (row.clearEpoch ?? 0) !== cap.clearEpoch || (row.scope !== undefined && row.scope !== scope))) return true;
+    await bindings.put({ key: 'sync-binding', scope, clearEpoch: cap.clearEpoch });
+    await storeProtocol(cfg, cap);
+    return false;
+  });
+  if (stale) {
+    await pauseSync('云端账本或清空代际已变化，请先核对并重新连接');
+    localStorage.setItem(LS.disabled, '1');
+    throw new Error('云端清空代际或账本已变化，本地待推送记录已保留，请先核对');
+  }
+  runProtocols.set(cfg, cap);
+}
+
+async function assertLease(lease?: SyncLease): Promise<void> {
+  if (lease) await assertLeaseCurrent(lease);
+}
+
+/** Synchronous browser markers share the control read lock with the final lease check. */
+async function writeRunMarkers(lease: SyncLease | undefined, write: () => void): Promise<void> {
+  await db.transaction('r', db.syncMeta, async () => {
+    await assertLease(lease);
+    write();
+  });
+}
+
 async function rest<T = unknown>(
   cfg: SyncConfig,
   path: string,
-  init?: RequestInit
+  init?: RequestInit,
+  lease: SyncLease | undefined = runLeases.get(cfg)
 ): Promise<T> {
+  await assertLease(lease);
   const controller = new AbortController();
+  const forwardAbort = () => controller.abort(lease?.signal.reason);
+  if (lease?.signal.aborted) forwardAbort();
+  else lease?.signal.addEventListener('abort', forwardAbort, { once: true });
   const timer: ReturnType<typeof setTimeout> = setTimeout(
     () => controller.abort(),
     REQUEST_TIMEOUT_MS
@@ -450,8 +535,10 @@ async function rest<T = unknown>(
       throw new Error(`Supabase ${res.status}: ${text}`);
     }
     const text = await res.text();
+    await assertLease(lease);
     return (text ? JSON.parse(text) : null) as T;
   } catch (e) {
+    await assertLease(lease);
     // 超时统一转成可读文案：调用方（useSync）会按退避重试，不会静默挂住
     if (e instanceof Error && e.name === 'AbortError') {
       throw new Error('云端无响应（超时），稍后自动重试');
@@ -459,6 +546,7 @@ async function rest<T = unknown>(
     throw e;
   } finally {
     clearTimeout(timer);
+    lease?.signal.removeEventListener('abort', forwardAbort);
   }
 }
 
@@ -486,7 +574,8 @@ const RECORD_TABLES = [
   db.lines,
   db.adjustments,
   db.sessions,
-  db.settings
+  db.settings,
+  db.syncMeta
 ];
 
 /** 在调用方的事务内按类型批量读取本地记录；缺失的 id 不放进结果。 */
@@ -531,6 +620,7 @@ interface PushRow {
   updated_at: number;
   record_updated_at?: number;
   schema_version?: number;
+  clear_epoch?: number;
   device_id: string;
   deleted: boolean;
 }
@@ -560,12 +650,14 @@ function stripMissingColumns(rows: PushRow[]): PushRow[] {
   });
 }
 
-async function postPayload(cfg: SyncConfig, rows: PushRow[]): Promise<void> {
-  await rest(cfg, 'yh_records?on_conflict=id', {
+async function postPayload(cfg: SyncConfig, rows: PushRow[], lease?: SyncLease): Promise<void> {
+  const protocol = runProtocols.get(cfg);
+  await rest(cfg, `yh_records?on_conflict=${protocol?.conflictTarget ?? 'id'}`, {
     method: 'POST',
-    headers: { Prefer: 'resolution=merge-duplicates,return=minimal' },
+    headers: { Prefer: 'resolution=merge-duplicates,return=minimal',
+      ...(protocol?.protocolVersion === 2 ? { 'x-yh-clear-epoch': String(protocol.clearEpoch) } : {}) },
     body: JSON.stringify(rows)
-  });
+  }, lease);
 }
 
 /** 按发件箱行组装推送 payload；本地缺失/删除的统一标 deleted */
@@ -596,22 +688,24 @@ function buildPushPayload(
       payloadRow.record_updated_at = local ? businessTime(local) : 0;
     }
     if (!schemaColumnMissing) payloadRow.schema_version = 2;
+    if (runProtocols.get(cfg)?.protocolVersion === 2) payloadRow.clear_epoch = row.clearEpoch ?? 0;
     payload.push(payloadRow);
   }
   return payload;
 }
 
 /** 推送 payload：缺列时降级重试；重试次数与缺列标志位的语义保持不变 */
-async function postWithSchemaFallback(cfg: SyncConfig, payload: PushRow[]): Promise<void> {
+async function postWithSchemaFallback(cfg: SyncConfig, payload: PushRow[], lease?: SyncLease): Promise<void> {
   if (payload.length === 0) return;
   let rowsToSend = payload;
   let attempts = 0;
   while (attempts < MAX_ATTEMPTS) {
     attempts++;
     try {
-      await postPayload(cfg, rowsToSend);
+      await postPayload(cfg, rowsToSend, lease);
       break;
     } catch (e) {
+      await assertLease(lease);
       const missing = missingColumns(e);
       if (!missing) throw e;
 
@@ -627,10 +721,14 @@ async function postWithSchemaFallback(cfg: SyncConfig, payload: PushRow[]): Prom
   }
 }
 
-async function pushOutbox(cfg: SyncConfig, deviceId: string): Promise<number> {
+async function pushOutbox(cfg: SyncConfig, deviceId: string, lease = runLeases.get(cfg)): Promise<number> {
   // 队列版本与业务快照必须一起读：两次独立事务会把旧 op 与新业务值拼成错误 payload。
   const { rows, locals } = await db.transaction('r', [db.outbox, ...RECORD_TABLES], async () => {
+    await assertLease(lease);
     const rows = await db.outbox.orderBy('queuedAt').limit(OUTBOX_BATCH).toArray();
+    const protocol = runProtocols.get(cfg);
+    if (rows.some((row) => (row.scope !== undefined && row.scope !== protocolScope(cfg)) ||
+      (row.clearEpoch ?? 0) !== (protocol?.clearEpoch ?? 0))) throw new Error('待推送账本或清空代际已变化，请重新核对');
     const locals = await getLocalMany(rows.filter((row) => row.op !== 'delete'));
     return { rows, locals };
   });
@@ -638,8 +736,9 @@ async function pushOutbox(cfg: SyncConfig, deviceId: string): Promise<number> {
 
   // HTTP 在事务外等待；期间本地仍可修改并以同一 id 登记新 revision。
   const payload = buildPushPayload(rows, locals, cfg, deviceId);
-  await postWithSchemaFallback(cfg, payload);
-  await db.transaction('rw', db.outbox, async () => {
+  await postWithSchemaFallback(cfg, payload, lease);
+  await db.transaction('rw', [db.outbox, db.syncMeta], async () => {
+    await assertLease(lease);
     const current = await db.outbox.bulkGet(rows.map((row) => row.id));
     const acknowledged = rows.filter((sent, i) => {
       const row = current[i];
@@ -681,7 +780,7 @@ async function mergeUnknownKinds(ids: string[]): Promise<void> {
  * 一条 `amountFen: "abc"` 或 `qtyBase: -1e9` 的脏行会让整场报表变 `NaN`，
  * 而 `keep-local` 语义又让它不会被正确版本覆盖回**来自愈**。
  */
-type FieldType = 'num' | 'str' | 'bool' | 'obj';
+type FieldType = 'num' | 'str' | 'bool' | 'obj' | 'array';
 
 interface KindSchema {
   /** 必填字段：缺失或类型不符即判非法 */
@@ -697,7 +796,7 @@ interface KindSchema {
 const REMOTE_SCHEMAS: Record<Kind, KindSchema> = {
   order: {
     required: { deviceId: 'str', operator: 'str', createdAt: 'str', payMethod: 'str', totalFen: 'num' },
-    optional: { sessionId: 'str', note: 'str', updatedAt: 'str', voided: 'bool' }
+    optional: { sessionId: 'str', note: 'str', updatedAt: 'str', voided: 'bool', lineIds: 'array' }
   },
   line: {
     required: { orderId: 'str', productId: 'str', qtyBase: 'num', amountFen: 'num' },
@@ -778,6 +877,8 @@ function matchFieldType(value: unknown, type: FieldType): boolean {
       return typeof value === 'boolean';
     case 'obj':
       return isPlainObject(value);
+    case 'array':
+      return Array.isArray(value) && value.every((item) => typeof item === 'string');
     default:
       return false;
   }
@@ -845,7 +946,27 @@ export function parseRemoteRecord(kind: Kind, data: unknown): Record<string, unk
     }
   }
 
-  return withinBounds(kind, data) ? data : null;
+  if (!withinBounds(kind, data)) return null;
+  if (kind !== 'line') return data;
+
+  // 旧明细仍有数量/金额，缺省的展示字段只按已知基本单位语义派生。
+  // box 的展示数量缺失时没有箱规来源，保留缺失，不能把 qtyBase 冒充箱数。
+  const line = { ...data, discountFen: data.discountFen ?? 0, gift: data.gift ?? false };
+  const unit = data.unit ?? 'base';
+  const unitPrice = data.unitPriceFen ?? Math.round((data.amountFen as number) / (data.qtyBase as number));
+  const normalized: Record<string, unknown> = {
+    ...line,
+    unit,
+    ...(data.qty == null && unit === 'base' ? { qty: data.qtyBase } : {}),
+    unitPriceFen: unitPrice,
+    listUnitPriceFen: data.listUnitPriceFen ?? unitPrice
+  };
+  // 有限输入做除法仍可能溢出；规范化后的声明数值也必须有限。
+  for (const [field, type] of Object.entries({ ...schema.required, ...schema.optional })) {
+    const value = normalized[field];
+    if (type === 'num' && value != null && !Number.isFinite(value)) return null;
+  }
+  return normalized;
 }
 
 /**
@@ -906,6 +1027,8 @@ interface RemotePlan {
   puts: Map<Kind, Map<string, unknown>>;
   /** kind → 待删除的 id */
   deletes: Map<Kind, Set<string>>;
+  /** line put 的远端版本，缺父时原样持久化，避免重放旧待决覆盖新版。 */
+  lineRows: Map<string, RemotePendingLine['row']>;
   conflicts: SyncConflictRow[];
   unknownIds: string[];
   /** 需要把本地版本回推到云端的记录（`keep-local` / `conflict` 判定出来的） */
@@ -947,6 +1070,130 @@ export function __resetSyncFlagsForTest(): void {
 function sameContentAsRemote(cur: unknown, remote: unknown, id: string): boolean {
   if (!isPlainObject(remote)) return false;
   return canonicalJson({ ...remote, id }) === canonicalJson(cur);
+}
+
+function remoteOrderRowData(row: RemoteRow | undefined): SalesOrder | undefined {
+  if (!row || row.deleted || row.kind !== 'order') return undefined;
+  const parsed = parseRemoteRecord('order', row.data);
+  return parsed ? ({ ...parsed, id: row.record_id } as unknown as SalesOrder) : undefined;
+}
+
+function undoChangeFromRow(change: RemoteChange, row: RemoteOrderUndoRow): void {
+  change.canUndo = row.canUndo;
+  change.undoDisabledReason = row.disabledReason;
+  change.undoVersionKey = row.remoteVersionKey;
+  change.afterFingerprint = row.afterFingerprint;
+}
+
+async function pruneRemoteOrderUndo(): Promise<void> {
+  const rows = await db.remoteOrderUndo.orderBy('capturedAt').toArray();
+  const complete = rows.filter((row) => row.canUndo);
+  const incomplete = rows.filter((row) => !row.canUndo);
+  await db.remoteOrderUndo.bulkDelete([
+    ...complete.slice(0, Math.max(0, complete.length - 20)),
+    ...incomplete.slice(0, Math.max(0, incomplete.length - 100))
+  ].map((row) => row.orderId));
+}
+
+/** 在远端订单/明细组落库前保存一次本地订单及全量明细。 */
+async function captureRemoteOrderUndo(
+  orderId: string,
+  orderRow: RemoteRow | undefined
+): Promise<RemoteOrderUndoRow | undefined> {
+  const beforeOrder = await db.orders.get(orderId);
+  if (!beforeOrder) return undefined;
+  const beforeLines = await db.lines.where('orderId').equals(orderId).toArray();
+  const key = orderRow ? remoteOrderVersionKey(orderRow) : `${orderId}:pending`;
+  const existing = (await db.remoteOrderUndo.where('orderId').equals(orderId).toArray())
+    .sort((a, b) => b.capturedAt - a.capturedAt)[0];
+  if (existing && (existing.remoteVersionKey === key || existing.remoteVersionKey === `${orderId}:pending` ||
+    (!orderRow && !existing.canUndo))) {
+    if (orderRow && existing.remoteVersionKey !== key) {
+      const remote = remoteOrderRowData(orderRow);
+      const updated = {
+        ...existing,
+        remoteVersionKey: key,
+        remoteOrderLineIds: remote?.lineIds,
+        remoteOrderTotalFen: remote?.totalFen
+      };
+      await db.remoteOrderUndo.put(updated);
+      return updated;
+    }
+    return existing;
+  }
+  const capturedAt = Math.max(Date.now(), existing?.capturedAt ? existing.capturedAt + 1 : 0);
+  const remote = remoteOrderRowData(orderRow);
+  const row: RemoteOrderUndoRow = {
+    orderId,
+    capturedAt,
+    beforeOrder: JSON.parse(JSON.stringify(beforeOrder)) as SalesOrder,
+    beforeLines: JSON.parse(JSON.stringify(beforeLines)) as SaleLine[],
+    beforeFingerprint: orderLineFingerprint(beforeOrder, beforeLines),
+    beforeComplete: compareLineSetAndTotal(beforeOrder, beforeLines, beforeOrder.lineIds, beforeOrder.totalFen),
+    remoteVersionKey: key,
+    remoteOrderLineIds: remote?.lineIds ? [...remote.lineIds] : undefined,
+    remoteOrderTotalFen: remote?.totalFen,
+    afterFingerprint: '',
+    canUndo: false,
+    disabledReason: remote ? undefined : '远端订单清单缺失，无法完整撤销'
+  };
+  await db.remoteOrderUndo.put(row);
+  return row;
+}
+
+async function finalizeRemoteOrderUndo(
+  orderIds: Iterable<string>,
+  impact?: RemoteImpact
+): Promise<void> {
+  for (const orderId of new Set(orderIds)) {
+    const rows = (await db.remoteOrderUndo.where('orderId').equals(orderId).toArray())
+      .sort((a, b) => b.capturedAt - a.capturedAt);
+    const row = rows[0];
+    if (!row) {
+      for (const change of impact ? remoteChangeList(impact) : []) {
+        if (change.kind === 'order' && change.recordId === orderId) {
+          change.canUndo = false;
+          change.undoDisabledReason = '撤销快照已超过保留范围，请到销售记录核对';
+        }
+      }
+      continue;
+    }
+    // 完整组定稿后冻结 after：旧远端重放不能把用户后来编辑重新授权给旧撤销。
+    if (row.canUndo && row.afterFingerprint) {
+      for (const change of impact ? remoteChangeList(impact) : []) {
+        if (change.kind === 'order' && change.recordId === orderId) undoChangeFromRow(change, row);
+      }
+      continue;
+    }
+    const order = await db.orders.get(orderId);
+    const lines = await db.lines.where('orderId').equals(orderId).toArray();
+    const pending = await db.remotePendingLines.where('orderId').equals(orderId).count();
+    row.afterFingerprint = order ? orderLineFingerprint(order, lines) : '';
+    const complete = compareLineSetAndTotal(
+      order,
+      lines,
+      row.remoteOrderLineIds,
+      row.remoteOrderTotalFen
+    );
+    row.canUndo = Boolean(row.beforeComplete && order && complete && pending === 0);
+    row.disabledReason = row.canUndo
+      ? undefined
+      : !row.beforeComplete
+        ? '本地旧单明细不完整，无法整单撤销'
+        : !row.remoteOrderLineIds
+        ? '远端订单缺少完整明细清单，无法整单撤销'
+        : pending > 0
+          ? '明细仍在等待主单同步，暂不能撤销'
+          : !order
+            ? '远端订单已删除，无法整单撤销'
+            : '远端明细尚未完整到齐，无法整单撤销';
+    await db.remoteOrderUndo.put(row);
+    if (impact) {
+      for (const change of remoteChangeList(impact)) {
+        if (change.kind === 'order' && change.recordId === orderId) undoChangeFromRow(change, row);
+      }
+    }
+  }
 }
 
 /* ---------------------------------------------------- H3：对方改动的识别与撤销 */
@@ -1111,42 +1358,92 @@ function collectRemoved(
  * - 覆盖可能发生在已结账的单/场次上，`updateRecord` 有「本场 open 才能改」的业务限制。
  * 撤销是**用户主动行为**（不是自动回滚），写库 + 入队仍在同一事务里，本地优先不破。
  */
-export async function restoreLocalSnapshot(change: RemoteChange): Promise<void> {
+export async function restoreLocalSnapshot(change: RemoteChange): Promise<{ sessionSummaryUpdated?: boolean }> {
   const snapshot = toSnapshot(change.local);
   if (!snapshot) throw new Error('这条改动没有留下本地旧值，无法撤销');
+
+  if (change.kind === 'order' && change.type !== 'removed') {
+    const restoreSessionId = typeof snapshot.sessionId === 'string' ? snapshot.sessionId : undefined;
+    await db.transaction('rw', [db.orders, db.lines, db.outbox, db.remoteOrderUndo, db.remotePendingLines, db.syncMeta], async () => {
+    await assertWritable();
+    if (change.canUndo !== true || !change.undoVersionKey) {
+      throw new Error(change.undoDisabledReason ?? '订单缺少完整明细清单，无法整单撤销');
+    }
+    const undoRows = (await db.remoteOrderUndo.where('orderId').equals(change.recordId).toArray())
+      .filter((row) => row.remoteVersionKey === change.undoVersionKey)
+      .sort((a, b) => b.capturedAt - a.capturedAt);
+    const undo = undoRows[0];
+    if (!undo || !undo.canUndo || !undo.afterFingerprint) {
+      throw new Error('订单缺少完整明细清单，无法整单撤销');
+    }
+    const currentOrder = await db.orders.get(change.recordId);
+    const currentLines = await db.lines.where('orderId').equals(change.recordId).toArray();
+    if (!currentOrder || orderLineFingerprint(currentOrder, currentLines) !== undo.afterFingerprint) {
+      throw new Error('订单在收到远端改动后又被再次修改，已拒绝撤销');
+    }
+    const beforeOrder = { ...undo.beforeOrder } as SalesOrder;
+    const beforeLines = undo.beforeLines.map((line) => ({ ...line })) as SaleLine[];
+    const updatedAt = nextUndoUpdatedAt(
+      currentOrder.updatedAt,
+      ...currentLines.map((line) => line.updatedAt),
+      beforeOrder.updatedAt,
+      ...beforeLines.map((line) => line.updatedAt),
+      change.remote?.updatedAt as string | undefined
+    );
+    const restoredOrder: SalesOrder = {
+      ...beforeOrder,
+      id: change.recordId,
+      updatedAt,
+      lineIds: beforeLines.map((line) => line.id)
+    };
+    const oldIds = new Set(currentLines.map((line) => line.id));
+    const restoredLines = beforeLines.map((line) => ({ ...line, updatedAt }));
+    const restoredIds = new Set(restoredLines.map((line) => line.id));
+    const extraIds = [...oldIds].filter((id) => !restoredIds.has(id));
+    await db.lines.bulkDelete(extraIds);
+    await db.orders.put(restoredOrder);
+    await db.lines.bulkPut(restoredLines);
+    await enqueueInTx([
+      { kind: 'order', recordId: change.recordId },
+      ...restoredLines.map((line) => ({ kind: 'line' as const, recordId: line.id, op: 'upsert' as const })),
+      ...extraIds.map((id) => ({ kind: 'line' as const, recordId: id, op: 'delete' as const }))
+    ]);
+    await db.remoteOrderUndo.delete(change.recordId);
+    });
+    syncWanted();
+    const sessionSummaryUpdated = restoreSessionId
+      ? await refreshClosedSessionSummaryAfterRemoteUndo(restoreSessionId)
+      : undefined;
+    return { sessionSummaryUpdated };
+  }
+
   const row: Record<string, unknown> =
     change.kind === 'setting'
       ? { key: change.recordId, value: snapshot.value }
       : { ...snapshot, id: change.recordId };
+  const lines = change.kind === 'order'
+    ? (change.children ?? []).map((line) => toSnapshot(line)).filter((line): line is Record<string, unknown> => Boolean(line))
+    : [];
   const tables: Table<any, any>[] = [TABLE_BY_KIND[change.kind]];
-  const lines = (change.children ?? [])
-    .map((line) => toSnapshot(line))
-    .filter((line): line is Record<string, unknown> => Boolean(line));
-  // 订单被删时明细已被级联删除：撤销必须把明细一起写回，否则「单回来了、钱却没了」
   if (change.kind === 'order' && lines.length > 0) tables.push(db.lines);
-  await db.transaction('rw', [...tables, db.outbox], async () => {
+  await db.transaction('rw', [...tables, db.outbox, db.syncMeta], async () => {
+    await assertWritable();
     await TABLE_BY_KIND[change.kind].put(row);
-    if (change.kind === 'order' && lines.length > 0) {
-      await db.lines.bulkPut(lines as unknown as SaleLine[]);
-    }
+    if (change.kind === 'order' && lines.length > 0) await db.lines.bulkPut(lines as unknown as SaleLine[]);
     await enqueueInTx([
       { kind: change.kind, recordId: change.recordId },
-      ...(change.kind === 'order'
-        ? lines.map((line) => ({
-            kind: 'line' as const,
-            recordId: String(line.id),
-            op: 'upsert' as const
-          }))
-        : [])
+      ...(change.kind === 'order' ? lines.map((line) => ({ kind: 'line' as const, recordId: String(line.id), op: 'upsert' as const })) : [])
     ]);
   });
   syncWanted();
+  return {};
 }
 
 /** 撤销「被对方复活」时，把本地重新删掉（其它类型用；订单走 `voidOrder`，见 useSync） */
 export async function dropLocalRecord(kind: Kind, recordId: string): Promise<void> {
   const table = TABLE_BY_KIND[kind];
-  await db.transaction('rw', [table, db.outbox], async () => {
+  await db.transaction('rw', [table, db.outbox, db.syncMeta], async () => {
+    await assertWritable();
     await table.delete(recordId);
     await enqueueInTx([{ kind, recordId, op: 'delete' }]);
   });
@@ -1173,7 +1470,7 @@ function pruneRepushThrottle(now: number): void {
  *   互为对方的远端、无限对推；
  * - **best-effort**：入队失败只影响收敛速度，不能把本轮同步报成失败（否则会触发整轮重试）。
  */
-async function repushLocalVersions(candidates: RemotePlan['repush']): Promise<void> {
+async function repushLocalVersions(candidates: RemotePlan['repush'], lease?: SyncLease): Promise<void> {
   if (candidates.length === 0) return;
   const now = Date.now();
   const rows: { kind: Kind; recordId: string }[] = [];
@@ -1189,11 +1486,16 @@ async function repushLocalVersions(candidates: RemotePlan['repush']): Promise<vo
   pruneRepushThrottle(now);
   if (rows.length === 0) return;
   try {
-    await enqueueMany(rows);
+    await db.transaction('rw', [db.outbox, db.syncMeta], async () => {
+      await assertLease(lease);
+      await enqueueInTx(rows);
+    });
+    syncWanted();
     // 只有**入队成功**才记节流（L-3）：先记后入队的话，一次配额/事务失败会把这条记录
     // 静默冻结 30 秒，而下一轮同步本来可以立刻重试。
     for (const r of rows) lastRepushAt.set(`${r.kind}:${r.recordId}`, now);
   } catch (e) {
+    await assertLease(lease);
     console.warn('[sync] 回推本地较新版本失败，下一轮同步会重新判定', e);
   }
 }
@@ -1210,6 +1512,7 @@ function planRemoteChanges(
   const plan: RemotePlan = {
     puts: new Map(),
     deletes: new Map(),
+    lineRows: new Map(),
     conflicts: [],
     unknownIds: [],
     repush: [],
@@ -1270,10 +1573,18 @@ function planRemoteChanges(
     }
 
     const cur = current.get(`${row.kind}:${row.record_id}`);
+    // 旧 line 先补兼容默认值，比较也使用投影后的值，避免仅默认字段缺失触发回声回推。
+    const normalizedLine = row.kind === 'line' ? parseRemoteRecord('line', row.data) : null;
+    if (row.kind === 'line' && !normalizedLine) {
+      plan.invalid += 1;
+      warnInvalidRemote('line', row.record_id);
+      continue;
+    }
+    const remoteData = normalizedLine ? projectDeclaredFields('line', normalizedLine) : row.data;
     const decision = resolveRemote(
       row.kind,
       cur,
-      row.data,
+      remoteData,
       Number(row.record_updated_at) || 0
     );
 
@@ -1291,7 +1602,7 @@ function planRemoteChanges(
       // 但**只有内容真的不同才回推**：远端如果只是本机自己刚推上去的那一版（时间相同、
       // 内容相同），回推就变成无意义的写放大，还会让两台设备互相喂数据。
       // 真正入队放到事务外（见 applyRemoteBatch），这里只登记候选。
-      if (!sameContentAsRemote(cur, row.data, row.record_id)) {
+      if (!sameContentAsRemote(cur, remoteData, row.record_id)) {
         plan.repush.push({ kind: row.kind, id: row.record_id });
       }
       continue;
@@ -1344,6 +1655,9 @@ function planRemoteChanges(
           id: row.record_id
         };
         putRow(row.kind, row.record_id, next);
+        if (row.kind === 'line') {
+          plan.lineRows.set(row.record_id, { ...row, kind: 'line', data: projectDeclaredFields('line', parsed) });
+        }
         collectTakeRemote(plan.impact, row.kind, row.record_id, cur, next, knownIds);
       }
     }
@@ -1351,55 +1665,90 @@ function planRemoteChanges(
   return plan;
 }
 
-/**
- * 按计划落库：先删（含 order 级联明细）再写；由调用方保证处在事务内。
- * 返回**真正写入/删除的业务行数**（诊断用，见 L-4；被丢弃的孤儿明细不计入）。
- */
-async function applyPlannedChanges(plan: RemotePlan): Promise<number> {
+/** 先比业务版本，再比远端写入水位；旧页重放不能替换较新的待决内容。 */
+function compareRemoteLineVersion(a: RemoteRow, b: RemoteRow): number {
+  // 墓碑没有业务时间，顺序由远端水位证明；不能拿 0 与活行的业务日期比较。
+  if (a.deleted || b.deleted) return Number(a.updated_at) - Number(b.updated_at);
+  const business = (Number(a.record_updated_at) || businessTime(a.data)) -
+    (Number(b.record_updated_at) || businessTime(b.data));
+  return business || Number(a.updated_at) - Number(b.updated_at);
+}
+
+/** 父已落库时在同一事务排空待决；本机待推版本始终受 outbox 保护。 */
+async function drainPendingLines(parentIds?: string[]): Promise<number> {
+  const waiting = parentIds
+    ? parentIds.length > 0 ? await db.remotePendingLines.where('orderId').anyOf(parentIds).toArray() : []
+    : await db.remotePendingLines.toArray();
+  if (waiting.length === 0) return 0;
+  const ids = [...new Set(waiting.map((line) => line.orderId))];
+  const parents = await db.orders.bulkGet(ids);
+  const parentQueues = await db.outbox.bulkGet(ids.map((id) => `order:${id}`));
+  const alive = new Set(ids.filter((_, i) => parents[i] && parentQueues[i]?.op !== 'delete'));
+  const locals = await db.lines.bulkGet(waiting.map((line) => line.id));
+  const queued = await db.outbox.bulkGet(waiting.map((line) => `line:${line.id}`));
+  const put: SaleLine[] = [];
+  const done: string[] = [];
+  waiting.forEach((pending, i) => {
+    if (!alive.has(pending.orderId) || queued[i]) return;
+    if (resolveRemote('line', locals[i], pending.row.data, Number(pending.row.record_updated_at) || 0) === 'take-remote') {
+      put.push({ ...pending.row.data, id: pending.id } as unknown as SaleLine);
+    }
+    // 已有更新/相同本地明细也已解决：不能把旧待决留到未来再覆盖。
+    done.push(pending.id);
+  });
+  if (put.length > 0) await db.lines.bulkPut(put);
+  if (done.length > 0) await db.remotePendingLines.bulkDelete(done);
+  return put.length;
+}
+
+/** 业务表、待决区与 outbox 都由调用方的同一个 rw 事务保护。 */
+async function applyPlannedChanges(
+  plan: RemotePlan,
+  parentTombstones: Set<string>,
+  drainAll = false
+): Promise<number> {
   let applied = 0;
   const orderIds = [...(plan.deletes.get('order') ?? [])];
   if (orderIds.length > 0) {
     await db.orders.bulkDelete(orderIds);
     const removedLines = await db.lines.where('orderId').anyOf(orderIds).delete();
+    await db.remotePendingLines.where('orderId').anyOf(orderIds).delete();
     applied += orderIds.length + removedLines;
     plan.deletes.delete('order');
   }
   for (const [kind, set] of plan.deletes) {
     if (set.size > 0) {
       await TABLE_BY_KIND[kind].bulkDelete([...set]);
+      if (kind === 'line') await db.remotePendingLines.bulkDelete([...set]);
       applied += set.size;
     }
   }
 
-  // 父单已删的明细不能写回来（M-4）：order 墓碑与「更晚的 line 行」可能落在不同批次/页，
-  // dropLinesOfOrder 只覆盖同一批。这里批量查一次父单存在性（不逐行 await），
-  // 缺失的整条丢弃并记诊断，避免孤儿明细参与 FIFO/成本计算、再被推给其它设备。
   const linePuts = plan.puts.get('line');
   if (linePuts && linePuts.size > 0) {
-    // 同一批里正在写入的 order 也算存在（首次全量时 order 与 line 常在同一个计划里）
     const createdOrders = new Set(plan.puts.get('order')?.keys() ?? []);
-    const parentIds = [
-      ...new Set(
-        [...linePuts.values()]
-          .map((line) => (line as SaleLine).orderId)
-          .filter((id): id is string => Boolean(id) && !createdOrders.has(id))
-      )
-    ];
-    const alive = new Set<string>();
-    if (parentIds.length > 0) {
-      const parents = await db.orders.bulkGet(parentIds);
-      parentIds.forEach((id, i) => {
-        if (parents[i]) alive.add(id);
-      });
-    }
-    let dropped = 0;
-    for (const [id, line] of linePuts) {
-      const orderId = (line as SaleLine).orderId;
-      if (createdOrders.has(orderId) || alive.has(orderId)) continue;
+    const parentIds = [...new Set([...linePuts.values()].map((line) => (line as SaleLine).orderId))];
+    const parents = await db.orders.bulkGet(parentIds);
+    const parentQueues = await db.outbox.bulkGet(parentIds.map((id) => `order:${id}`));
+    const alive = new Set(parentIds.filter((id, i) =>
+      (createdOrders.has(id) || parents[i]) && parentQueues[i]?.op !== 'delete'));
+    const pending: RemotePendingLine[] = [];
+    const resolved: string[] = [];
+    for (const [id, value] of linePuts) {
+      const line = value as SaleLine;
+      if (alive.has(line.orderId)) {
+        resolved.push(id);
+        continue;
+      }
       linePuts.delete(id);
-      dropped += 1;
+      if (parentTombstones.has(line.orderId)) {
+        resolved.push(id);
+        continue;
+      }
+      pending.push({ id, orderId: line.orderId, row: plan.lineRows.get(id)!, receivedAt: Date.now() });
     }
-    if (dropped > 0) appendWarn(`丢弃 ${dropped} 条孤立明细：父单已删除`);
+    if (resolved.length > 0) await db.remotePendingLines.bulkDelete(resolved);
+    if (pending.length > 0) await db.remotePendingLines.bulkPut(pending);
   }
 
   for (const [kind, map] of plan.puts) {
@@ -1407,6 +1756,11 @@ async function applyPlannedChanges(plan: RemotePlan): Promise<number> {
       await TABLE_BY_KIND[kind].bulkPut([...map.values()]);
       applied += map.size;
     }
+  }
+  applied += await drainPendingLines(drainAll ? undefined : [...(plan.puts.get('order')?.keys() ?? [])]);
+  if (await db.remotePendingLines.count() > PENDING_LINES_MAX) {
+    appendWarn(`待决明细达到 ${PENDING_LINES_MAX} 条上限，本页未保存，请重试同步`);
+    throw new Error(`待决明细超过 ${PENDING_LINES_MAX} 条上限，本页已回滚`);
   }
   if (plan.conflicts.length > 0) await saveConflicts(plan.conflicts);
   await mergeUnknownKinds(plan.unknownIds);
@@ -1467,7 +1821,7 @@ interface ApplyResult {
  */
 async function applyRemoteBatch(
   rows: RemoteRow[],
-  opts: { replay?: boolean; suppressRemoved?: boolean } = {}
+  opts: { replay?: boolean; suppressRemoved?: boolean; parentTombstones?: Set<string>; drainAll?: boolean; lease?: SyncLease } = {}
 ): Promise<ApplyResult> {
   const empty = (): ApplyResult => ({
     applied: 0,
@@ -1476,21 +1830,31 @@ async function applyRemoteBatch(
     invalid: 0,
     impact: emptyRemoteImpact()
   });
-  if (rows.length === 0) return empty();
+  if (rows.length === 0 && !opts.drainAll) return empty();
+  const parentTombstones = new Set(opts.parentTombstones);
 
   // H3：先取「本机见过的 id」快照，用来区分「对方新记的单」和「我删掉又被对方复活的单」
   const knownIds = loadKnownIds();
   const { plan, applied, newOrders, knownRows, pending } = await db.transaction(
     'rw',
-    [...RECORD_TABLES, db.conflicts, db.outbox],
+    [...RECORD_TABLES, db.conflicts, db.outbox, db.remotePendingLines, db.remoteOrderUndo, db.syncMeta],
     async () => {
+      await assertLease(opts.lease);
       // pending 检查与读业务/决策/落库共用事务，本地写入不能插进检查与应用之间。
       const queued = await db.outbox.bulkGet(rows.map((r) => `${r.kind}:${r.record_id}`));
       const pendingIds = new Set(queued.filter((r): r is OutboxRow => Boolean(r)).map((r) => r.id));
-      const active = rows.filter((r) => !pendingIds.has(`${r.kind}:${r.record_id}`));
+      let active = rows.filter((r) => !pendingIds.has(`${r.kind}:${r.record_id}`));
       const pending = rows.length - active.length;
+      const pendingLines = await db.remotePendingLines.bulkGet(active.map((r) => r.record_id));
+      active = active.filter((row, i) => row.kind !== 'line' || !pendingLines[i] ||
+        compareRemoteLineVersion(row, pendingLines[i]!.row) >= 0);
       const knownRows = active.filter((r) => KNOWN_KINDS.has(r.kind));
-      if (active.length === 0) {
+      for (const row of knownRows) {
+        if (row.kind !== 'order') continue;
+        if (row.deleted) parentTombstones.add(row.record_id);
+        else if (parseRemoteRecord('order', row.data)) parentTombstones.delete(row.record_id);
+      }
+      if (active.length === 0 && !opts.drainAll) {
         return { plan: null, applied: 0, newOrders: 0, knownRows, pending };
       }
       const unknownIds = active
@@ -1510,7 +1874,33 @@ async function applyRemoteBatch(
         ids.forEach((id, i) => current.set(`${kind}:${id}`, locals[i]));
       }
 
+      const orderRows = new Map<string, RemoteRow | undefined>();
+      for (const row of knownRows) {
+        if (row.kind === 'order') orderRows.set(row.record_id, row);
+        else if (row.kind === 'line') {
+          const localLine = current.get(`line:${row.record_id}`) as SaleLine | undefined;
+          const parsed = row.deleted ? undefined : parseRemoteRecord('line', row.data);
+          const parentId = localLine?.orderId ?? parsed?.orderId;
+          if (typeof parentId === 'string' && !orderRows.has(parentId)) orderRows.set(parentId, undefined);
+        }
+      }
+      const original = new Map(current);
       const planned = planRemoteChanges(knownRows, current, knownIds);
+      const changedOrders = new Set<string>();
+      for (const [id, value] of planned.puts.get('order') ?? []) {
+        if (canonicalJson(original.get(`order:${id}`)) !== canonicalJson(value)) changedOrders.add(id);
+      }
+      for (const id of planned.deletes.get('order') ?? []) {
+        if (original.get(`order:${id}`)) changedOrders.add(id);
+      }
+      for (const [id, value] of planned.puts.get('line') ?? []) {
+        if (canonicalJson(original.get(`line:${id}`)) !== canonicalJson(value)) changedOrders.add((value as SaleLine).orderId);
+      }
+      for (const id of planned.deletes.get('line') ?? []) {
+        const line = original.get(`line:${id}`) as SaleLine | undefined;
+        if (line) changedOrders.add(line.orderId);
+      }
+      for (const orderId of changedOrders) await captureRemoteOrderUndo(orderId, orderRows.get(orderId));
       planned.unknownIds = unknownIds;
       // 重放轮：冲突留痕不重记（同一条冲突增量轮已经记过，天天重记会让 conflicts 无界增长）
       if (opts.replay) planned.conflicts = [];
@@ -1525,7 +1915,9 @@ async function applyRemoteBatch(
           .map((line) => toSnapshot(line))
           .filter((line): line is Record<string, unknown> => Boolean(line));
       }
-      const appliedCount = await applyPlannedChanges(planned);
+      const appliedCount = await applyPlannedChanges(planned, parentTombstones, opts.drainAll);
+      await finalizeRemoteOrderUndo(orderRows.keys(), planned.impact);
+      await pruneRemoteOrderUndo();
       /*
        * 首次接入的「已下载 N 单」要的是**本机原本没见过**的订单数：
        * `plan.puts` 里同样可能是对已有订单的覆盖，直接数 puts 会把改价也算成新单。
@@ -1541,6 +1933,10 @@ async function applyRemoteBatch(
     }
   );
   if (!plan) return { ...empty(), pending };
+  if (opts.parentTombstones) {
+    opts.parentTombstones.clear();
+    parentTombstones.forEach((id) => opts.parentTombstones!.add(id));
+  }
 
   /*
    * 清空账本触发的全量重放：那些墓碑是「清空」本身，不是「对方悄悄删你的单」。
@@ -1559,11 +1955,11 @@ async function applyRemoteBatch(
       added += 1;
     }
   }
-  if (added > 0) saveKnownIds(knownIds);
+  if (added > 0) await writeRunMarkers(opts.lease, () => saveKnownIds(knownIds));
 
   // 回推仍放在事务提交之后：入队是 best-effort，失败不能让已应用的远端行回滚。
   // outbox 虽已纳入 pending 检查的事务范围，回推本身不属于入站落库。
-  await repushLocalVersions(plan.repush);
+  await repushLocalVersions(plan.repush, opts.lease);
   return { applied, orders: newOrders, pending, invalid: plan.invalid, impact: plan.impact };
 }
 
@@ -1670,8 +2066,12 @@ async function fetchRemotePage(
   cursor: PullCursor,
   limit: number = PAGE_SIZE
 ): Promise<RemoteRow[]> {
+  return fetchRemoteRows(cfg, buildPullParams(cursor, cfg.ledgerKey, limit));
+}
+
+/** 分页和缺父补查共用同一套列降级与 cfg 头部。 */
+async function fetchRemoteRows(cfg: SyncConfig, params: URLSearchParams): Promise<RemoteRow[]> {
   const request = async (): Promise<RemoteRow[]> => {
-    const params = buildPullParams(cursor, cfg.ledgerKey, limit);
     if (recordColumnMissing) params.set('select', PULL_COLUMNS_LEGACY);
     const rows = await rest<RemoteRow[]>(cfg, `yh_records?${params.toString()}`);
     return Array.isArray(rows) ? rows : [];
@@ -1686,6 +2086,62 @@ async function fetchRemotePage(
     warnDegraded('远端缺少 record_updated_at 列，拉取已降级；升级请先执行新版 supabase/schema.sql');
     return await request();
   }
+}
+
+interface ParentLookupContext {
+  attempted: Set<string>;
+  tombstones: Set<string>;
+}
+
+/** PostgREST 保留字符必须在 in 字面值内部转义，再交 URLSearchParams 编码。 */
+function quotedFilterValue(value: string): string {
+  return `"${value.replace(/\\/g, '\\\\').replace(/"/g, '\\"')}"`;
+}
+
+/** 网络在业务事务之前；空结果只代表尚未知晓，不能当父墓碑。 */
+async function lookupMissingParents(
+  cfg: SyncConfig,
+  rows: RemoteRow[],
+  context: ParentLookupContext
+): Promise<RemoteRow[]> {
+  if (context.attempted.size >= PARENT_LOOKUP_MAX) return [];
+  const candidates = new Set<string>();
+  const pageParents = new Set(rows.filter((row) => row.kind === 'order' &&
+    (row.deleted || parseRemoteRecord('order', row.data))).map((row) => row.record_id));
+  for (const row of rows) {
+    if (row.kind !== 'line' || row.deleted) continue;
+    const line = parseRemoteRecord('line', row.data);
+    if (line) candidates.add(line.orderId as string);
+  }
+  const waiting = await db.remotePendingLines.orderBy('orderId').uniqueKeys();
+  waiting.forEach((id) => candidates.add(String(id)));
+  const ids = [...candidates].filter((id) => !pageParents.has(id) &&
+    !context.tombstones.has(id) && !context.attempted.has(id)).sort();
+  if (ids.length === 0) return [];
+  const parents = await db.orders.bulkGet(ids);
+  const missing = ids.filter((_, i) => !parents[i]);
+  // 轮转遍历不同 parent，避免最前 100 个长时间缺失时其余永远轮不到。
+  const after = localStorage.getItem(LS.parentLookupAfter) ?? '';
+  const ordered = [...missing.filter((id) => id > after), ...missing.filter((id) => id <= after)];
+  const selected = ordered.slice(0, PARENT_LOOKUP_MAX - context.attempted.size);
+  const found: RemoteRow[] = [];
+  for (let i = 0; i < selected.length; i += PARENT_LOOKUP_BATCH) {
+    const batch = selected.slice(i, i + PARENT_LOOKUP_BATCH);
+    batch.forEach((id) => context.attempted.add(id));
+    const params = new URLSearchParams({
+      ledger: `eq.${cfg.ledgerKey}`,
+      kind: 'eq.order',
+      record_id: `in.(${batch.map(quotedFilterValue).join(',')})`,
+      select: PULL_COLUMNS,
+      order: 'updated_at.asc,id.asc',
+      limit: String(PARENT_LOOKUP_BATCH)
+    });
+    const response = await fetchRemoteRows(cfg, params);
+    found.push(...response.filter((row) => row.kind === 'order' && batch.includes(row.record_id)));
+  }
+  if (selected.length > 0) await writeRunMarkers(runLeases.get(cfg),
+    () => localStorage.setItem(LS.parentLookupAfter, selected[selected.length - 1]));
+  return found;
 }
 
 /**
@@ -1704,6 +2160,7 @@ async function readClearMark(cfg: SyncConfig): Promise<number> {
     if (!row || row.id !== markerId) return 0;
     return clearMarkValue(row);
   } catch {
+    await assertLease(runLeases.get(cfg));
     return 0;
   }
 }
@@ -1727,6 +2184,8 @@ async function resolvePullStart(
   cfg: SyncConfig
 ): Promise<{ cursor: PullCursor; cleared: boolean }> {
   const local: PullCursor = { ts: lastPullAt(), id: lastPullId() };
+  // Confirmed reconnect compares the marker atomically at RPC; keep its queue intact until then.
+  if (await bindings.get(`reconnect-baseline:${protocolScope(cfg)}`)) return { cursor: local, cleared: false };
   // 水位为 0 时本来就要全量拉取，不必多打一次探针
   if (local.ts <= 0) return { cursor: local, cleared: false };
 
@@ -1734,12 +2193,11 @@ async function resolvePullStart(
   if (mark <= 0 || mark === clearedMark()) return { cursor: local, cleared: false };
 
   // 先落盘再开拉：即使本轮中途失败，也不会反复重置、卡在同一份全量重放上
-  setClearedMark(mark);
   const reset: PullCursor = { ts: 0, id: '' };
-  setLastPullCursor(reset);
+  await writeRunMarkers(runLeases.get(cfg), () => { setClearedMark(mark); setLastPullCursor(reset); });
 
   // 先作废「清空前的旧改动」，再进入推送/重放
-  const dropped = await dropOutboxQueuedBefore(mark);
+  const dropped = await dropOutboxQueuedBefore(mark, runLeases.get(cfg));
   if (dropped > 0) {
     appendWarn(`清空账本：丢弃 ${dropped} 条清空前的待推送改动（它们属于被清掉的旧账本）`);
   }
@@ -1755,11 +2213,13 @@ async function resolvePullStart(
  * 只删发件箱、不碰业务表：真正删除本地旧记录仍由远端墓碑（全量重放）完成，
  * 这样即使丢弃后拉取失败，本机账本也还在，不会变成「数据凭空消失」。
  */
-async function dropOutboxQueuedBefore(clearedAt: number): Promise<number> {
-  const stale = await db.outbox.where('queuedAt').below(clearedAt).primaryKeys();
-  if (stale.length === 0) return 0;
-  await db.outbox.bulkDelete(stale);
-  return stale.length;
+async function dropOutboxQueuedBefore(clearedAt: number, lease?: SyncLease): Promise<number> {
+  return db.transaction('rw', [db.outbox, db.syncMeta], async () => {
+    await assertLease(lease);
+    const stale = await db.outbox.where('queuedAt').below(clearedAt).primaryKeys();
+    await db.outbox.bulkDelete(stale);
+    return stale.length;
+  });
 }
 
 /** 一轮拉取循环的结果 */
@@ -1800,6 +2260,7 @@ async function pullOnce(
   opts: {
     persistCursor: boolean;
     replay: boolean;
+    parents: ParentLookupContext;
     suppressRemoved?: boolean;
     /**
      * B3 进度回调：每应用完一页就报一次「本轮累计已拉行数」。
@@ -1812,7 +2273,7 @@ async function pullOnce(
   // 持久化游标：只按真实行尾推进（绝不写入回退后的起点）
   let cursor = start;
   // 请求游标：本轮第一页叠加重叠窗口，后续页从真实游标继续翻
-  let requestCursor = pullStartCursor(start);
+  let requestCursor = opts.replay ? start : pullStartCursor(start);
   let pulled = 0;
   let pulledOrders = 0;
   let capped = false;
@@ -1824,25 +2285,40 @@ async function pullOnce(
 
   for (let page = 0; page < MAX_PAGES; page++) {
     const rows = await fetchRemotePage(cfg, requestCursor);
-    if (rows.length === 0) break;
+    const parentRows = await lookupMissingParents(cfg, rows, opts.parents);
+    if (rows.length === 0) {
+      const applied = await applyRemoteBatch(parentRows, {
+        replay: opts.replay, suppressRemoved, parentTombstones: opts.parents.tombstones, drainAll: true, lease: runLeases.get(cfg)
+      });
+      pulled += applied.applied;
+      pulledOrders += applied.orders;
+      skippedPending += applied.pending;
+      skippedInvalid += applied.invalid;
+      mergeRemoteImpact(impact, applied.impact);
+      break;
+    }
 
     if (replayAll) {
       const mark = rows
         .filter(isClearMarkerRow)
         .reduce((max, row) => Math.max(max, clearMarkValue(row)), 0);
       if (mark > 0 && mark !== clearedMark()) {
-        setClearedMark(mark);
+        await writeRunMarkers(runLeases.get(cfg), () => setClearedMark(mark));
         // 本轮之后的行都跟着这次清空走：即使水位检查时没探到标记，这里也能兜住
         suppressRemoved = true;
       }
     }
 
     // 标记行只用来对齐「清空」状态：既不写业务表，也不进未知 kind 诊断
-    const dataRows = rows.filter((row) => !isClearMarkerRow(row));
+    const dataRows = [...rows.filter((row) => !isClearMarkerRow(row)), ...parentRows]
+      .sort((a, b) => Number(a.updated_at) - Number(b.updated_at) || (a.id < b.id ? -1 : a.id > b.id ? 1 : 0));
     if (dataRows.length > 0) {
       const applied = await applyRemoteBatch(dataRows, {
         replay: opts.replay,
-        suppressRemoved
+        suppressRemoved,
+        parentTombstones: opts.parents.tombstones,
+        drainAll: page === 0,
+        lease: runLeases.get(cfg)
       });
       pulled += applied.applied;
       pulledOrders += applied.orders;
@@ -1856,9 +2332,9 @@ async function pullOnce(
         /* 忽略：进度提示失败不影响数据落库 */
       }
     }
-    // 先落库再推进游标：中途失败时下次仍会重放同一页，不会留下空洞
+    // 先落库、核租约，再推进游标：暂停后的迟到响应不得移动新账本水位。
     cursor = nextCursor(rows, cursor);
-    if (opts.persistCursor) setLastPullCursor(cursor);
+    await writeRunMarkers(runLeases.get(cfg), () => { if (opts.persistCursor) setLastPullCursor(cursor); });
     // 重叠窗口只用于第一页：后续页跟着真实游标走，否则会反复拉同一段
     requestCursor = cursor;
     if (rows.length < PAGE_SIZE) break;
@@ -1869,6 +2345,14 @@ async function pullOnce(
     // 每轮同步都从 0 重放一遍）；探测有行 → 确实还有后续，交给调用方续扫。
     const probe = await fetchRemotePage(cfg, cursor, 1);
     capped = probe.length > 0;
+  }
+  // 后页补齐明细后，刷新先前页累计的订单变更能力；读取和完成性判定共用短事务。
+  const affectedOrders = remoteChangeList(impact).filter((change) => change.kind === 'order').map((change) => change.recordId);
+  if (affectedOrders.length) {
+    await db.transaction('rw', [db.orders, db.lines, db.remoteOrderUndo, db.remotePendingLines, db.syncMeta], async () => {
+      await assertLease(runLeases.get(cfg));
+      await finalizeRemoteOrderUndo(affectedOrders, impact);
+    });
   }
   return { pulled, pulledOrders, capped, cursor, skippedPending, skippedInvalid, impact };
 }
@@ -1891,33 +2375,37 @@ async function pullOnce(
  *   （重放幂等，重复扫只是多花几次请求，不会写坏数据）。本摊账本远小于
  *   `MAX_PAGES × PAGE_SIZE`（1 万行），所以正常规模下一轮就能扫完。
  */
-async function dailyReplay(cfg: SyncConfig): Promise<RemoteImpact> {
+async function dailyReplay(cfg: SyncConfig, parents: ParentLookupContext): Promise<PullPassResult> {
   // 上一轮若因页数配额中断，从续扫游标接着扫；否则从 0 开始（见 LS.lastReplayCursor）
   const resume = lastReplayCursor();
   console.info(resume.ts > 0 ? '[sync] 今日全量重放（续扫）' : '[sync] 今日首次同步做全量重放');
   const pass = await pullOnce(cfg, resume.ts > 0 ? resume : { ts: 0, id: '' }, true, {
     persistCursor: false,
-    replay: true
+    replay: true,
+    parents
   });
   warnSkippedRows(pass.skippedPending, pass.skippedInvalid);
   if (pass.capped) {
     // 探测页证明后面还有数据：把扫到的位置落盘，下一轮从这里续扫。
     // 只「不落标记」是不够的 —— 那样下一轮又从 0 重来，第 N 万行之后永远扫不到（H-1）。
-    setLastReplayCursor(pass.cursor);
+    await writeRunMarkers(runLeases.get(cfg), () => setLastReplayCursor(pass.cursor));
     console.warn(`[sync] 全量重放未扫完（已扫至 ${pass.cursor.ts}），下次同步继续补`);
     warnReplayIncomplete(pass.cursor.ts);
-    return pass.impact;
+    return pass;
   }
-  clearLastReplayCursor();
-  clearWarnByPrefix(WARN_REPLAY_PREFIX);
-  setLastReplayDate(localDate());
+  await writeRunMarkers(runLeases.get(cfg), () => {
+    clearLastReplayCursor();
+    clearWarnByPrefix(WARN_REPLAY_PREFIX);
+    setLastReplayDate(localDate());
+  });
   console.info(`[sync] 全量重放完成，已应用 ${pass.pulled} 行`);
-  return pass.impact;
+  return pass;
 }
 
 /** 一轮 pull 的结果：行数（诊断）+ H3 的「对方改动」 */
 interface PullOutcome {
   pulled: number;
+  hasMore: boolean;
   /** 本轮新增订单数（B3 首次接入提示「已下载 N 单」用） */
   pulledOrders: number;
   impact: RemoteImpact;
@@ -1943,11 +2431,13 @@ async function pull(
   // 本轮是否从 0 全量重放（首次 / 清空账本后）：全量时看到标记行即可直接对齐，不必多打探针
   const replayAll = from.ts <= 0;
   const impact = emptyRemoteImpact();
+  const parents: ParentLookupContext = { attempted: new Set(), tombstones: new Set() };
 
   // 增量轮：起点叠加重叠窗口，持久化水位按真实行尾推进
   const incremental = await pullOnce(cfg, from, replayAll, {
     persistCursor: true,
     replay: false,
+    parents,
     suppressRemoved: clearedThisRound,
     onPull
   });
@@ -1956,21 +2446,27 @@ async function pull(
   mergeRemoteImpact(impact, incremental.impact);
   warnSkippedRows(incremental.skippedPending, incremental.skippedInvalid);
 
-  if (lastReplayDate() === localDate()) return { pulled, pulledOrders, impact };
+  if (incremental.capped) warnReplayIncomplete(incremental.cursor.ts);
+  if (lastReplayDate() === localDate()) return { pulled, pulledOrders, impact, hasMore: incremental.capped };
 
   // 水位本来就是 0：增量轮已经是一次完整全量，不必再叠一层，补落标记即可
   if (replayAll) {
     // 被页数配额截断时记下续扫点：下一轮的每日重放从那里接着扫，而不是再从 0 开始
-    if (incremental.capped) setLastReplayCursor(incremental.cursor);
-    else {
-      clearLastReplayCursor();
-      setLastReplayDate(localDate());
-    }
-    return { pulled, pulledOrders, impact };
+    await writeRunMarkers(runLeases.get(cfg), () => {
+      if (incremental.capped) setLastReplayCursor(incremental.cursor);
+      else {
+        clearLastReplayCursor();
+        setLastReplayDate(localDate());
+      }
+    });
+    return { pulled, pulledOrders, impact, hasMore: incremental.capped };
   }
 
-  mergeRemoteImpact(impact, await dailyReplay(cfg));
-  return { pulled, pulledOrders, impact };
+  const replay = await dailyReplay(cfg, parents);
+  mergeRemoteImpact(impact, replay.impact);
+  // 续扫已经到尾时，增量 overlap 的页数上限不再使本轮假装仍未完成。
+  const hasMore = replay.capped || (incremental.capped && replay.cursor.ts < incremental.cursor.ts);
+  return { pulled, pulledOrders: pulledOrders + replay.pulledOrders, impact, hasMore };
 }
 
 /* ------------------------------------------------- 冲突查看与「用云端」 */
@@ -2120,7 +2616,9 @@ export async function adoptRemoteConflict(id: number): Promise<void> {
   const parsed = parseRemoteRecord(kind, remote);
   if (!parsed) throw new Error('云端快照没通过校验，没有采用');
 
-  await db.transaction('rw', [TABLE_BY_KIND[kind], db.conflicts], async () => {
+  await db.transaction('rw', [TABLE_BY_KIND[kind], db.conflicts, db.syncMeta], async () => {
+    await assertWritable();
+    if (canonicalJson(await db.conflicts.get(id)) !== canonicalJson(row)) throw new Error('冲突快照已变化，请重新核对');
     if (kind === 'setting') {
       const value = parsed.value;
       if (typeof value !== 'string') throw new Error('云端设置值不合法，没有采用');
@@ -2148,6 +2646,10 @@ export async function adoptRemoteConflict(id: number): Promise<void> {
 export interface SyncResult {
   pushed: number;
   pulled: number;
+  /** 本机仍等待主单的明细数，不计入业务账本。 */
+  deferredLines: number;
+  /** 分页未扫完或待决未解决，界面不能报告完整同步。 */
+  hasMore: boolean;
   /** B3：本轮**新增**的订单数（新设备首次接入时提示「已下载 N 单」） */
   pulledOrders: number;
   /** H3：本轮被远端覆盖 / 删除 / 复活的记录（供 useSync 合成一条可撤销 Toast） */
@@ -2158,64 +2660,83 @@ export interface SyncResult {
  * @param onPull B3 进度回调：每应用完一页报一次累计行数。
  *   只是给「正在下载历史…（已拉 N 条）」用的旁路信号，不改变 push/pull 顺序与落库语义。
  */
+/** 首次下载未完整时跨重启保持；扫描完但有待决仍需继续下载。 */
+export function initialSyncPending(): boolean {
+  return !lastSyncAt() || localStorage.getItem(LS.initialPending) === '1' || Boolean(localStorage.getItem(LS.lastReplayCursor));
+}
+
 export async function syncNow(
   cfg: SyncConfig,
   onPull?: (pulled: number) => void
 ): Promise<SyncResult> {
+  return runSyncExclusive(async (lease) => {
+  cfg = { ...cfg };
+  runLeases.set(cfg, lease);
+  try {
   if (!navigator.onLine) throw new Error('当前离线');
+  await completeRecoveryCleanup();
+  if (await pendingClear(cfg)) throw new Error('清空操作结果待确认，请先在设置中查询或重试同一操作');
+  await negotiateProtocol(cfg, lease);
   const deviceId = (await db.settings.get('deviceId'))?.value ?? '';
   // H1：清空标记检查必须在 push 之前。否则本机（B）断网期间的旧改动会先落云，
   // 清空标记触发的全量重放随后又把这些「复活」的行当成正常数据保留下来。
   // resolvePullStart 在标记变新时会丢弃 `queuedAt < clearedAt` 的发件箱条目；
   // 清空之后的新改动不受影响，会在下面的 pushOutbox 里正常补发。
   const start = await resolvePullStart(cfg);
-  const pushed = await pushOutbox(cfg, deviceId);
-  const { pulled, pulledOrders, impact } = await pull(cfg, start.cursor, start.cleared, onPull);
-  localStorage.setItem(LS.lastSync, String(Date.now()));
-  localStorage.removeItem(LS.error);
-  return { pushed, pulled, pulledOrders, impact };
+  const reconciled = await pushReconnectBaseline(cfg, lease);
+  const pushed = reconciled ?? await pushOutbox(cfg, deviceId);
+  const { pulled, pulledOrders, impact, hasMore: capped } = await pull(cfg, start.cursor, start.cleared, onPull);
+  const deferredLines = await db.remotePendingLines.count();
+  const hasMore = capped || deferredLines > 0;
+  const waitingPrefix = '明细等待主单同步';
+  if (deferredLines > 0) replaceWarnByPrefix(waitingPrefix, `${waitingPrefix}：${deferredLines} 条，后续同步会继续补查`);
+  else clearWarnByPrefix(waitingPrefix);
+  await writeRunMarkers(lease, () => {
+    if (initialSyncPending()) {
+      if (hasMore) localStorage.setItem(LS.initialPending, '1');
+      else localStorage.removeItem(LS.initialPending);
+    }
+    localStorage.setItem(LS.lastSync, String(Date.now()));
+    localStorage.removeItem(LS.error);
+  });
+  return { pushed, pulled, pulledOrders, impact, deferredLines, hasMore };
+  } finally {
+    runLeases.delete(cfg);
+  }
+  });
 }
 
 export async function testSyncConfig(cfg: SyncConfig): Promise<void> {
   await rest(cfg, 'yh_records?select=id&limit=1');
 }
 
-/**
- * 清空云端账本（危险操作，与本地清空一起用）。
- * v2 起服务端撤销了 anon 的 DELETE，这里改为软删除：把本账本所有行标记 deleted=true。
- * 好处：误操作后可在控制台把 deleted 改回 false 恢复；且不再存在「一键物理抹除」的能力。
- *
- * 软删除后「清空」退化成一条靠 updated_at 水位传播的普通变更，而 pull 只拉
- * 严格大于本地水位的行：另一台设备时钟偏快（水位高于 tombstone 的 updated_at），
- * 或 tombstone 恰好落在对方水位的同一毫秒，都会永远拉不到、且不会自愈。
- * 所以清空后再写一条固定 id 的标记行，标记值一变，对方就把游标重置为 0 全量重放一次。
- */
-export async function clearCloud(cfg: SyncConfig): Promise<void> {
-  const clearedAt = Date.now();
-  await rest(cfg, `yh_records?ledger=eq.${encodeURIComponent(cfg.ledgerKey)}`, {
-    method: 'PATCH',
-    headers: { Prefer: 'return=minimal' },
-    body: JSON.stringify({ deleted: true, updated_at: clearedAt })
+/** 清云只有单个幂等 RPC；未知结果保留操作号，同一操作重试不会删除后来新单。 */
+export function clearCloud(cfg: SyncConfig): Promise<ClearReceipt> {
+  return runMaintenance('clear-cloud', async (lease) => {
+    const receipt = await clearLedgerRpc(cfg, lease.signal);
+    await assertLeaseCurrent(lease);
+    return receipt;
   });
+}
 
-  // 标记行不属于任何业务表（pull 侧会整行过滤掉），只用于通知其它设备重放；
-  // id 带账本码，避免多个账本共用一张表时互相覆盖同一条标记。
-  // 不写 record_updated_at / schema_version，让旧库靠列默认值也能写入。
-  const markerId = clearMarkerId(cfg.ledgerKey);
-  await rest(cfg, 'yh_records?on_conflict=id', {
-    method: 'POST',
-    headers: { Prefer: 'resolution=merge-duplicates,return=minimal' },
-    body: JSON.stringify([
-      {
-        id: markerId,
-        record_id: markerId,
-        ledger: cfg.ledgerKey,
-        kind: CLEAR_MARKER_KIND,
-        data: { clearedAt },
-        updated_at: clearedAt,
-        deleted: false
-      }
-    ])
+/** 提交期间保持同一维护租约；云端确认之前绝不清本机。 */
+export function clearCloudAndLocal(cfg: SyncConfig): Promise<ClearReceipt> {
+  return runMaintenance('clear-cloud', async (lease) => {
+    const receipt = await clearLedgerRpc(cfg, lease.signal);
+    await assertLeaseCurrent(lease);
+    const completionKey = `clear-local-complete:${protocolScope(cfg)}`;
+    const completions = db.table<{ key: string; operationId: string }, string>('syncMeta');
+    const completed = await completions.get(completionKey);
+    if (completed?.operationId !== receipt.operationId) {
+      await clearLocalSafely(lease, { key: completionKey, operationId: receipt.operationId });
+    } else await completeRecoveryCleanup();
+    await db.transaction('rw', db.syncMeta, async () => {
+      await assertLeaseCurrent(lease);
+      await bindings.put({ key: 'sync-binding', scope: protocolScope(cfg), clearEpoch: receipt.clearEpoch });
+      await finishClearOperation(cfg, receipt.operationId);
+      await completions.delete(completionKey);
+    });
+    return receipt;
   });
 }
 

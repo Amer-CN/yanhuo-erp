@@ -8,6 +8,10 @@ import type {
   Session,
   Setting
 } from './types';
+import type { RemoteOrderUndoRow } from './remoteOrderUndo';
+import type { SyncControlRow } from './syncTypes';
+export type { RemoteOrderUndoRow } from './remoteOrderUndo';
+export type { SyncControlRow } from './syncTypes';
 
 export interface OutboxRow {
   /** `${kind}:${recordId}` */
@@ -18,6 +22,8 @@ export interface OutboxRow {
   queuedAt: number;
   /** 每次入队的唯一版本；旧行缺省，兼容现有 schema，无需索引。 */
   revision?: string;
+  scope?: string;
+  clearEpoch?: number;
 }
 
 /** 同步冲突留痕：同一记录两端都改过、又无法按业务时间判定时，保留双方快照 */
@@ -37,8 +43,24 @@ export interface SyncConflictRow {
   remote: string;
 }
 
+/** 暂未找到主单的远端明细：持久保留原远端版本，不进入库存/报表。 */
+export interface RemotePendingLine {
+  id: string;
+  orderId: string;
+  row: {
+    id: string;
+    record_id: string;
+    kind: 'line';
+    data: Record<string, unknown>;
+    updated_at: number;
+    record_updated_at?: number;
+    deleted: boolean;
+  };
+  receivedAt: number;
+}
+
 /** 主库 schema 版本：唯一来源。升版本前先看 backup.snapshotBeforeOpen 的迁移快照 */
-export const SCHEMA_VERSION = 5;
+export const SCHEMA_VERSION = 8;
 
 export class AppDB extends Dexie {
   products!: Table<Product, string>;
@@ -50,6 +72,9 @@ export class AppDB extends Dexie {
   settings!: Table<Setting, string>;
   outbox!: Table<OutboxRow, string>;
   conflicts!: Table<SyncConflictRow, number>;
+  remotePendingLines!: Table<RemotePendingLine, string>;
+  remoteOrderUndo!: Table<RemoteOrderUndoRow, string>;
+  syncMeta!: Table<SyncControlRow, string>;
 
   constructor() {
     super('yanhuo-erp');
@@ -82,7 +107,7 @@ export class AppDB extends Dexie {
      * 这里折叠加同一条记录只留 `at` 最新的一行 —— 旧数据处理掉重复、不丢内容，
      * 升级后设置页的「待核对 N 条」不会再带着历史噪音。
      */
-    this.version(SCHEMA_VERSION)
+    this.version(5)
       .stores({ conflicts: '++id, at, kind, recordId, [kind+recordId]' })
       .upgrade(async (tx) => {
         const table = tx.table('conflicts');
@@ -110,6 +135,12 @@ export class AppDB extends Dexie {
           }
         }
       });
+    // v6 只加待决表；v5 去重迁移仍按原版本执行。
+    this.version(6).stores({ remotePendingLines: 'id, orderId, receivedAt' });
+    // v7 保存最近远端整单变更的本地快照，支持完整订单撤销。
+    this.version(7).stores({ remoteOrderUndo: 'orderId, capturedAt' });
+    // v8 持久化同步租约、generation/fence 与恢复维护状态。
+    this.version(8).stores({ syncMeta: 'key' });
   }
 }
 

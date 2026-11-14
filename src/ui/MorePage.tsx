@@ -30,6 +30,8 @@ export default function MorePage({
     initialSync: 'idle' | 'running' | 'done';
     /** B3：首轮已拉到的行数（不是单数，文案写「条」） */
     pulledCount: number;
+    deferredLines: number;
+    hasMore: boolean;
   };
   onOpen: (p: Exclude<SubPage, null>) => void;
   onCloseSession: () => void;
@@ -49,7 +51,11 @@ export default function MorePage({
           ? '同步中…'
           : sync.error
             ? '同步出错'
-            : `已连接 · 待推送 ${sync.pending} 条`;
+            : sync.deferredLines > 0
+              ? `明细等待主单同步（${sync.deferredLines} 条）`
+              : sync.hasMore
+                ? '历史尚未下载完整，下次同步继续'
+                : `已连接 · 待推送 ${sync.pending} 条`;
 
   return (
     <div className="page-stack">

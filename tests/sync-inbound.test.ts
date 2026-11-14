@@ -5,6 +5,7 @@ import { db } from '../src/db/db';
 import { enqueue, enqueueMany, pendingCount } from '../src/db/outbox';
 import { parseRemoteRecord, syncNow } from '../src/db/sync';
 import { makeLine, makeOrder, resetDb, T0 } from './helpers';
+import { fifoAllocate, sessionReport } from '../src/db/calc';
 
 const CFG = { url: 'https://example.supabase.co', anonKey: 'anon-key', ledgerKey: 'led-1' };
 
@@ -76,6 +77,7 @@ beforeEach(async () => {
   vi.stubGlobal(
     'fetch',
     vi.fn(async (url: string, init?: RequestInit) => {
+      if (String(url).includes('/rpc/yh_sync_capabilities')) return Response.json({ code: 'PGRST202' }, { status: 404 });
       const u = String(url);
       // 推送：POST yh_records?on_conflict=id
       if (u.includes('on_conflict')) {
@@ -487,7 +489,7 @@ describe('孤儿明细（M-4）', () => {
    * order 墓碑与「更晚的 line 行」可能落在不同批次：父单已删时不能把明细写回来，
    * 但同一批里一起到达的 order + line 必须正常写入（首次全量的常见形态）。
    */
-  it('父单已删除的明细不写回；同批到达的父单与明细正常写入', async () => {
+  it('同批父单与明细正常写入；父单缺失的明细持久待决等待，不能当已删除', async () => {
     pages = [
       [
         {
@@ -517,7 +519,7 @@ describe('孤儿明细（M-4）', () => {
           deleted: false
         },
         {
-          // 父单本地已不存在（墓碑先到 / 另一台设备更晚的编辑）：这条必须被丢弃
+          // 本地查不到父单，没有墓碑证据；必须持久待决等父单，不能误判删除
           id: 'line:l9',
           record_id: 'l9',
           kind: 'line',
@@ -534,7 +536,8 @@ describe('孤儿明细（M-4）', () => {
     expect(await db.orders.get('o2')).toBeTruthy();
     expect(await db.lines.get('l2')).toBeTruthy();
     expect(await db.lines.get('l9')).toBeUndefined();
-    expect(store.get('yh-sync-warn') ?? '').toContain('孤立明细');
+    expect(await db.remotePendingLines.get('l9')).toMatchObject({ orderId: 'gone' });
+    expect(store.get('yh-sync-warn') ?? '').toContain('明细等待主单同步');
   });
 });
 
@@ -556,6 +559,48 @@ describe('parseRemoteRecord 入站校验', () => {
       expect(parseRemoteRecord(c.kind as never, c.data)).toBeNull();
     });
   }
+
+  it('旧最小 line 补有限默认值，落库后场次让利与毛利仍为有限数', async () => {
+    const minimal = { orderId: 'legacy', productId: 'p1', qtyBase: 2, amountFen: 500, extraCloudField: 'must-project' };
+    expect(parseRemoteRecord('line', minimal)).toMatchObject({
+      unit: 'base', qty: 2, unitPriceFen: 250, listUnitPriceFen: 250, discountFen: 0, gift: false
+    });
+    await db.orders.put(makeOrder('legacy', 500, 's1'));
+    pages = [[{ id: 'line:legacy-line', record_id: 'legacy-line', kind: 'line', data: minimal,
+      updated_at: 1000, deleted: false }]];
+    await syncNow(CFG);
+    const saved = await db.lines.get('legacy-line');
+    expect(saved).toMatchObject({ discountFen: 0, gift: false, qty: 2 });
+    expect(saved).not.toHaveProperty('extraCloudField');
+    const orders = await db.orders.toArray();
+    const lines = await db.lines.toArray();
+    const report = sessionReport('s1', orders, lines, fifoAllocate([], orders, lines));
+    expect(report).toMatchObject({ lineCount: 1, revenueFen: 500, discountFen: 0 });
+    expect(Object.values(report).every((value) => Number.isFinite(value))).toBe(true);
+  });
+
+  it('旧 line 的 null 默认值兼容，未知 box 展示数量缺失不猜，非法数值仍拒绝', () => {
+    const minimal = { orderId: 'o1', productId: 'p1', qtyBase: 2, amountFen: 501 };
+    expect(parseRemoteRecord('line', { ...minimal, discountFen: null, gift: null })).toMatchObject({ discountFen: 0, gift: false });
+    expect(parseRemoteRecord('line', { ...minimal, unit: 'box' })).not.toHaveProperty('qty');
+    expect(parseRemoteRecord('line', { ...minimal, unit: 'box', qty: 1 })).toMatchObject({ qty: 1, unitPriceFen: 251 });
+    for (const values of [{ discountFen: '0' }, { gift: 0 }, { qty: Infinity }, { unitPriceFen: NaN }, { amountFen: '501' }]) {
+      expect(parseRemoteRecord('line', { ...minimal, ...values })).toBeNull();
+    }
+  });
+
+  it('拒绝有限输入派生出 Infinity 单价的 line，不落业务或待决并留下非法诊断', async () => {
+    const tiny = { orderId: 'tiny-parent', productId: 'p1', qtyBase: Number.MIN_VALUE, amountFen: 1 };
+    expect(parseRemoteRecord('line', tiny)).toBeNull();
+    await db.orders.put(makeOrder('tiny-parent', 1));
+    pages = [[{ id: 'line:tiny-line', record_id: 'tiny-line', kind: 'line', data: tiny,
+      updated_at: 1000, deleted: false }]];
+    await syncNow(CFG);
+    expect(await db.lines.get('tiny-line')).toBeUndefined();
+    expect(await db.remotePendingLines.get('tiny-line')).toBeUndefined();
+    expect(store.get('yh-sync-warn')).toContain('非法数据已跳过：line:tiny-line');
+    expect(await db.outbox.count()).toBe(0);
+  });
 
   it('合法远端行原样接受', () => {
     const order = {

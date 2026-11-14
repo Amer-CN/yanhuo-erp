@@ -3,6 +3,7 @@ import { ensureBootstrapSettings, ensureDeviceId, migrateSessions } from '../db/
 import { seedIfEmpty } from '../db/seed';
 import { latestSnapshot, snapshotBeforeOpen } from '../db/backup';
 import { SETTING_KEYS } from '../db/types';
+import { completeRecoveryCleanup } from '../db/dataRecovery';
 import type { Done } from './kit';
 
 export function msgOf(e: unknown): string {
@@ -36,6 +37,7 @@ export function useBoot(showToast: Done) {
         } catch {
           // 快照失败不阻断启动；不写 console，避免打扰摊主
         }
+        await completeRecoveryCleanup();
         await ensureDeviceId();
         await ensureBootstrapSettings({
           [SETTING_KEYS.deviceName]: defaultDeviceName(),

@@ -66,6 +66,7 @@ beforeEach(async () => {
     removeItem: (key: string) => store.delete(key)
   });
   vi.stubGlobal('fetch', vi.fn(async (url: string, init?: RequestInit) => {
+    if (String(url).includes('/rpc/yh_sync_capabilities')) return Response.json({ code: 'PGRST202' }, { status: 404 });
     expect(new URL(String(url)).origin).toBe(CFG.url);
     fetchTransactions.push(Dexie.currentTransaction);
     if (init?.method === 'POST') {
@@ -257,7 +258,12 @@ describe('推送确认只清除本次发送的版本', () => {
     const order = await saveRecord(input());
     let queuedTx: Transaction | undefined;
     let orderTx: Transaction | undefined;
-    const onQueued = (row: unknown) => { queuedTx ??= Dexie.currentTransaction; return row; };
+    const onQueued = (row: unknown) => {
+      const tx = Dexie.currentTransaction;
+      // 协议预检也读取 outbox；只观察真正同时包含业务表的推送快照事务。
+      if (tx?.storeNames.includes('orders')) queuedTx ??= tx;
+      return row;
+    };
     const onOrder = (row: unknown) => { orderTx ??= Dexie.currentTransaction; return row; };
     db.outbox.hook('reading', onQueued);
     db.orders.hook('reading', onOrder);
