@@ -5,12 +5,17 @@ import http from 'node:http';
 import { pathToFileURL } from 'node:url';
 
 const TABLE_PATH = '/rest/v1/yh_records';
+const CAPABILITIES_PATH = '/rest/v1/rpc/yh_sync_capabilities';
+const CLEAR_PATH = '/rest/v1/rpc/yh_clear_ledger';
+const EPOCH_HEADER = 'x-yh-clear-epoch';
+const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 const FILTER_KEYS = new Set(['ledger', 'id', 'record_id', 'kind', 'or', 'updated_at', 'order', 'limit', 'select']);
 const COLUMNS = new Set(['id', 'record_id', 'ledger', 'kind', 'data', 'updated_at', 'record_updated_at', 'schema_version', 'device_id', 'deleted']);
+const V2_COLUMNS = new Set([...COLUMNS, 'clear_epoch']);
 
 function cors(res) {
   res.setHeader('Access-Control-Allow-Origin', '*');
-  res.setHeader('Access-Control-Allow-Headers', 'apikey, authorization, content-type, prefer, x-ledger-key');
+  res.setHeader('Access-Control-Allow-Headers', `apikey, authorization, content-type, prefer, x-ledger-key, ${EPOCH_HEADER}`);
   res.setHeader('Access-Control-Allow-Methods', 'GET, POST, PATCH, DELETE, OPTIONS');
   res.setHeader('Access-Control-Max-Age', '600');
 }
@@ -38,6 +43,46 @@ function parseFilter(value, operators) {
   return { op: match[1], value: match[2] };
 }
 
+function parseInValues(raw) {
+  if (!raw.startsWith('in.(') || !raw.endsWith(')')) return null;
+  const body = raw.slice(4, -1);
+  const values = [];
+  let offset = 0;
+  while (offset < body.length) {
+    while (/\s/.test(body[offset] ?? '') && offset < body.length) offset++;
+    let value = '';
+    if (body[offset] === '"') {
+      offset++;
+      let closed = false;
+      while (offset < body.length) {
+        const char = body[offset++];
+        if (char === '"') { closed = true; break; }
+        if (char === '\\') {
+          if (offset === body.length) return null;
+          const escaped = body[offset++];
+          if (escaped !== '"' && escaped !== '\\') return null;
+          value += escaped;
+        } else value += char;
+      }
+      if (!closed) return null;
+      while (/\s/.test(body[offset] ?? '') && offset < body.length) offset++;
+      if (offset < body.length && body[offset] !== ',') return null;
+    } else {
+      const start = offset;
+      while (offset < body.length && body[offset] !== ',') offset++;
+      value = body.slice(start, offset).trim();
+      if (/[()"\\]/.test(value)) return null;
+    }
+    if (!value) return null;
+    values.push(value);
+    if (offset < body.length) {
+      offset++;
+      if (offset === body.length) return null;
+    }
+  }
+  return values.length ? values : null;
+}
+
 function queryPredicate(url, allowedKeys = FILTER_KEYS) {
   for (const key of url.searchParams.keys()) {
     if (!allowedKeys.has(key)) return { error: `unsupported filter: ${key}` };
@@ -46,11 +91,8 @@ function queryPredicate(url, allowedKeys = FILTER_KEYS) {
   for (const key of ['ledger', 'id', 'record_id', 'kind']) {
     const raw = url.searchParams.get(key);
     if (raw === null) continue;
-    const inMatch = key === 'record_id' ? /^in\.\(([^()]*)\)$/.exec(raw) : null;
-    const values = inMatch?.[1].split(',').map((value) => value.trim());
-    if (raw.startsWith('in.') && (!values || values.some((value) => !value || /["\\]/.test(value)))) {
-      return { error: `unsupported ${key} in filter` };
-    }
+    const values = key === 'record_id' && raw.startsWith('in.') ? parseInValues(raw) : null;
+    if (raw.startsWith('in.') && !values) return { error: `unsupported ${key} in filter` };
     const parsed = values
       ? { op: 'in', value: values }
       : parseFilter(raw, new Set(['eq']));
@@ -105,11 +147,11 @@ function compareRows(a, b) {
   return String(a.id).localeCompare(String(b.id));
 }
 
-function projectRows(rows, url) {
+function projectRows(rows, url, columnsAllowed) {
   const select = url.searchParams.get('select');
   if (!select || select === '*') return rows;
   const columns = select.split(',').map((column) => column.trim());
-  if (columns.some((column) => !COLUMNS.has(column))) return null;
+  if (columns.some((column) => !columnsAllowed.has(column))) return null;
   return rows.map((row) => Object.fromEntries(columns.filter((column) => column in row).map((column) => [column, row[column]])));
 }
 
@@ -120,11 +162,24 @@ function normalizeResult(result) {
   return null;
 }
 
+function matchesEpoch(items, header, currentEpoch) {
+  if (header !== undefined && (typeof header !== 'string' || !/^(0|[1-9][0-9]{0,18})$/.test(header) || header !== String(currentEpoch))) return false;
+  if (currentEpoch > 0 && header === undefined) return false;
+  return items.every((item) => (item.clear_epoch === undefined && currentEpoch === 0) || item.clear_epoch === currentEpoch);
+}
+
+function epochMismatch(res) {
+  return response(res, 409, { code: 'SYNC_CLEAR_EPOCH_MISMATCH', message: 'SYNC_CLEAR_EPOCH_MISMATCH' });
+}
+
 export function createMockServer(options = {}) {
   const mode = options.mode ?? 'v1';
   if (!['v1', 'v2'].includes(mode)) throw new TypeError(`unsupported mock mode: ${mode}`);
-  const rows = new Map();
+  let rows = new Map();
+  let stateEpochs = new Map();
+  let receipts = new Map();
   const keyOf = (row) => mode === 'v1' ? String(row.id) : `${row.ledger}\0${row.id}`;
+  const epochOf = (ledger) => stateEpochs.get(ledger) ?? 0;
 
   return http.createServer(async (req, res) => {
     cors(res);
@@ -137,13 +192,63 @@ export function createMockServer(options = {}) {
     }
     const ledger = String(req.headers['x-ledger-key'] ?? '').trim();
     const request = { method: req.method, path: url.pathname, query: url.searchParams, ledger };
-    options.onRequest?.(request);
     try {
+      await options.onRequest?.(request);
       await options.beforeRequest?.(request);
       const injected = normalizeResult(await options.failRequest?.(request));
       if (injected) return response(res, injected.status, injected.body);
     } catch (error) {
       return response(res, 500, { error: error instanceof Error ? error.message : String(error) });
+    }
+
+    if (url.pathname === CAPABILITIES_PATH || url.pathname === CLEAR_PATH) {
+      if (mode === 'v1') return response(res, 404, { code: 'PGRST202' });
+      if (!ledger) return response(res, 403, { error: 'ledger header required' });
+      if (url.searchParams.size) return response(res, 400, { error: 'RPC query parameters are unsupported' });
+      if (url.pathname === CAPABILITIES_PATH) {
+        if (!['GET', 'POST'].includes(req.method)) return response(res, 405, { error: 'method' });
+        return response(res, 200, {
+          protocolVersion: 2, conflictTarget: 'ledger,id', ledgerScoped: true, clearRpcEnabled: true,
+          clearEpoch: epochOf(ledger), epochHeader: EPOCH_HEADER, epochHeaderRequired: epochOf(ledger) > 0
+        });
+      }
+      if (req.method !== 'POST') return response(res, 405, { error: 'method' });
+      let payload;
+      try {
+        payload = JSON.parse(await readBody(req));
+      } catch {
+        return response(res, 400, { error: 'bad json' });
+      }
+      if (!payload || typeof payload !== 'object' || Array.isArray(payload) || typeof payload.p_operation_id !== 'string' || !UUID.test(payload.p_operation_id)) {
+        return response(res, 400, { code: '22023', message: 'SYNC_CLEAR_OPERATION_ID_REQUIRED' });
+      }
+      const operationId = payload.p_operation_id.toLowerCase();
+      const receiptKey = `${ledger}\0${operationId}`;
+      if (receipts.has(receiptKey)) return response(res, 200, receipts.get(receiptKey));
+
+      const clearedAt = Date.now();
+      const clearEpoch = Math.max(clearedAt, epochOf(ledger) + 1);
+      let clearedCount = 0;
+      const stagedRows = new Map(rows);
+      for (const [key, row] of rows) {
+        if (row.ledger !== ledger) continue;
+        if (row.kind !== 'ledger' && !row.deleted) clearedCount++;
+        stagedRows.set(key, { ...row, deleted: true, updated_at: clearedAt, record_updated_at: clearedAt, clear_epoch: clearEpoch });
+      }
+      const markerId = `__ledger_cleared__:${ledger}`;
+      const marker = {
+        id: markerId, record_id: markerId, ledger, kind: 'ledger', data: { clearedAt, clearEpoch },
+        updated_at: clearedAt, record_updated_at: clearedAt, schema_version: 2, clear_epoch: clearEpoch, device_id: '', deleted: false
+      };
+      stagedRows.set(keyOf(marker), marker);
+      const receipt = { operationId, clearedAt, clearedCount, clearEpoch };
+      const stagedEpochs = new Map(stateEpochs).set(ledger, clearEpoch);
+      const stagedReceipts = new Map(receipts).set(receiptKey, receipt);
+      // No awaits after staging: rows, marker, epoch and receipt become visible together.
+      rows = stagedRows;
+      stateEpochs = stagedEpochs;
+      receipts = stagedReceipts;
+      return response(res, 200, receipt);
     }
 
     if (url.pathname !== TABLE_PATH) return response(res, 404, { error: 'not found' });
@@ -159,7 +264,7 @@ export function createMockServer(options = {}) {
       if (!/^\d+$/.test(limitRaw)) return response(res, 400, { error: 'invalid limit' });
       const ordered = orderRows(url, [...rows.values()].filter((row) => row.ledger === ledger && predicate.test(row)));
       if (!ordered) return response(res, 400, { error: 'unsupported order' });
-      const projected = projectRows(ordered.slice(0, Number(limitRaw)), url);
+      const projected = projectRows(ordered.slice(0, Number(limitRaw)), url, mode === 'v2' ? V2_COLUMNS : COLUMNS);
       if (!projected) return response(res, 400, { error: 'unsupported select' });
       return response(res, 200, projected);
     }
@@ -184,6 +289,7 @@ export function createMockServer(options = {}) {
       if (!items.length || items.some((item) => !item || typeof item !== 'object' || Array.isArray(item) || typeof item.id !== 'string' || !item.id.trim() || item.ledger !== ledger)) {
         return response(res, 403, { error: 'ledger mismatch or invalid row' });
       }
+      if (mode === 'v2' && !matchesEpoch(items, req.headers[EPOCH_HEADER], epochOf(ledger))) return epochMismatch(res);
       const staged = new Map();
       for (const item of items) {
         const key = keyOf(item);
@@ -208,18 +314,21 @@ export function createMockServer(options = {}) {
       return response(res, 403, { error: 'ledger reassignment violates row policy' });
     }
     if ('id' in patch) return response(res, 400, { error: 'primary key patches are unsupported' });
+    if (mode === 'v2' && !matchesEpoch([patch], req.headers[EPOCH_HEADER], epochOf(ledger))) return epochMismatch(res);
+    const staged = new Map();
     for (const [key, row] of rows) {
       if (row.ledger !== ledger || !predicate.test(row)) continue;
       const next = { ...row, ...patch };
-      rows.set(key, next);
+      staged.set(key, next);
     }
+    for (const [key, row] of staged) rows.set(key, row);
     return response(res, 204);
   });
 }
 
 if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) {
   const port = Number(process.argv[2] ?? 54321);
-  const server = createMockServer();
+  const server = createMockServer({ mode: process.env.MOCK_SCHEMA_MODE || 'v1' });
   server.listen(port, '127.0.0.1', () => {
     const address = server.address();
     const actualPort = address && typeof address !== 'string' ? address.port : port;

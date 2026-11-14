@@ -6,7 +6,7 @@
 断言面使用「更多 → 销售记录」：它按本机收到的全部订单聚合，不受场次归属设备限制。
 
 ⚠️ 本脚本是**全仓唯一不设 `yh-sync-disabled=1` 的脚本**：它就是要真的发同步请求。
-- 默认（不设 SYNC_*）跑本地假 Supabase（scripts/mock-supabase.mjs），不会碰真实账本；
+- 默认（不设 SYNC_*）跑本地 v2 协议假 Supabase（scripts/mock-supabase.mjs），不会碰真实账本；
 - 真实模式（设 SYNC_URL / SYNC_KEY / SYNC_LEDGER 并显式 SYNC_TEST_ONLY=1）必须使用**测试专用账本**：
   `cleanup_cloud()` 会把整个账本 PATCH 成 `deleted=true`，那是对账本的破坏性操作。
   若 SYNC_LEDGER 等于内置生产账本码（src/db/syncDefaults.ts），脚本会直接退出。
@@ -193,6 +193,7 @@ def main() -> int:
         mock = subprocess.Popen(
             ["node", MOCK, str(PORT)],
             cwd=ROOT,
+            env={**os.environ, "MOCK_SCHEMA_MODE": "v2"},
             stdout=subprocess.PIPE,
             stderr=subprocess.STDOUT,
             text=True,

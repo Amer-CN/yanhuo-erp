@@ -12,6 +12,7 @@ export interface MockFailure {
 
 export interface MockServerOptions {
   mode?: 'v1' | 'v2';
+  // Journal runs before the gate/failure hooks; thrown or rejected errors return JSON 500.
   onRequest?: (request: MockRequest) => void;
   beforeRequest?: (request: MockRequest) => void | Promise<void>;
   failRequest?: (request: MockRequest) => MockFailure | number | false | null | undefined | Promise<MockFailure | number | false | null | undefined>;
