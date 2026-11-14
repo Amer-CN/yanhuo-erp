@@ -14,6 +14,8 @@
 
 主索引和发布顺序见 [总方案](2026-11-13-stability-repair.md)；前端操作契约见 [前端计划](2026-11-13-stability-frontend.md)。B02/B03/B04 顺序修改 `sync.ts`；B05/F02/B06 顺序修改设置与同步协调。该拆分是修复责任划分，不借机全面重构。
 
+> **2026-11-15 执行终态：本地实现与自动门禁已完成，外部验收 pending。** 实际任务关闭和提交索引以[总方案终验](2026-11-13-stability-repair.md#最终验收记录2026-11-15)为准；下方任务卡保留原始设计/回归步骤，未勾选框不再作为第二套进度。最终实现增加 `syncProtocol` / `syncReconcile` / `syncReconnect` / `dataRecovery`；clear 和条件上传均为 header-bound 最小 definer，anon 不可写 state/receipt。B06 下方已按最终权限契约校正。
+
 | 文件 | 职责 |
 |---|---|
 | `src/db/db.ts` | outbox 修订字段、待决明细/撤销/同步控制表和版本迁移 |
@@ -199,7 +201,7 @@ SyncConfig类型从sync.ts抽到小型`syncTypes.ts`（本任务新建），避�
 
 ## B06 — 全云清空：事务、幂等与未知结果
 
-**优先级：P1功能封口；依赖：B05、F02a、B07准备阶段；完成后接入F02b。Files:** 修改 `sync.ts`、`syncControl.ts`、mock；新增 `supabase/migrations/2026-11-13-stability-prepare.sql`中的RPC/receipt、`tests/clear-cloud-rpc.test.ts`；修改 `tests/clear-cloud.test.ts`、e2e-sync-recovery、docs/03。
+**优先级：P1功能封口；依赖：B05、F02a、B07准备阶段；完成后接入F02b。Files:** 修改 `sync.ts`、`syncControl.ts`、mock；新增 `supabase/migrations/2026-11-13-stability-prepare.sql`中的RPC/receipt、`tests/sync-protocol.test.ts` / `tests/mock-rpc.test.ts`；修改 `tests/clear-cloud.test.ts`、e2e-sync-recovery、docs/03。
 
 - [ ] **1. 固定契约。** 客户端先创建UUID operationId并持久保存“待确认清空”，只发：
 
@@ -211,8 +213,8 @@ x-ledger-key: 本账本同步码
 {"p_operation_id":"UUID"}
 ```
 
-返回`{operationId,clearedAt,clearedCount}`，clearedAt为服务端毫秒；RPC从header派生ledger，不接受客户端传入任意ledger。相同operationId返回第一次结果，绝不再次清空后来新单。
-- [ ] **2. SQL事务语义。** 新表`yh_clear_operations(ledger text, operation_id uuid, cleared_at bigint, cleared_count bigint, primary key(ledger,operation_id))`，RLS与账本header一致；anon仅select/insert，禁止update/delete。函数默认`SECURITY INVOKER`，固定search_path、撤销PUBLIC execute、只给anon execute。函数内部先`pg_advisory_xact_lock`按ledger串行化：查receipt存在则返回；否则同一事务将该ledger业务行软删、upsert现有`__ledger_cleared__:<ledger>`标记（conflict ledger,id），写receipt，再返回。任何一步抛错，整事务回滚。
+返回`{operationId,clearedAt,clearedCount,clearEpoch}`，clearedAt为服务端毫秒；RPC从header派生ledger，不接受客户端传入任意ledger。相同operationId返回第一次结果，绝不再次清空后来新单。
+- [ ] **2. SQL事务语义。** 最终表`yh_clear_operations(ledger,operation_id,cleared_at,cleared_count,clear_epoch)`按`(ledger,operation_id)`主键，RLS与账本header一致；anon只可select本账本，禁止直接insert/update/delete。最小`SECURITY DEFINER` RPC固定search_path、撤销PUBLIC execute、只给anon execute，内部仅从header取ledger且所有读写显式限定。先`pg_advisory_xact_lock`按ledger串行化：查receipt存在则返回；否则同一事务推进epoch、软删业务行、upsert标记、写receipt再返回。任何一步抛错整体回滚。
 
 ```sql
 -- 函数体中的关键语义；完整函数/返回类型在此任务迁移文件中定义并由集成测试执行。
@@ -222,14 +224,14 @@ select * into v_existing from public.yh_clear_operations
 -- FOUND则直接返回v_existing；否则执行UPDATE/marker INSERT/receipt INSERT。
 ```
 
-拒绝空header、超长非法操作id、写入他账本；不使用service_role或SECURITY DEFINER来绕过RLS。公开共享码的既有访问边界未改变，不承诺具备登录权限系统。
+拒绝空header、非法UUID、写入他账本；不用service_role客户端。受限definer只封装显式账本范围的事务能力，不提供任意state/receipt写helper；普通REST写仍由RLS和epoch trigger限定。公开共享码的既有访问边界未改变，不承诺具备登录权限系统。
 - [ ] **3. 客户端无两请求回退。** clearCloud经B05独占同步并锁定UI；未部署RPC明确“云端尚未升级，未清空”，保留本机。网络超时可能是已提交但响应丢失，状态为`unknown`，保留相同operationId；查询receipt或重试同id确认。不能生成新id后“再清一次”，否则会抹掉清空后的新单。
-- [ ] **4. 两端清空代际。** 接收清空标记时先失效旧代再处理旧outbox，不能仅凭不同设备queuedAt与clearedAt的时钟比较。准备迁移新增 `yh_records.clear_epoch bigint not null default 0`（独立于业务updatedAt）；`yh_ledger_state(ledger text primary key, clear_epoch bigint not null default 0)`存服务端现役代。清空RPC在同一事务递增该ledger代际（取max(旧值+1,服务端毫秒)），更新既有行墓碑的epoch、marker和receipt；服务器行级触发器要求INSERT/UPDATE的NEW.clear_epoch等于该ledger当前值，否则抛明确错误。state从未清空过时epoch=0，旧端默认0仍能用；第一次新协议清空后，旧端不带epoch会被拒绝，不能继续复活旧账。state由受限 `SECURITY DEFINER` helper更新/读取：固定 `search_path=pg_catalog,public`、schema限定对象、校验header ledger，无动态SQL、不向anon授予直接state写权限；业务RPC保持INVOKER。测试helper无法跨账本修改state。
+- [ ] **4. 两端清空代际。** 接收清空标记时先失效旧代再处理旧outbox，不能仅凭不同设备queuedAt与clearedAt的时钟比较。准备迁移新增 `yh_records.clear_epoch bigint not null default 0`（独立于业务updatedAt）；`yh_ledger_state(ledger text primary key, clear_epoch bigint not null default 0)`存服务端现役代。清空RPC在同一事务递增该ledger代际（取max(旧值+1,服务端毫秒)），更新既有行墓碑的epoch、marker和receipt；服务器行级触发器要求INSERT/UPDATE的NEW.clear_epoch等于该ledger当前值，否则抛明确错误。state从未清空过时epoch=0，旧端默认0仍能用；第一次新协议清空后，旧端不带epoch会被拒绝，不能继续复活旧账。state只由header-bound最小definer RPC/trigger更新或读取：固定 `search_path=pg_catalog,public`、schema限定对象、校验header ledger，无动态SQL、不向anon授予直接state/receipt写权限，也不提供公开的mutation helper。普通业务REST继续受RLS限定。
 
 客户端 outbox 每次入队保存当时已观察的 `clearEpoch`；标记变化时该ledger旧epoch待推项进入恢复前备份/隔离区，不自动重贴新epoch发送。客户端初次上线先读/确认当前epoch再push，缺失能力时禁全云清空；服务端“旧epoch”错误先暂停push、拉标记，不通用重试原payload。清空之后新单仅使用新epoch；旧PWA在B07验收中明确拒绝并引导升级。行主键仍用原业务id，不通过改id绕过epoch检查。
 
 并发约束：所有业务INSERT/UPDATE的epoch检查触发器必须取得与清空RPC**相同ledger的事务级advisory lock**后再读取state，锁保持到事务结束。否则写事务可能在清空前通过epoch检查、清空后才提交并复活旧账。UPDATE/UPSERT时marker也遵守新epoch；helper仅负责受限state，不替业务写绕过RLS。prepare只增加默认epoch=0与能力标志 `clearRpcEnabled=false`；finalize在两端确认升级、事务测试通过后才启用清空RPC/epoch切换，不可在兼容旧PWA阶段提前执行第一次清空。RPC失败/timeout重试始终沿用原operationId。
-- [ ] **5. 故障注入测试。** SQL层marker故意失败应0业务行被删；RPC重放同id两次之间插新单，第二次不得删新单；两个不同id并发按ledger串行；他账本不变；timeout后receipt能确认；无RPC时不动本机。`pnpm exec vitest run tests/clear-cloud-rpc.test.ts tests/clear-cloud.test.ts tests/sync-control.test.ts`、本地PostgreSQL/PostgREST/RLS集成、E2E慢网取消/重入全部通过。
+- [ ] **5. 故障注入测试。** SQL层marker故意失败应0业务行被删；RPC重放同id两次之间插新单，第二次不得删新单；两个不同id并发按ledger串行；他账本不变；timeout后receipt能确认；无RPC时不动本机。`pnpm exec vitest run tests/sync-protocol.test.ts tests/clear-cloud.test.ts tests/sync-control.test.ts tests/mock-rpc.test.ts`、本地PostgreSQL/PostgREST/RLS集成、E2E慢网取消/重入全部通过。
 - [ ] **6. 提交。** `fix(sync): clear ledgers transactionally with idempotent operation receipts`。生产部署只交付人工步骤，不能因本地测试通过自动执行。
 
 ## B07 — 补列、复合账本主键与协议升级
@@ -261,7 +263,7 @@ notify pgrst, 'reload schema';
 上面constraint名只是该项目默认形态的示例，正式迁移必须使用前一步查出的名字；未满足前置条件直接RAISE，不能靠删数据解决。schema.sql新建库直接采用复合PK；它不冒充能替代所有旧库迁移。F03 raw帮助须区分新库和升级顺序。
 - [ ] **5. 多账本端到端。** 同项目ledger A/B分别seed相同sample及setting，9个id重合也应能各自upsert；A修改、清空不改变B；同账本重发不重复；换ledger重置cursor并让旧响应失效；从备份导入保留UUID。PostgREST实际HTTP测试用anon角色/header，不能只以SQL owner绕RLS执行。
 - [ ] **6. 旧端和clear epoch策略。** finalize后的on_conflict=id旧客户端会失败，不允许伪装成功。生产先核对两个PWA build；能力检测失败显示升级引导。B06涉及清空epoch后旧端写入必须被服务端规则拒绝/隔离，在本地混版本测试明确验证；不能承诺“任意旧端继续工作”。备份及手动导入作为离线兜底，而非绕过新协议写云端。
-- [ ] **7. 回滚及验收。** prepare可保留附加列/索引不伤旧客户端；新前端回滚只能回到支持复合冲突的已验构建。finalize后数据跨ledger同id合法，禁止自动恢复全表id唯一。执行`pnpm exec vitest run tests/sync-ledger.test.ts tests/sync-cursor.test.ts tests/clear-cloud-rpc.test.ts tests/mock-supabase.test.ts`；独立测试库运行SQL/RLS套件，证明准备/完成脚本幂等、旧行数与内容哈希不变，最后完整门禁与两台真机。
+- [ ] **7. 回滚及验收。** prepare可保留附加列/索引不伤旧客户端；新前端回滚只能回到支持复合冲突的已验构建。finalize后数据跨ledger同id合法，禁止自动恢复全表id唯一。执行`pnpm exec vitest run tests/sync-ledger.test.ts tests/sync-cursor.test.ts tests/clear-cloud.test.ts tests/mock-rpc.test.ts tests/mock-supabase.test.ts`；独立测试库运行SQL/RLS套件，证明准备/完成脚本幂等、旧行数与内容哈希不变，最后完整门禁与两台真机。
 - [ ] **8. 可重复运行的集成命令。** 新建 `scripts/e2e-supabase-protocol.py`（本任务文件列表的一部分），环境 `YH_PROTOCOL_TEST_URL/KEY` 必须全部设置且URL为loopback，否则退出；所有ledger用每次运行的随机前缀，不接受内置生产ledger。脚本用Python标准库HTTP执行anon请求，依次验证复合id、RLS、RPC、幂等重试、旧epoch写入拒绝与并发清空/写入。只允许清理本次随机ledger，无全表清理。SQL套件为事务包裹并最终ROLLBACK；运行前要求 `psql` 目标为独立测试DB且显式 `YH_TEST_DATABASE_URL` 为loopback。
 
 ```powershell

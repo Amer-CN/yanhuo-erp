@@ -1,4 +1,4 @@
-# 正式稳定版修复总方案 Implementation Plan
+# 稳定性修复候选总方案 Implementation Plan
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
@@ -13,7 +13,7 @@
 ## 0. 状态、边界与读法
 
 - 计划日期：2026-11-13（Asia/Shanghai）。计划基线：`0953a9e5763cf402a0795a8e5c894b58848c036f`。
-- **本文是方案，不代表缺陷已修复，不是发布凭证。** 实施中逐项勾选；不能把原有 140 个用例通过作为新增缺陷关闭依据。
+- **当前状态：本地修复候选已验证，外部验收待完成。** B01–B07/F01–F05 的本地实现、回归与复审已完成；候选未合入 main、未推送或部署，未执行生产迁移、实际 PostgREST HTTP、多连接并发或目标真机验收。下方“最终验收记录”是本轮结果唯一来源，其他文档引用这里。
 - 实测基线（2026-11-13）：13 文件 / 140 用例通过，数据层行覆盖 84.45%，sync.ts 77.92%；lint 0 error / 32 warning；build 通过。smoke、mock sync、offline、a11y、零配置拦截通过。原版 e2e-merge 等旧 Toast 失败，临时副本改等内联回执后业务验证通过。
 - 当前工作区另有 17 个上一轮知识收尾文件改动及未跟踪证据。实施前保存差异清单，**禁止 git add .、git reset --hard、git clean，以及覆盖这些改动**。隔离分支/worktree 由执行阶段创建；本方案未自动 commit/push。
 - 不写生产 Supabase、不替用户轮换同步码、不触真实账本、不执行控制台迁移、不开放 0.0.0.0。云端脚本可编写和在隔离数据库测试；生产执行另列步骤。
@@ -25,6 +25,59 @@
 2. [数据、同步与云端协议](2026-11-13-stability-backend.md)：B01–B07。
 
 本文是唯一任务索引；两份子计划分别定义实现与验收，避免同一缺陷重复分配。H3 订单撤销只算 B04；设置页面只是其入口，不另算一个前端修复。
+
+## 执行进度（隔离分支，本地未部署）
+
+| 任务 | 状态 | 本地凭证 |
+|---|---|---|
+| 隔离/基线 | 已完成 | `stability-repair` worktree；140例与build通过；计划提交 `09a8d29` |
+| B01 | 已完成 | `9b92d19`；mock HTTP14例、护栏7例、全量154例、merge二导/mock sync E2E通过；规格/质量通过 |
+| F03 | 已完成 | `de18607`；canonical SQL显示/复制两状态E2E、SQL2例/build/tsc通过；规格/质量通过 |
+| B02 | 已本地提交并完成终验 | `0cd2914`；发送版本确认与旧 ack 保护 |
+| F04 键盘 | 已本地提交并完成终验 | `1b78b7a`；顶层弹层键盘与嵌套焦点 |
+| F05 | 已本地提交并完成终验 | `d230c59`；库存草稿与历史动作 |
+| F01 / 页面恢复 | 已本地提交并完成终验 | `2078f1a`；编辑目标、建商品返回与失败页面重试 |
+| B03/B04/B05/B06 客户端 | 本地实现、专项和终验完成 | `533c000`；跨页待决、整单撤销、持久租约、恢复、条件重连及幂等清云 |
+| B06/B07 云端包 | 迁移包及隔离 SQL 验证完成，外部验证 pending | `1a21ca4`；schema / prepare / finalize、事务 RPC、RLS、严格 mock；生产未执行 |
+| F02 / PWA / CI | 已本地提交并完成终验 | `f4ec686`；危险操作协调、更新入口和八项阻塞 E2E |
+| 文档与基线 | 已按最终实现回写 | 本节为唯一验收索引；正式线上/真机状态不由本地结果代替 |
+
+### 最终验收记录（2026-11-15）
+
+**结论：本地修复候选通过；外部验收待完成。** 执行于 Asia/Shanghai，保留 `stability-repair` worktree。最终实现提交为 `f4ec6864923d63cb95989ea92489abc97f253c0e`，与 `533c000`（数据层）、`1a21ca4`（协议包）构成最后三批实现。文档提交只改变说明，不改变产品源码。
+
+| 验收面 / 命令 | 实测结果与凭证 |
+|---|---|
+| `pnpm exec tsc --noEmit` | exit 0；构建命令也执行同一检查 |
+| `pnpm test:cov` | **29 文件 / 328 用例，全部通过，0 skip**；数据层 lines **90.77%**、branches **85.52%**、functions **92.62%**；sync lines **88.74%**。阈值未降低。日志 `E:\Temp\yh-final-stability-20261115\test-cov-final.log` |
+| `pnpm lint` | exit 0，**0 error / 30 warning**，低于原 32；保留既有事件回调、类型和无障碍告警。日志 `E:\Temp\yh-final-stability-20261115\lint-final.log` |
+| `pnpm build` | exit 0，25 precache entries / **887.56 KiB**；保留 backup 静态/动态导入不能拆 chunk 的构建提示。日志 `E:\Temp\yh-final-stability-20261115\build-final.log` |
+| 固定构建浏览器总验收 | **14/14 脚本组通过**：零配置请求拦截、smoke、v2 mock 双设备/离线补发、offline、merge/重复导入、edit-undo、F01、危险操作/重连、Sheet、page-recovery、UI edge、canonical SQL help、a11y、真实 SW update。F01 **16/16**、恢复 **7/7**、UI edge **12/12**、更新 **5 组**。结果 `E:\Temp\yh-final-stability-20261115\final\results.json`，源码 before/after 哈希一致 |
+| 构建标识 | 全套浏览器使用提交前的 `2078f1a7-dirty` 固定产物，其源码与最终实现一致；源码哈希见同证据目录。之后仅注入实现提交号重建为 **`f4ec6864`**，重建 exit 0；日志 `E:\Temp\yh-final-stability-20261115\build-candidate.log` |
+| Python 安全护栏 | `python -m unittest discover -s tests -p 'test*.py'`：**7/7**，真实模式缺配置/生产码拒绝，未发网络 |
+| PostgreSQL WASM | 最终协议执行 **15 fixture 组**、迁移约束 **28/28**、数据库入口身份护栏 **8/8**；schema / prepare 的条件上传各一套，**2/2**。覆盖 anon/RLS、历史数据保全、约束拒绝/回滚、清空 epoch、故障原子性、receipt-first 及精确远端基线。独立安装根 `E:\Temp\yh-stability-sql-20261113-cloud`，不是 psql TCP 或真实 HTTP |
+| 依赖审计 | 使用 `--registry=https://registry.npmjs.org`：生产依赖 **0**；全部依赖 **1 high / 12 moderate / 2 low**，均为开发工具链，未混入本轮大升级。high 为 Vite Windows launch-editor；开发服务仅 loopback。默认镜像不支持 audit endpoint，未把其错误算作审计结果。JSON 在上述证据根 |
+| 差异与复审 | `git diff --check` 通过；前后端专项规格/质量审查完成。最终 B04 指纹重放授权、条件上传及清空本机完成标记补丁复审均无未处理 Critical/Important |
+| 实际 psql TCP / PostgREST HTTP / 多连接并发 | **pending**：未执行，需独立环境，不记为产品失败、通过或 skip |
+| 生产迁移 / main 合并 / push / 部署 / 线上新构建验证 | **out-of-scope**：本轮未执行，未获授权；交付人工迁移顺序 |
+| 两台目标真机 / 安装态 PWA / 营业日与恢复演练 | **pending**：按下方真机矩阵人工验收 |
+
+实现与设计稿的精化：清空和条件上传使用 header-bound、固定 search_path 的最小 `SECURITY DEFINER` RPC；anon 不可直接写 state/receipt。重连不是最后一次 GET 后普通 POST，而是同账本锁内比较完整投影并原子上传；缺 RPC 明确暂停。显式保留本机整单时，仅为该单远端多余活明细登记墓碑。已定稿撤销指纹不随重放改写；本机清空完成标记与业务清理同事务，finish 失败重试不删后来新记的数据。
+
+保留的非阻塞项：既有大账本性能三项、5 条历史结构 Minor 和开发依赖告警不属于本轮清零指标；建商品异步核验期间第二次取消可能中止首次返回但草稿保留；部分协议错误分支缺独立故障注入，详见异味基线。源码、迁移包、分支和临时凭证保留供复核，未删除原工作区的 17 份知识收尾改动。
+
+知识收尾各事实面：
+
+| 事实面 | 状态 | 边界 |
+|---|---|---|
+| 代码 | changed-and-verified | 最终实现、红绿回归、完整门禁和复审通过 |
+| 运行态 | pending | 本机固定构建与 build 标识已核对；远端部署/真实云/目标手机未验证 |
+| 文档 | changed-and-verified | README、使用/云同步/运维、CHANGELOG、基线和子计划对齐；10 文档的 41 个相对链接、16 个锚点通过 |
+| Agent 规则 | changed-and-verified | 当前 worktree 的 AGENTS 保留本轮权限边界和唯一验收索引；原主工作区已有改动未覆盖 |
+| 跨会话记忆 | not-applicable | 未创建或手改额外项目记忆，事实集中在正式文档 |
+| 工作区 | verified-current | 修复按白名单本地提交；保留隔离 worktree、分支与临时证据，未合并/推送/删除原资料 |
+
+复核现场仍保留；清场不属于本轮交付。候选不称为“已上线”或“真机验证稳定版”。
 
 ## 1. 策略选择
 
@@ -41,6 +94,7 @@
 - 危险操作一旦开始提交，确认、取消、Esc、遮罩和系统返回全部锁定，直到明确成功/失败。取消只在提交前承诺保留数据。
 - **撤销合并恢复本机，不清整个云账本。** 导入已传播时，整库反向覆盖不是安全撤销；恢复本地后暂停同步并明确提示“云端未回滚”。重新连接先预览差异，不能一键将恢复快照整库标脏。目标是保留各端唯一数据，不承诺自动撤销已经广播给其他设备的每一个改动。
 - 备份恢复先隔离同步，再原子替换本机数据、清旧队列/诊断，暂停状态跨重启保持。恢复后的单据不能因旧队列残留变成云端墓碑。
+- 重连只读预览，订单连明细整组选择；仅云端记录保留，仅本机/采用本机记录以新业务时间 upsert，采用本机订单还需给该单云端多余旧明细写墓碑。上传必须验证额外条件写 RPC 能力、在服务端原子比较远端基线并核对 receipt；第三台预览后的更新应拒绝旧确认，不能只靠客户端二次 GET。缺能力/过期继续暂停，不写未定字段。
 - H3 撤销以整张订单为单位，包括单头、明细和新业务时间；快照不完整或本机之后又改过时不给虚假“撤销成功”，提示到记录页核对。
 - 云端清空改为单个幂等 RPC 事务；没有部署该能力时不回退到 PATCH + POST 两请求方案，也不清本机来假装两端都成功。
 
@@ -119,20 +173,30 @@ python scripts/check-default-sync.py
 python scripts/e2e-smoke.py
 python scripts/e2e-sync.py
 python scripts/e2e-offline.py
+$env:MERGE_BASE='http://127.0.0.1:4173/'
 python scripts/e2e-merge.py
-python scripts/e2e-stability.py
+python scripts/e2e-stability.py --base http://127.0.0.1:4173/
+$env:SYNC_RECOVERY_BASE='http://127.0.0.1:4173/'
 python scripts/e2e-sync-recovery.py
+$env:SHEET_BASE='http://127.0.0.1:4173/'
+python scripts/e2e-sheet-keyboard.py
+$env:PAGE_RECOVERY_BASE='http://127.0.0.1:4173/'
+python scripts/e2e-page-recovery.py
+python scripts/e2e-ui-edge.py --base http://127.0.0.1:4173/
+$env:STABILITY_BASE='http://127.0.0.1:4173/'
+python scripts/e2e-sync-help.py
+python scripts/e2e-update.py --dist dist
 python scripts/a11y-check.py
 pnpm audit --prod --registry=https://registry.npmjs.org
 git diff --check
 ```
 
-- 新建的 `e2e-stability.py` / `e2e-sync-recovery.py` 由 F01/B05 定义，接入 `.github/actions/e2e/action.yml`。脚本默认 loopback，临时 browser context；真实账本请求统一 abort。
+- [共用 E2E action](../../../.github/actions/e2e/action.yml)保留 Build、dev 5173 / preview 4173、原有回归及 a11y 观察期；新增稳定性/恢复/合并/键盘/页面恢复/UI 边界/SQL 帮助/PWA 更新八项为阻塞步骤。新增步骤显式用 preview 4173，更新脚本自建 4184 fixture。运行前先启动 dev/preview；本机原截图 OUT 由集成者临时 wrapper 隔离，命令与独立 SQL/HTTP 前置条件见[运维手册](../../08-运维手册.md#12-本轮候选的本地门禁与交付边界)。
 - 现有 140 个测试不能少、不能新增 skip；实际数量按运行结果回填，不为凑数拆用例。
 - 整体 coverage 不低于基线 84.45%；sync.ts lines 不低于现状 77.92%，现有 75% 硬阈值不得降低。新增关键状态机分支要有针对性断言，百分比不能替代场景验收。
 - lint 不新增 warning；既有 32 条不强行归零。新建文件必须无 warning。
 - 本轮相关 a11y 子项必须通过；不得为了通过而关闭检测。是否取消全局观察期单独决定，不把两周观察期提前写成完成。
-- 执行正式 PostgreSQL/PostgREST/RLS 集成（独立测试项目或本地容器）验证 B07/B06；mock 通过不等于 RLS 已验证。环境缺失时标为“待验证”，不能报稳定版完成。
+- 真实 psql TCP / PostgREST HTTP / 多连接并发使用专用 loopback 测试环境独立验收 B07/B06/条件重连写；SQL/WASM、mock、配置护栏各自只覆盖对应范围。普通 CI 不调用缺环境即失败的脚本；环境缺失记录“未验证”，不记为产品失败、通过或 skip，更不能报稳定版完成。
 
 ### 真机与对账
 

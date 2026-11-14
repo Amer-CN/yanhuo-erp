@@ -11,6 +11,12 @@
 
 ## 状态
 
+**当前工作分支交付状态：本地修复候选已验证，外部验收待完成。** 本轮从 `0953a9e` 基线修复编辑目标、同步队列、订单完整性、恢复/重连、事务清云与 PWA 更新流程；候选尚未部署，既有线上地址不代表已包含本轮修复。
+
+最终测试数量、覆盖率、E2E 结果和未完成项统一记录在[稳定性修复总方案的最终验收记录](docs/superpowers/plans/2026-11-13-stability-repair.md#最终验收记录2026-11-15)。本地 mock、fake-indexeddb 或 PostgreSQL WASM 验证不代表实际 PostgREST HTTP、多连接并发或两台真机已验收；本轮不 push、不部署、不操作生产账本。
+
+以下是原有功能与历史里程碑，不能作为候选发布凭证：
+
 - [x] 交接文档阅读 + 资产核对
 - [x] 需求定稿（12 项）
 - [x] 技术栈落地（React + TS + Vite + Dexie + PWA）
@@ -21,8 +27,8 @@
 - [x] PWA 离线（E2E 已验证断网刷新 + 断网开单）
 - [x] 设计评审（Nielsen 22/40）并完成 P0×2 / P1×3 / P2 十余项修复
 - [x] 无障碍回归（标签关联 / 弹层焦点 / Esc / 键盘行 / 44px / 减动效）
-- [x] 云同步：Supabase 主账 + 本地发件箱，离线开单、联网自动推拉；零配置内置，配不配置都能用（配置见 [`docs/03-云同步设置.md`](docs/03-云同步设置.md)）
-- [x] 上线 + 线上验证（GitHub Pages HTTPS、PWA 可安装、真实 Supabase 双设备同步已验证）
+- [x] 云同步：Supabase 主账 + 本地发件箱，离线开单、联网自动推拉；内置配置默认开启。恢复后需预览差异再重连，账本切换和清云依赖远端协议能力（见[云同步设置](docs/03-云同步设置.md)）
+- [x] 既有版本上线与历史验证（GitHub Pages HTTPS、PWA 安装及历史双设备同步；本轮候选未部署、未做真机复验）
 - [ ] 真机摊位上跑一遍（等你俩春节前实际使用）
 
 ## 开发
@@ -32,7 +38,7 @@ pnpm install
 pnpm dev          # 开发服务器 http://localhost:5173
 pnpm build        # 生产构建到 dist/
 pnpm preview      # 预览生产构建 http://localhost:4173
-pnpm test         # 核心计算单元测试
+pnpm test         # 数据层与同步回归；最终数量见稳定性修复总方案
 ```
 
 > ⚠️ 不要把 `vite dev` / `preview` 暴露到公网或不可信局域网；launch-editor 相关漏洞可在 dev 进程被利用。默认只监听 `127.0.0.1`；真机联调需要局域网时，临时 `pnpm dev --host` 覆盖，用完即关。
@@ -43,14 +49,28 @@ pnpm test         # 核心计算单元测试
 pip install -r scripts/requirements.txt
 python -m playwright install chromium
 
-python scripts/e2e-smoke.py     # 开单/进货/报表/库存全流程
-python scripts/e2e-offline.py   # 断网可用（先 build + preview）
-python scripts/e2e-merge.py     # 两设备导出导入合并（先 build + preview）
-python scripts/e2e-sync.py      # 两设备自动云同步 + 断网补发（默认本地假 Supabase，可连真实项目）
-python scripts/a11y-check.py    # 标签/焦点/Esc/键盘/44px/减动效
+# 先在两个终端分别启动 loopback dev(5173) 与 build 后的 preview(4173)
+pnpm dev --host 127.0.0.1 --port 5173
+pnpm preview --host 127.0.0.1 --port 4173
+
+python scripts/check-default-sync.py
+python scripts/e2e-smoke.py
+python scripts/e2e-sync.py      # 默认本地假 Supabase
+python scripts/e2e-offline.py
+python scripts/e2e-stability.py --base http://127.0.0.1:4173/
+SYNC_RECOVERY_BASE=http://127.0.0.1:4173/ python scripts/e2e-sync-recovery.py
+MERGE_BASE=http://127.0.0.1:4173/ python scripts/e2e-merge.py
+SHEET_BASE=http://127.0.0.1:4173/ python scripts/e2e-sheet-keyboard.py
+PAGE_RECOVERY_BASE=http://127.0.0.1:4173/ python scripts/e2e-page-recovery.py
+python scripts/e2e-ui-edge.py --base http://127.0.0.1:4173/
+STABILITY_BASE=http://127.0.0.1:4173/ python scripts/e2e-sync-help.py
+python scripts/e2e-update.py --dist dist  # 自建 4184 fixture；需要现有 build
+python scripts/a11y-check.py
 ```
 
-CI 在 PR 上自动跑 `check-default-sync` + `e2e-smoke` + `e2e-sync` + `e2e-offline`，见 [`.github/workflows/e2e.yml`](.github/workflows/e2e.yml)。
+以上环境变量写法用于 Bash/CI；PowerShell 写法及证据目录注意事项见[运维手册](docs/08-运维手册.md#12-本轮候选的本地门禁与交付边界)。
+
+PR 与 main 部署共用 [E2E action](.github/actions/e2e/action.yml)：保留 build、dev/preview、smoke/sync/offline 和零配置拦截；新增稳定性、恢复、合并、键盘、页面恢复、UI 边界、SQL 帮助与 PWA 更新为阻塞步骤；a11y 仍处观察期。实际 SQL/RLS、PostgREST HTTP 和多连接并发需要独立环境，按运维手册另行执行；普通 CI 不把缺环境跑成失败或 skip，也不将其记作已验收。
 
 界面截图在 [`docs/screenshots/ui/`](docs/screenshots/ui/)（含深色 / 浅色两套）。
 

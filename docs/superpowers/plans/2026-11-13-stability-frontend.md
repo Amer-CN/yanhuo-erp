@@ -14,6 +14,8 @@
 
 总顺序、发布边界见 [总方案](2026-11-13-stability-repair.md)，共享数据契约见 [后端计划](2026-11-13-stability-backend.md)。F01/F03 可先做；F02 的恢复路径必须等 B05，清云路径等 B06。不更换字体、布局风格或导航体系。
 
+> **2026-11-15 执行终态：F01–F05 本地实现与浏览器门禁完成。** 唯一进度、提交与终验凭证见[总方案](2026-11-13-stability-repair.md#最终验收记录2026-11-15)，下方未勾选任务卡保留设计步骤，不作为第二套状态。更新控制最终置于 `main.tsx` 的唯一 `AppUpdateProvider`；页面故障按钮为“重新打开应用”。独立专项分别为 stability / sync-recovery / sheet-keyboard / page-recovery / ui-edge / update，全部已进阻塞门禁；a11y 全局观察期不变。真机键盘、返回键和安装态PWA仍pending。
+
 | 文件 | 职责/变更 |
 |---|---|
 | `src/App.tsx` | 保存建商品前的 editor 目标，精确返回；保存后的模式切换 |
@@ -196,7 +198,7 @@ if (e.key === 'Tab') {
 
 保留 Esc/返回键只关一层、滚动锁引用计数。HistoryPage button 原生语义修复见 F05，不混在 focus 算法里。
 
-- [ ] **4. 更新单一控制。** 把 `useRegisterSW` 提升到 `useAppUpdate`（AppShell 唯一实例），同时供 UpdateBar 和设置页使用；`later` 只控制横幅，不删除设置入口。设置页显示“当前版本/build”；有待更新时显示“更新并重新打开”，无待更新时显示“检查更新”。构建标识在 Vite build 时注入提交短哈希，测试允许工作区 dirty 后缀；不要靠手写版本号区分构建。`register.update()` 触发检查，`updateServiceWorker(true)` 只响应用户确认。
+- [ ] **4. 更新单一控制。** 把 `useRegisterSW` 提升到 `useAppUpdate`（main 根节点唯一 AppUpdateProvider），同时供 UpdateBar 和设置页使用；`later` 只控制横幅，不删除设置入口。设置页显示“当前版本/build”；有待更新时显示“更新并重新打开”，无待更新时显示“检查更新”。构建标识在 Vite build 时注入提交短哈希，测试允许工作区 dirty 后缀；不要靠手写版本号区分构建。`register.update()` 触发检查，`updateServiceWorker(true)` 只响应用户确认。
 - [ ] **5. 验收。** 单层/嵌套各 10 次正反 Tab 无背景焦点；Esc、返回键仍一层一次；忙碌状态不能退出。懒 chunk 失败恢复网络后刷新能打开、草稿未丢；点稍后仍可从设置完成更新。390/320/768 宽、浅深色、reduced-motion；真实软键盘仍列真机验证。
 - [ ] **6. 提交。** 键盘与更新/错误恢复可分别 commit：`fix(a11y): isolate keyboard focus to topmost sheet`、`fix(pwa): expose recoverable reload and persistent update entry`。
 
