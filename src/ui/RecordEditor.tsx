@@ -587,15 +587,15 @@ export default function RecordEditor({
           ) : null}
         </div>
         {mode === 'edit' ? (
-          <Btn block disabled={busy || Boolean(saveBlockedReason)} onClick={() => submit(false)}>
+          <Btn block disabled={busy || Boolean(saveBlockedReason)} onClick={() => { void submit(false); }}>
             {busy ? '保存中…' : '保存修改'}
           </Btn>
         ) : (
           <>
-            <Btn variant="secondary" block disabled={busy || Boolean(saveBlockedReason)} onClick={() => submit(false)}>
+            <Btn variant="secondary" block disabled={busy || Boolean(saveBlockedReason)} onClick={() => { void submit(false); }}>
               {busy ? '保存中…' : '只保存'}
             </Btn>
-            <Btn block disabled={busy || Boolean(saveBlockedReason)} onClick={() => submit(true)}>
+            <Btn block disabled={busy || Boolean(saveBlockedReason)} onClick={() => { void submit(true); }}>
               {busy ? '保存中…' : mode === 'patch' ? '保存并继续补记' : '保存并记下一单'}
             </Btn>
           </>

@@ -1,13 +1,14 @@
-import { useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { useLiveQuery } from 'dexie-react-hooks';
 import { Download, Upload, Smartphone, Trash2, TriangleAlert, RotateCcw, Save, Moon, Sun } from 'lucide-react';
 import { db } from '../../db/db';
-import { clearAllData, loadAll, setSetting } from '../../db/repo';
+import { loadAll, setSetting } from '../../db/repo';
+import { clearLocalSafely, restoreLocalBackup } from '../../db/dataRecovery';
+import { pendingClear, type SyncClearOperationRow } from '../../db/syncProtocol';
 import {
   exportBackup,
   importMerge,
   parseBackup,
-  replaceAll,
   type BackupFile,
   type MergeResult
 } from '../../db/merge';
@@ -21,17 +22,25 @@ import {
 import { SETTING_KEYS, type Product, type Setting } from '../../db/types';
 import {
   adoptRemoteConflict,
-  afterMerge,
-  clearCloud,
+  clearCloudAndLocal,
+  getStoredSyncConfig,
   getSyncConfig,
   loadConflicts,
-  type ConflictView
+  type ConflictView,
+  type SyncConfig
 } from '../../db/sync';
 import SyncPanel from '../SyncPanel';
 import type { SyncApi } from '../useSync';
 import type { Theme } from '../AppShell';
 import { fenToStr } from '../../db/util';
 import { Btn, Card, ConfirmSheet, Field, Sheet, type Done } from '../kit';
+import { useAppUpdate } from '../useAppUpdate';
+
+interface SettingsOperation {
+  busy: boolean;
+  isBusy: () => boolean;
+  run: (task: () => Promise<void>) => Promise<void>;
+}
 
 interface PendingMerge {
   backup: BackupFile;
@@ -91,6 +100,7 @@ function diffSettings(current: Setting[], incoming: Setting[]): string[] {
 }
 
 const SNAPSHOT_REASON: Record<SnapshotReason, string> = {
+  'pre-recovery': '恢复前安全备份',
   close: '收摊自动',
   manual: '手动',
   'pre-migrate': '迁移前'
@@ -268,12 +278,14 @@ function BackupSection({
   settings,
   deviceId,
   onDone,
-  onPickFile
+  onPickFile,
+  operation
 }: {
   settings: Record<string, string>;
   deviceId: string;
   onDone: Done;
   onPickFile: (file: File) => void;
+  operation: SettingsOperation;
 }) {
   const fileRef = useRef<HTMLInputElement>(null);
   const lastExport = settings[SETTING_KEYS.lastExportAt] ?? '';
@@ -301,12 +313,12 @@ function BackupSection({
         两台设备各自开单，收摊后：一台点「导出」发微信，另一台点「导入合并」。同一条记录不会重复计入。
       </p>
       <div className="stack-sm" style={{ marginTop: 10 }}>
-        <Btn block onClick={() => void doExport()}>
+        <Btn block disabled={operation.busy} onClick={() => void doExport()}>
           <span className="icon-text">
             <Download size={18} aria-hidden="true" /> 导出备份（发微信）
           </span>
         </Btn>
-        <Btn block variant="secondary" onClick={() => fileRef.current?.click()}>
+        <Btn block variant="secondary" disabled={operation.busy} onClick={() => fileRef.current?.click()}>
           <span className="icon-text">
             <Upload size={18} aria-hidden="true" /> 导入并合并
           </span>
@@ -337,11 +349,13 @@ function BackupSection({
 function SnapshotSection({
   sync,
   onDone,
-  conflictCount
+  conflictCount,
+  operation
 }: {
   sync: SyncApi;
   onDone: Done;
   conflictCount: number;
+  operation: SettingsOperation;
 }) {
   const [snapshots, setSnapshots] = useState<SnapshotRow[]>([]);
   const [restoreTarget, setRestoreTarget] = useState<SnapshotRow | null>(null);
@@ -380,18 +394,22 @@ function SnapshotSection({
   };
 
   const doRestore = async () => {
-    if (!restoreTarget?.id) return;
-    setSnapshotBusy(true);
-    try {
-      await restoreSnapshot(restoreTarget.id);
-      setRestoreTarget(null);
-      await refreshSnapshots();
-      onDone('已恢复到这份备份，云同步已暂停；确认无误后到「云同步」重新开启', 'warning');
-    } catch (e) {
-      onDone('恢复失败：' + (e instanceof Error ? e.message : String(e)), 'error');
-    } finally {
-      setSnapshotBusy(false);
-    }
+    if (!restoreTarget?.id || snapshotBusy) return;
+    const id = restoreTarget.id;
+    await operation.run(async () => {
+      setSnapshotBusy(true);
+      try {
+        await restoreSnapshot(id);
+        setRestoreTarget(null);
+        await refreshSnapshots();
+        window.dispatchEvent(new Event('yh-sync-config'));
+        onDone('已恢复本机备份，云端未回滚。同步已暂停，请到「云同步」预览差异后重新接入', 'warning');
+      } catch (e) {
+        onDone('恢复失败：' + (e instanceof Error ? e.message : String(e)), 'error');
+      } finally {
+        setSnapshotBusy(false);
+      }
+    });
   };
 
   const restoreStats = restoreTarget ? snapshotStats(restoreTarget) : null;
@@ -434,7 +452,7 @@ function SnapshotSection({
         <Btn
           block
           variant="secondary"
-          disabled={snapshotBusy}
+          disabled={snapshotBusy || operation.busy}
           onClick={() => void doSnapshot()}
           style={{ marginTop: 10 }}
         >
@@ -461,7 +479,7 @@ function SnapshotSection({
                       block={false}
                       variant="secondary"
                       style={{ flex: 1 }}
-                      disabled={snapshotBusy}
+                      disabled={snapshotBusy || operation.busy}
                       onClick={() => setRestoreTarget(row)}
                     >
                       恢复
@@ -485,7 +503,7 @@ function SnapshotSection({
         )}
       </Card>
 
-      <SyncPanel sync={sync} onDone={onDone} />
+      <SyncPanel sync={sync} onDone={onDone} blocked={operation.busy} />
 
       {conflictCount > 0 ? (
         <Card>
@@ -602,12 +620,48 @@ function SnapshotSection({
           }
           confirmText="恢复并暂停云同步"
           danger
-          busy={snapshotBusy}
+          busy={snapshotBusy || operation.busy}
           onConfirm={() => void doRestore()}
-          onCancel={() => setRestoreTarget(null)}
+          onCancel={() => { if (!operation.isBusy()) setRestoreTarget(null); }}
         />
       ) : null}
     </>
+  );
+}
+
+/** 更新入口独立于横幅；「稍后」后仍能在这里完成更新。 */
+function UpdateSection() {
+  const { needRefresh, checking, updating, checked, registration, unavailable, error, check, update } =
+    useAppUpdate();
+  const status = unavailable
+    ?? (needRefresh
+      ? '有新版本待更新。收摊后点下面的按钮，更新并重新打开应用。'
+      : registration
+        ? checked
+          ? '检查完成，暂未发现待更新版本。'
+          : '收摊后可检查更新；发现新版本后由你决定何时重新打开。'
+        : error ? '应用更新暂不可用。' : '正在准备应用更新…');
+
+  return (
+    <section aria-labelledby="app-update-title">
+      <Card>
+        <h2 className="section-title" id="app-update-title">应用更新</h2>
+        <p className="tiny-text" style={{ margin: '8px 0 0', overflowWrap: 'anywhere' }}>
+          当前构建：{__APP_BUILD__}
+        </p>
+        <p className="muted-text" role="status" style={{ marginTop: 8 }}>{status}</p>
+        {error ? <p className="glass-hint glass-hint--error" role="alert">{error}</p> : null}
+        <Btn
+          block
+          variant={needRefresh ? 'primary' : 'secondary'}
+          disabled={Boolean(unavailable) || !registration || checking || updating}
+          onClick={() => void (needRefresh ? update() : check())}
+          style={{ marginTop: 10 }}
+        >
+          {updating ? '更新中…' : checking ? '检查中…' : needRefresh ? '更新并重新打开' : '检查更新'}
+        </Btn>
+      </Card>
+    </section>
   );
 }
 
@@ -617,24 +671,37 @@ function DangerSection({
   onDone,
   pending,
   setPending,
-  busy,
-  setBusy
+  operation
 }: {
   deviceId: string;
   onDone: Done;
   pending: PendingMerge | null;
   setPending: (p: PendingMerge | null) => void;
-  busy: boolean;
-  setBusy: (b: boolean) => void;
+  operation: SettingsOperation;
 }) {
   const [backupFirst, setBackupFirst] = useState(true);
   const [result, setResult] = useState<MergeResult | null>(null);
   const [preMerge, setPreMerge] = useState<string | null>(null);
   const [undoConfirm, setUndoConfirm] = useState(false);
   const [clearStep, setClearStep] = useState<0 | 1 | 2 | 3>(0);
-  const [pendingCfg, setPendingCfg] = useState<ReturnType<typeof getSyncConfig>>(null);
-  // 清空本机进行中：重复点会连跑两遍（第二遍必然报错），按钮一并禁掉
-  const [clearing, setClearing] = useState(false);
+  const [pendingCfg, setPendingCfg] = useState<SyncConfig | null>(null);
+  const [clearOperation, setClearOperation] = useState<SyncClearOperationRow | undefined>();
+  const [clearError, setClearError] = useState<string | null>(null);
+  const busy = operation.busy;
+
+  const refreshClear = useCallback(async () => {
+    const cfg = getStoredSyncConfig();
+    setClearOperation(cfg ? await pendingClear(cfg) : undefined);
+  }, []);
+
+  useEffect(() => {
+    const refresh = () => { void refreshClear().catch((e) => {
+      setClearError(`无法读取清空状态：${e instanceof Error ? e.message : String(e)}`);
+    }); };
+    refresh();
+    window.addEventListener('yh-sync-config', refresh);
+    return () => window.removeEventListener('yh-sync-config', refresh);
+  }, [refreshClear]);
 
   // 每次导入新备份时重置「合并前先备份」勾选（与原来 pickFile 里的重置一致）
   useEffect(() => {
@@ -642,67 +709,78 @@ function DangerSection({
   }, [pending]);
 
   const confirmMerge = async () => {
-    if (!pending || busy) return;
-    setBusy(true);
-    try {
-      let snapshot: string | null = null;
-      if (backupFirst) {
+    if (!pending) return;
+    const incoming = pending.backup;
+    await operation.run(async () => {
+      try {
+        // 撤销快照始终保留在内存，勾选仅决定是否另外导出文件。
         const pre = await exportBackup(deviceId);
-        snapshot = JSON.stringify(pre);
-        const preName = `烟花账-合并前备份-${new Date().toISOString().slice(0, 10)}.json`;
-        const file = new File([snapshot], preName, { type: 'application/json' });
-        await shareOrDownload(file, pre, '合并前本机备份');
+        const snapshot = JSON.stringify(pre);
+        if (backupFirst) {
+          const preName = `烟花账-合并前备份-${new Date().toISOString().slice(0, 10)}.json`;
+          const file = new File([snapshot], preName, { type: 'application/json' });
+          await shareOrDownload(file, pre, '合并前本机备份');
+        }
+        const r = await importMerge(incoming);
+        setPreMerge(snapshot);
+        setPending(null);
+        setResult(r);
+        // importMerge 已把实际变更与发件箱同事务提交。
+        await setSetting(SETTING_KEYS.lastImportAt, new Date().toISOString());
+        onDone('合并完成，请核对下面的数字');
+      } catch (e) {
+        onDone('合并失败：' + (e instanceof Error ? e.message : String(e)), 'error');
       }
-      const r = await importMerge(pending.backup);
-      await afterMerge();
-      await setSetting(SETTING_KEYS.lastImportAt, new Date().toISOString());
-      setPreMerge(snapshot);
-      setPending(null);
-      setResult(r);
-      onDone('合并完成，请核对下面的数字');
-    } catch (e) {
-      onDone('合并失败：' + (e instanceof Error ? e.message : String(e)), 'error');
-    } finally {
-      setBusy(false);
-    }
+    });
   };
 
   const undoMerge = async () => {
     if (!preMerge) return;
-    try {
-      await replaceAll(JSON.parse(preMerge) as BackupFile);
-      const cfg = getSyncConfig();
-      if (cfg) {
-        // 云端也可能已经有合并后的记录，先清再推送，避免又被拉回来
-        await clearCloud(cfg);
+    const snapshot = preMerge;
+    await operation.run(async () => {
+      try {
+        await restoreLocalBackup(JSON.parse(snapshot) as BackupFile, 'undo-merge');
+        setUndoConfirm(false);
+        setPreMerge(null);
+        setResult(null);
+        window.dispatchEvent(new Event('yh-sync-config'));
+        onDone('已撤销本机合并，云端未回滚。同步已暂停，请预览差异后重新接入', 'warning');
+      } catch (e) {
+        onDone('撤销失败：' + (e instanceof Error ? e.message : String(e)), 'error');
       }
-      await afterMerge();
-      setPreMerge(null);
-      setResult(null);
-      onDone('已撤销合并，账本回到合并前', 'warning');
-    } catch (e) {
-      onDone('撤销失败：' + (e instanceof Error ? e.message : String(e)), 'error');
-    }
+    });
   };
 
-  /** 危险操作三段式：1 确认清本机 → 2 再确认 → 3（有云端配置时）是否清云端 */
-  const runClearLocal = async () => {
-    if (clearing) return;
-    setClearStep(0);
-    setClearing(true);
-    try {
-      await clearAllData();
-      onDone('已清空', 'warning');
-    } catch (e) {
-      // 清空失败必须如实告知，否则用户以为账本已经空了
-      onDone(`没清掉：${e instanceof Error ? e.message : String(e)}`, 'error');
-    } finally {
-      setClearing(false);
-    }
+  const performClear = async (cfg: SyncConfig | null) => {
+    await operation.run(async () => {
+      setClearError(null);
+      try {
+        if (cfg) await clearCloudAndLocal(cfg);
+        else await clearLocalSafely();
+        setClearStep(0);
+        setPendingCfg(null);
+        setResult(null);
+        setPreMerge(null);
+        window.dispatchEvent(new Event('yh-sync-config'));
+        onDone(cfg ? '云端与本机已清空，云同步保持暂停' : '本机已清空，云同步保持暂停', 'warning');
+      } catch (e) {
+        const detail = e instanceof Error ? e.message : String(e);
+        const message = cfg
+          ? `清空未完成，云端结果或本机完成状态需确认，请重试同一次操作：${detail}`
+          : `本机没清掉：${detail}`;
+        setClearError(message);
+        onDone(message, 'error');
+      } finally {
+        await refreshClear().catch((e) => {
+          setClearError(`无法读取清空状态：${e instanceof Error ? e.message : String(e)}`);
+        });
+      }
+    });
   };
 
+  /** 三次确认；只有云端确认成功后，协调接口才允许清本机。 */
   const confirmClearStep = async () => {
-    if (clearing) return;
+    if (operation.isBusy()) return;
     if (clearStep === 1) {
       setClearStep(2);
       return;
@@ -712,41 +790,35 @@ function DangerSection({
       if (cfg) {
         setPendingCfg(cfg);
         setClearStep(3);
-        return;
+      } else {
+        await performClear(null);
       }
-      await runClearLocal();
       return;
     }
-    const cfg = pendingCfg;
-    setPendingCfg(null);
-    let cloudError: string | null = null;
-    if (cfg) {
-      try {
-        await clearCloud(cfg);
-      } catch (e) {
-        // 云端失败不阻断本地清空；必须明确告知，否则下次同步会把旧数据拉回来
-        cloudError = e instanceof Error ? e.message : String(e);
-      }
-    }
-    await runClearLocal();
-    if (cloudError) {
-      onDone(`本地已清空，但云端没清干净（${cloudError}）。联网后再清一次云端`, 'warning');
-    }
+    if (clearStep === 3 && pendingCfg) await performClear(pendingCfg);
   };
 
-  /**
-   * 取消 / 关掉对话框 = **永远是安全出口**：只关闭，绝不清任何数据。
-   *
-   * 历史事故（H-01，已修，**别改回**）：第 3 段「同时清空云端账本？」原来把「取消」
-   * 实现成「跳过清云端、但仍清本机」，于是摊主想「先不清云端」点一下取消，
-   * 本机账本当场被清空且不可恢复（清空本机没有撤销）。
-   * 现在只有 confirmClearStep（确认）能走到 clearAllData / clearCloud，
-   * cancel / 遮罩 / Esc / 关闭按钮一律短路到这里。
-   */
+  const retryClear = () => {
+    if (operation.isBusy()) return;
+    const cfg = getStoredSyncConfig();
+    if (!cfg) {
+      setClearError('请先恢复这次清空使用的同步配置，再重试同一次操作');
+      return;
+    }
+    setPendingCfg(cfg);
+    setClearError(null);
+    setClearStep(3);
+  };
+
+  // 提交后所有取消入口都由同一个同步 gate 拦住，避免 React 重新渲染前的连点。
   const cancelClearStep = () => {
+    if (operation.isBusy()) return;
     setPendingCfg(null);
+    setClearError(null);
     setClearStep(0);
   };
+  const closeMerge = () => { if (!operation.isBusy()) setPending(null); };
+  const closeResult = () => { if (!operation.isBusy()) setResult(null); };
 
   return (
     <>
@@ -756,13 +828,32 @@ function DangerSection({
           <Btn
             block
             variant="danger"
-            onClick={() => setClearStep(1)}
+            disabled={busy || Boolean(clearOperation)}
+            onClick={() => { if (!operation.isBusy()) { setClearError(null); setClearStep(1); } }}
           >
             <span className="icon-text">
               <Trash2 size={18} aria-hidden="true" /> 清空全部数据
             </span>
           </Btn>
         </div>
+        {clearOperation ? (
+          <div className="stack-sm" role="status" style={{ marginTop: 12 }}>
+            <p className="muted-text" style={{ margin: 0 }}>
+              {clearOperation.state === 'confirmed'
+                ? '云端清空已确认，本机收尾状态待确认。继续同一次操作，不会再次清除云端新数据。'
+                : clearOperation.state === 'unknown'
+                  ? '上次清空结果未知，本机数据仍保留。请重试同一次清空来确认结果。'
+                  : '已有待确认的清空操作，本机数据仍保留。请继续同一次操作。'}
+            </p>
+            <p className="tiny-text" style={{ margin: 0, overflowWrap: 'anywhere' }}>
+              操作编号：{clearOperation.operationId}
+            </p>
+            <Btn block variant="danger" disabled={busy} onClick={retryClear}>
+              重试同一次清空
+            </Btn>
+          </div>
+        ) : null}
+        {clearError && clearStep === 0 ? <p className="glass-hint glass-hint--error" role="alert">{clearError}</p> : null}
         <p className="tiny-text" style={{ marginBottom: 0 }}>
           烟花账 v0.4 · 本地优先 · 云同步已内置
         </p>
@@ -772,14 +863,15 @@ function DangerSection({
         <Sheet
           title="确认合并"
           subtitle={`来源设备 ${pending.backup.deviceId ? pending.backup.deviceId.slice(0, 8) : '未知'} · 导出于 ${pending.backup.exportedAt.slice(0, 16).replace('T', ' ')}`}
-          onClose={() => setPending(null)}
+          onClose={closeMerge}
+          dismissible={!busy}
           footer={
             <div className="row" style={{ gap: 8 }}>
-              <Btn block={false} variant="secondary" style={{ flex: 1 }} onClick={() => setPending(null)}>
+              <Btn block={false} variant="secondary" style={{ flex: 1 }} disabled={busy} onClick={closeMerge}>
                 取消
               </Btn>
               <Btn block={false} style={{ flex: 1 }} disabled={busy} onClick={confirmMerge}>
-                合并这些数据
+                {busy ? '合并中…' : '合并这些数据'}
               </Btn>
             </div>
           }
@@ -821,6 +913,7 @@ function DangerSection({
                 type="checkbox"
                 className="glass-checkbox"
                 checked={backupFirst}
+                disabled={busy}
                 onChange={(e) => setBackupFirst(e.target.checked)}
               />
               合并前先导出本机备份（推荐）
@@ -836,14 +929,15 @@ function DangerSection({
       {result ? (
         <Sheet
           title="合并完成"
-          onClose={() => setResult(null)}
+          onClose={closeResult}
+          dismissible={!busy}
           footer={
             <div className="row" style={{ gap: 8 }}>
-              <Btn block={false} variant="secondary" style={{ flex: 1 }} onClick={() => setResult(null)}>
+              <Btn block={false} variant="secondary" style={{ flex: 1 }} disabled={busy} onClick={closeResult}>
                 完成
               </Btn>
               {preMerge ? (
-                <Btn block={false} variant="tertiary" style={{ flex: 1 }} onClick={() => setUndoConfirm(true)}>
+                <Btn block={false} variant="tertiary" style={{ flex: 1 }} disabled={busy} onClick={() => { if (!operation.isBusy()) setUndoConfirm(true); }}>
                   <span className="icon-text">
                     <RotateCcw size={16} aria-hidden="true" /> 撤销合并
                   </span>
@@ -870,14 +964,12 @@ function DangerSection({
       {undoConfirm ? (
         <ConfirmSheet
           title="撤销这次合并？"
-          description="会把账本恢复到合并前的状态。"
+          description="仅将本机恢复到合并前。云端未回滚；完成后同步保持暂停，必须预览差异并确认后重新接入。"
           confirmText="撤销合并"
           danger
-          onConfirm={() => {
-            setUndoConfirm(false);
-            void undoMerge();
-          }}
-          onCancel={() => setUndoConfirm(false)}
+          busy={busy}
+          onConfirm={() => void undoMerge()}
+          onCancel={() => { if (!operation.isBusy()) setUndoConfirm(false); }}
         />
       ) : null}
 
@@ -891,17 +983,20 @@ function DangerSection({
                 : '同时清空云端账本？'
           }
           description={
-            clearStep === 1
-              ? '导出备份后再操作。'
-              : clearStep === 2
-                ? '清空后无法恢复（除了导入之前导出的备份）。'
-                : '两台手机都会被清空。点「不清了（保留数据）」只关掉这一步，什么都不会清。若另一台手机还有未上传的改动，它上线时可能会把部分旧数据带回来；建议先在那边同步一次。'
+            <>
+              {clearStep === 1
+                ? '导出备份后再操作。'
+                : clearStep === 2
+                  ? '确认后清空本机；有云同步时还会再确认云端。完成后同步保持暂停。'
+                  : '确认后将清空这个云端账本及本机。提交前可点「不清了（保留数据）」安全退出；提交后请等待结果。云端清空成功才会清本机，结果未知时使用同一操作编号重试。旧设备将保持暂停，重新接入前需确认差异。'}
+              {clearError ? <span className="glass-hint glass-hint--error" role="alert" style={{ display: 'block', marginTop: 10 }}>{clearError}</span> : null}
+            </>
           }
           confirmText={clearStep === 1 ? '继续' : clearStep === 2 ? '清空本机' : '一并清空云端'}
           /* 第 3 步的取消必须写成安全语义：原来它就叫「取消」，却会清本机 */
           cancelText={clearStep === 3 ? '不清了（保留数据）' : '取消'}
           danger
-          busy={clearing}
+          busy={busy}
           onConfirm={() => void confirmClearStep()}
           onCancel={cancelClearStep}
         />
@@ -931,32 +1026,48 @@ export default function SettingsPage({
 }) {
   const [pending, setPending] = useState<PendingMerge | null>(null);
   const [busy, setBusy] = useState(false);
+  const gate = useRef(false);
+  const isBusy = useCallback(() => gate.current, []);
+  const run = useCallback(async (task: () => Promise<void>) => {
+    if (gate.current) return;
+    gate.current = true;
+    setBusy(true);
+    try {
+      await task();
+    } finally {
+      gate.current = false;
+      setBusy(false);
+    }
+  }, []);
+  const operation: SettingsOperation = { busy, isBusy, run };
   const conflictCount = useLiveQuery(() => db.conflicts.count(), [], 0) ?? 0;
 
   const pickFile = async (file: File) => {
-    try {
-      const text = await file.text();
-      const backup = parseBackup(text);
-      const current = await loadAll();
-      const productDiffs = diffProducts(current.products, backup.data.products);
-      const settingsDiffs = diffSettings(current.settings, backup.data.settings);
+    await run(async () => {
+      try {
+        const text = await file.text();
+        const backup = parseBackup(text);
+        const current = await loadAll();
+        const productDiffs = diffProducts(current.products, backup.data.products);
+        const settingsDiffs = diffSettings(current.settings, backup.data.settings);
 
-      setPending({
-        backup,
-        counts: {
-          products: backup.data.products.length,
-          batches: backup.data.batches.length,
-          orders: backup.data.orders.length,
-          lines: backup.data.lines.length,
-          adjustments: backup.data.adjustments.length,
-          settings: backup.data.settings.length
-        },
-        productDiffs: productDiffs.slice(0, 8),
-        settingsDiffs
-      });
-    } catch (e) {
-      onDone('导入失败：' + (e instanceof Error ? e.message : String(e)), 'error');
-    }
+        setPending({
+          backup,
+          counts: {
+            products: backup.data.products.length,
+            batches: backup.data.batches.length,
+            orders: backup.data.orders.length,
+            lines: backup.data.lines.length,
+            adjustments: backup.data.adjustments.length,
+            settings: backup.data.settings.length
+          },
+          productDiffs: productDiffs.slice(0, 8),
+          settingsDiffs
+        });
+      } catch (e) {
+        onDone('导入失败：' + (e instanceof Error ? e.message : String(e)), 'error');
+      }
+    });
   };
 
   return (
@@ -969,17 +1080,18 @@ export default function SettingsPage({
         onDone={onDone}
       />
 
-      <BackupSection settings={settings} deviceId={deviceId} onDone={onDone} onPickFile={pickFile} />
+      <UpdateSection />
 
-      <SnapshotSection sync={sync} onDone={onDone} conflictCount={conflictCount} />
+      <BackupSection settings={settings} deviceId={deviceId} onDone={onDone} onPickFile={pickFile} operation={operation} />
+
+      <SnapshotSection sync={sync} onDone={onDone} conflictCount={conflictCount} operation={operation} />
 
       <DangerSection
         deviceId={deviceId}
         onDone={onDone}
         pending={pending}
         setPending={setPending}
-        busy={busy}
-        setBusy={setBusy}
+        operation={operation}
       />
     </div>
   );

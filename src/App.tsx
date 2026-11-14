@@ -259,7 +259,7 @@ export default function App() {
     toastCtl.showToast(saved
       ? `无法返回：${reason}。草稿已保留，可在商品管理核对`
       : `无法返回：${reason}。草稿未能写入存储，仅本页暂存，请先导出再刷新`, 'error');
-  }, [toastCtl.showToast]);
+  }, [toastCtl]);
 
   /** 写操作单独一个 value：数据变化不会让它们的消费者重渲染 */
   const appActions = useMemo<AppActionsValue>(
