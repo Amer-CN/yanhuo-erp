@@ -61,6 +61,8 @@ export default function RecordEditor({
   sessionId,
   orderId,
   initial,
+  resumeDraft,
+  saveBlockedReason,
   sessionOrderCount,
   online,
   pendingProductId,
@@ -80,6 +82,8 @@ export default function RecordEditor({
   sessionId?: string;
   orderId?: string;
   initial?: RecordDraft;
+  resumeDraft?: RecordDraft;
+  saveBlockedReason?: string;
   sessionOrderCount: number;
   /**
    * 当前是否在线（沿用 App 里 sync.online，不新增全局状态）。
@@ -97,7 +101,7 @@ export default function RecordEditor({
   onPendingProductConsumed?: () => void;
   onSaved: (order: SalesOrder, andNext: boolean, undo?: () => Promise<void>) => void;
   onCancel: () => void;
-  onCreateProduct: () => void;
+  onCreateProduct: (draft: RecordDraft) => void;
   onOpenHistory: () => void;
   onDone: Done;
 }) {
@@ -124,8 +128,9 @@ export default function RecordEditor({
     buildInput,
     totals,
     resetDraft,
-    discardDraft
-  } = useRecordDraft({ mode, products, avgCost, operators, deviceId, sessionId, orderId, initial });
+    discardDraft,
+    persistDraftNow
+  } = useRecordDraft({ mode, products, avgCost, operators, deviceId, sessionId, orderId, initial, resumeDraft });
 
   const [pickOpen, setPickOpen] = useState(false);
   /** 弹层入场锁（P1）：只有「保存后自动弹」的那一层会短时上锁 */
@@ -232,7 +237,8 @@ export default function RecordEditor({
   };
 
   const submit = async (andNext: boolean) => {
-    if (busy || swallowSubmitRef.current) return;
+    const effectiveNext = mode !== 'edit' && andNext;
+    if (busy || swallowSubmitRef.current || saveBlockedReason) return;
     if (
       !validate(() => {
         onDone('先加一个商品', 'error');
@@ -259,7 +265,7 @@ export default function RecordEditor({
               else await deleteRecord(order.id);
             };
 
-      if (andNext) {
+      if (effectiveNext) {
         // 用 discardDraft（含 debounce 队列）：只清 storage 会在卸载 flush 时把
         // 刚保存的这一单又写回草稿箱，下次开单冒出「继续上次没记完的单？」（L-11）
         discardDraft();
@@ -298,7 +304,7 @@ export default function RecordEditor({
       } else {
         discardDraft();
       }
-      onSaved(order, andNext, undo);
+      onSaved(order, effectiveNext, undo);
     } catch (e) {
       const msg =
         e instanceof RecordError
@@ -331,7 +337,8 @@ export default function RecordEditor({
   };
 
   const requestClose = () => {
-    if (draft.lines.length > 0 || draft.note.trim()) setConfirmClose(true);
+    if (saveBlockedReason) onCancel();
+    else if (draft.lines.length > 0 || draft.note.trim()) setConfirmClose(true);
     else onCancel();
   };
 
@@ -359,6 +366,11 @@ export default function RecordEditor({
       </header>
 
       <div className="record-page__body">
+        {saveBlockedReason ? (
+          <div className="glass-hint glass-hint--error" role="alert">
+            {saveBlockedReason}。这里只供核对保留草稿，无法保存到原单。
+          </div>
+        ) : null}
         {showDraftHint ? (
           <div className="first-run-card">
             <div>
@@ -574,16 +586,20 @@ export default function RecordEditor({
             </span>
           ) : null}
         </div>
-        <Btn variant="secondary" block disabled={busy} onClick={() => submit(false)}>
-          {busy ? '保存中…' : '只保存'}
-        </Btn>
-        <Btn block disabled={busy} onClick={() => submit(true)}>
-          {/*
-           * 文案保持「保存并记下一单」不动：e2e-smoke.py:76 按这个可访问名点按钮，
-           * 改名会让 CI 的 e2e 门禁失败。宽度靠 record.css 里收紧 gap / 内边距解决。
-           */}
-          {busy ? '保存中…' : '保存并记下一单'}
-        </Btn>
+        {mode === 'edit' ? (
+          <Btn block disabled={busy || Boolean(saveBlockedReason)} onClick={() => submit(false)}>
+            {busy ? '保存中…' : '保存修改'}
+          </Btn>
+        ) : (
+          <>
+            <Btn variant="secondary" block disabled={busy || Boolean(saveBlockedReason)} onClick={() => submit(false)}>
+              {busy ? '保存中…' : '只保存'}
+            </Btn>
+            <Btn block disabled={busy || Boolean(saveBlockedReason)} onClick={() => submit(true)}>
+              {busy ? '保存中…' : mode === 'patch' ? '保存并继续补记' : '保存并记下一单'}
+            </Btn>
+          </>
+        )}
       </div>
 
       {pickOpen ? (
@@ -595,8 +611,9 @@ export default function RecordEditor({
           onAdd={addProduct}
           onDone={closePicker}
           onCreate={() => {
+            const snapshot = persistDraftNow();
             closePicker();
-            onCreateProduct();
+            onCreateProduct(snapshot);
           }}
         />
       ) : null}
