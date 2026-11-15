@@ -24,7 +24,7 @@
 
 ## 审查与原资料
 
-- 原始审查：`review-spec.md`、`review-quality.md`。独立关闭附录：`review-spec-final.md`（原HTTP状态Important关闭，归档/提交待实际落地）、`review-quality-final.md`（HTTP-only Minor关闭，4个测试方法通过）。原报告保留原貌，附录与最终提交/归档凭证合读；不把生产/真机称为通过。
+- 原始审查：`review-spec.md`、`review-quality.md`。独立关闭附录：`review-spec-final.md`（原HTTP状态Important关闭，归档/提交待实际落地）、`review-quality-final.md`（HTTP-only Minor关闭，4个测试方法通过）。原报告保留原貌，附录与最终提交/归档凭证合读；不把生产/真机称为通过。整合提交为 `79604c4779cabf5fe30a82b3e4acff173f4e36b5`，精确38项文件清单、归档校验和提交后复核记录保留在同一F盘保全根的 `closeout-receipt` 补充目录；不改写既有256项验收档案。
 - 原main原始tracked patch和所有235逐字节副本：`F:\AIXM\烟花爆竹-closeout-evidence-20261115\tracked.patch`、`manifest.json`、`tracked`、`untracked`。本机全量哈希复核 `preservation-check.json`。
 - 完成态机器去向表：[legacy-manifest.json](legacy-manifest.json)，说明：[LEGACY-INVENTORY.md](LEGACY-INVENTORY.md)。所有历史脚本/截图只留档，不直接复跑。
 

@@ -64,7 +64,7 @@
 | 生产 / main / push / deploy | **未执行、out-of-scope**；人工prepare→兼容前端→两台确认→finalize | [人工发布检查表](../../stability-closeout/RELEASE-CHECKLIST.md) |
 | 目标真机 / 营业日 / 恢复演练 | **pending**；不能由上述本机真实服务或浏览器代勾 | 同上 |
 
-本轮命令输出初始根为 `E:\Temp\yh-closeout-20261115`，验收证据最终逐文件哈希归档到 `F:\AIXM\烟花爆竹-closeout-evidence-20261115\closeout-run`，见[凭证索引](../../stability-closeout/EVIDENCE.md)。本地实际服务已停止，分支/工作树、临时测试库与证据保留。
+本轮命令输出初始根为 `E:\Temp\yh-closeout-20261115`，验收证据最终逐文件哈希归档到 `F:\AIXM\烟花爆竹-closeout-evidence-20261115\closeout-run`，见[凭证索引](../../stability-closeout/EVIDENCE.md)。本地实际服务已停止，分支/工作树、临时测试库与证据保留。整合内容已本地提交为 `79604c4779cabf5fe30a82b3e4acff173f4e36b5`（38项精确文件）；终态回填和提交后复核见[收尾进度](../../stability-closeout/PROGRESS.md)。
 
 #### 初次修复交付记录（历史，2026-11-15）
 
