@@ -1,9 +1,11 @@
 # 主动体验巡检（真机尺寸实操）· 2026-11-12
 
+> **历史审计**：这里的“真机尺寸”是 Playwright 移动视口模拟，未验证目标手机。本文问题、旧清空/撤销/建商品路径适用于 2026-11-12 当时构建；现役修复与边界见[总方案](superpowers/plans/2026-11-13-stability-repair.md)。临时脚本和截图均已逐项哈希保全，去向见[遗留资料去向](stability-closeout/LEGACY-INVENTORY.md)；原文中的“可删除”是历史建议，本轮不删除任何唯一证据。
+
 > 目的：**用户没说、但一定会撞上**的操作体验问题。全部结论来自在 390×844 触摸环境里真实点出来的数据，不是读代码猜的。
 >
 > 环境：`pnpm build`（✓ built in 3.31s）+ `vite preview 127.0.0.1:4173`；Playwright Chromium，`viewport 390×844`、`device_scale_factor=3`、`is_mobile=True`、`has_touch=True`、`locale=zh-CN`、`timezone=Asia/Shanghai`；每轮独立 IndexedDB，默认 `localStorage['yh-sync-disabled']='1'`（仅 E 维度为看状态灯改用**本地假 Supabase**，全部请求由 Playwright 拦截返回，未写真实云端）。
-> 脚本：`scripts/ux-probe-20261112/`（临时复现脚本与原始 json，可整目录删除；未改任何 `src/`）；截图：`docs/screenshots/proactive/`。
+> 历史脚本相对路径：`scripts/ux-probe-20261112/`（临时复现与原始 JSON，未改任何 `src/`）；历史截图：`docs/screenshots/proactive/`。两者未直接加入现役回归，逐项副本在 `F:\AIXM\烟花爆竹-closeout-evidence-20261115\untracked` 下相同路径保全；参见[遗留资料去向](stability-closeout/LEGACY-INVENTORY.md)。本轮不删除这些资料。
 
 ---
 

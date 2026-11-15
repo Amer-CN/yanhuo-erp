@@ -26,8 +26,8 @@ React 18 + TypeScript + Vite；Dexie（IndexedDB）；GlassKit 1.40 + lucide-rea
 
 ## 目录
 
-- `src/db/`：types / db / repo / calc / merge / outbox / sync / syncDefaults
-- `src/ui/pages/`：7 个页面；`src/ui/kit.tsx` 组件；`src/ui/useRecordDraft.ts` 开单草稿 hook；`src/tokens.css` 设计令牌；`src/styles.css` 应用层样式
+- `src/db/`：业务层 `repo` / `calc` / `merge`，同步层 `sync` / `syncResolve` / `syncControl` / `syncReconnect` / `syncReconcile` / `syncProtocol` / `outbox`，恢复与备份 `dataRecovery` / `backup`；其余类型、seed、场次和工具模块见目录。
+- `src/ui/pages/`：7 个页面；`src/ui/kit.tsx` 组件；`src/ui/useRecordDraft.ts` 开单草稿 hook（持久化工具在 `recordDraft.ts`）；`src/tokens.css` 设计令牌；`src/styles.css` 应用层样式
 - `supabase/schema.sql`：云端建表；`docs/`：需求、使用说明、云同步、设计系统
 - `scripts/`：E2E 与诊断脚本
 - **`docs/代码异味基线-20261110.md`：重构基线（36 条 → 遗留 5 条，均 Minor）。动结构前先读**；文中 M1–M6 是重构批次编号，与下文产品里程碑 M6（真机试用）无关
@@ -44,6 +44,6 @@ React 18 + TypeScript + Vite；Dexie（IndexedDB）；GlassKit 1.40 + lucide-rea
 
 ## 当前状态
 
-**本地修复候选已验证，外部验收待完成。** 既有线上版本与本轮候选分开；本轮未部署，未做实际 PostgREST HTTP、多连接并发或目标真机验收。任务索引、已提交批次及最终测试凭证只在[稳定性修复总方案](docs/superpowers/plans/2026-11-13-stability-repair.md)维护，其他文档不固定测试数。
+**本地整合与独立真实协议验收通过，生产与目标真机待人工执行。** 既有线上版本与本轮候选分开；候选未部署，真实 loopback PostgreSQL/PostgREST HTTP 与多连接已验收，生产迁移/云环境与目标真机仍未执行。任务索引、最终测试凭证与发布边界只在[稳定性修复总方案](docs/superpowers/plans/2026-11-13-stability-repair.md)维护，其他文档不固定测试数。文档收尾断点见[收尾进度](docs/stability-closeout/PROGRESS.md)，续办前同时读其[阻塞事项](docs/stability-closeout/BLOCKED.md)；该进度文件不是第二任务索引。
 
-本地代码与验收记录已提交在 `stability-repair` 分支，保留 worktree 供复核。下一步是获授权后的独立 PostgREST/并发验收、分阶段生产迁移与两台真机演练；不得用本地 mock / PostgreSQL WASM 通过代替。
+本地代码与验收记录已在 `stability-repair` 分支，当前 `stability-closeout` 可按明确白名单整合文档/规则、验收脚本及必要工具链定点修补，并可在隔离 loopback 环境验收 PostgreSQL/PostgREST；原 `main` 只读。真实 loopback HTTP 与多连接结果是本轮有效验收，但不能推导生产迁移、生产云或目标真机已通过。生产迁移、push、deploy、真实账本和两台目标手机演练不在本轮授权内，逐项保持人工 pending。

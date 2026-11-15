@@ -1,0 +1,4788 @@
+{
+  "source_main": "0953a9e5763cf402a0795a8e5c894b58848c036f",
+  "candidate_base": "b738634d2115f67c0d5a133811b5b2dd4a98039f",
+  "preservation_root": "F:\\AIXM\\烟花爆竹-closeout-evidence-20261115",
+  "source_patch_sha256": "f3641c0811ef4273d4264a993220e6837882c30af52faae560b9bf115d2130a3",
+  "count": 235,
+  "tracked_count": 17,
+  "untracked_count": 218,
+  "tracked_bytes": 345714,
+  "untracked_bytes": 158297752,
+  "total_bytes": 158643466,
+  "untracked_dispositions": {
+    "已整合": 0,
+    "重复": 15,
+    "应保留": 203
+  },
+  "verification": "All 235 original byte sizes and SHA256 values are copied from and checked against the authoritative preservation manifest; image review is explicitly limited.",
+  "entries": [
+    {
+      "category": "tracked",
+      "path": ".gitignore",
+      "bytes": 166,
+      "sha256": "9576fef8f9e6bc2de54badf3861da3ae7fb90f9f397d5097a3d9a61c7d9cb7d3",
+      "preserved_path": "F:\\AIXM\\烟花爆竹-closeout-evidence-20261115\\tracked\\.gitignore",
+      "disposition": "已整合",
+      "reason": "整合 .devserver.log 忽略项",
+      "candidate_path": "F:\\AIXM\\烟花爆竹\\.agents\\worktrees\\stability-closeout\\.gitignore",
+      "historical_original_preserved": true
+    },
+    {
+      "category": "tracked",
+      "path": "AGENTS.md",
+      "bytes": 2978,
+      "sha256": "352c32e414d5012976069cbb7938aa4dbdf6c9da395a9ae41922255f39269da9",
+      "preserved_path": "F:\\AIXM\\烟花爆竹-closeout-evidence-20261115\\tracked\\AGENTS.md",
+      "disposition": "已整合",
+      "reason": "定点整合模块/草稿说明、续办指针与本轮授权边界；已读回修正后的 loopback 验收说明",
+      "candidate_path": "F:\\AIXM\\烟花爆竹\\.agents\\worktrees\\stability-closeout\\AGENTS.md",
+      "historical_original_preserved": true
+    },
+    {
+      "category": "tracked",
+      "path": "CHANGELOG.md",
+      "bytes": 4991,
+      "sha256": "dceb0192bc3c5fbb5bdb73434718c131fb5415951246cfc1ae83bc95d9b9b9b7",
+      "preserved_path": "F:\\AIXM\\烟花爆竹-closeout-evidence-20261115\\tracked\\CHANGELOG.md",
+      "disposition": "已整合",
+      "reason": "选择性整合历史功能且标适用日期；现役协议以修复候选和最新验收为准",
+      "candidate_path": "F:\\AIXM\\烟花爆竹\\.agents\\worktrees\\stability-closeout\\CHANGELOG.md",
+      "historical_original_preserved": true
+    },
+    {
+      "category": "tracked",
+      "path": "README.md",
+      "bytes": 3679,
+      "sha256": "af90f1c0ec336c08cdd6eb39ff1e2a0dc8e37a8a30ad92842158c6f96fd29948",
+      "preserved_path": "F:\\AIXM\\烟花爆竹-closeout-evidence-20261115\\tracked\\README.md",
+      "disposition": "已整合",
+      "reason": "合入 v1 截图归档说明；保留现役门禁/CI和唯一验收索引，不恢复旧测试数",
+      "candidate_path": "F:\\AIXM\\烟花爆竹\\.agents\\worktrees\\stability-closeout\\README.md",
+      "historical_original_preserved": true
+    },
+    {
+      "category": "tracked",
+      "path": "docs/01-需求与设计.md",
+      "bytes": 12641,
+      "sha256": "c464fccb80f3b58944e6d05c746ce96a49aee50e9b3ac83473d58a98038ba60d",
+      "preserved_path": "F:\\AIXM\\烟花爆竹-closeout-evidence-20261115\\tracked\\docs\\01-需求与设计.md",
+      "disposition": "已整合",
+      "reason": "合入 v1 日期/适用边界与现役入口",
+      "candidate_path": "F:\\AIXM\\烟花爆竹\\.agents\\worktrees\\stability-closeout\\docs\\01-需求与设计.md",
+      "historical_original_preserved": true
+    },
+    {
+      "category": "tracked",
+      "path": "docs/02-使用说明.md",
+      "bytes": 6036,
+      "sha256": "362bcb8a2998dd9fb1ceb5c783f2852e58f5aaacd550136f6c45cb39cdbde4fc",
+      "preserved_path": "F:\\AIXM\\烟花爆竹-closeout-evidence-20261115\\tracked\\docs\\02-使用说明.md",
+      "disposition": "已整合",
+      "reason": "合入库存/进货/结账/对账/快照步骤，保留 edit/patch、暂停重连与同号重试",
+      "candidate_path": "F:\\AIXM\\烟花爆竹\\.agents\\worktrees\\stability-closeout\\docs\\02-使用说明.md",
+      "historical_original_preserved": true
+    },
+    {
+      "category": "tracked",
+      "path": "docs/04-设计系统.md",
+      "bytes": 47038,
+      "sha256": "b4fcea817cd61d42f308c328829cece816346107b0e49250f88828e4f885cd41",
+      "preserved_path": "F:\\AIXM\\烟花爆竹-closeout-evidence-20261115\\tracked\\docs\\04-设计系统.md",
+      "disposition": "已整合",
+      "reason": "历史交互/截图/测试声明标为v1，保留通用设计规则",
+      "candidate_path": "F:\\AIXM\\烟花爆竹\\.agents\\worktrees\\stability-closeout\\docs\\04-设计系统.md",
+      "historical_original_preserved": true
+    },
+    {
+      "category": "tracked",
+      "path": "docs/05-技术债登记表.md",
+      "bytes": 39682,
+      "sha256": "dc20313925d38ca8f80f64322e11ae5e3923706d86a59c44848589a6db479fca",
+      "preserved_path": "F:\\AIXM\\烟花爆竹-closeout-evidence-20261115\\tracked\\docs\\05-技术债登记表.md",
+      "disposition": "已整合",
+      "reason": "历史盘点标头与现役债务指针合入",
+      "candidate_path": "F:\\AIXM\\烟花爆竹\\.agents\\worktrees\\stability-closeout\\docs\\05-技术债登记表.md",
+      "historical_original_preserved": true
+    },
+    {
+      "category": "tracked",
+      "path": "docs/06-技术债修复执行计划.md",
+      "bytes": 39495,
+      "sha256": "6333b6d484ab40f7f1d4c7600b05204b8ddb883191e3720c1edb74d69aabb825",
+      "preserved_path": "F:\\AIXM\\烟花爆竹-closeout-evidence-20261115\\tracked\\docs\\06-技术债修复执行计划.md",
+      "disposition": "已整合",
+      "reason": "历史计划标头合入并纠正全卡完成声明，保留人工债务",
+      "candidate_path": "F:\\AIXM\\烟花爆竹\\.agents\\worktrees\\stability-closeout\\docs\\06-技术债修复执行计划.md",
+      "historical_original_preserved": true
+    },
+    {
+      "category": "tracked",
+      "path": "docs/08-运维手册.md",
+      "bytes": 12680,
+      "sha256": "6e89a3267bc2d9ee57364bc44d5238488ecc106c46a46ed93d93f1d449a335e7",
+      "preserved_path": "F:\\AIXM\\烟花爆竹-closeout-evidence-20261115\\tracked\\docs\\08-运维手册.md",
+      "disposition": "已整合",
+      "reason": "三条现役RLS名称已包含；合入e2e故障说明、真实独立验收步骤和连接前安全入口",
+      "candidate_path": "F:\\AIXM\\烟花爆竹\\.agents\\worktrees\\stability-closeout\\docs\\08-运维手册.md",
+      "historical_original_preserved": true
+    },
+    {
+      "category": "tracked",
+      "path": "docs/09-架构概览.md",
+      "bytes": 2157,
+      "sha256": "749549011076e70fa994008785e6e962228cce570d3044a62f9c20d025f6ba73",
+      "preserved_path": "F:\\AIXM\\烟花爆竹-closeout-evidence-20261115\\tracked\\docs\\09-架构概览.md",
+      "disposition": "已整合",
+      "reason": "旧游标说明被现役复合游标/revision/pending/syncMeta/事务RPC说明取代",
+      "candidate_path": "F:\\AIXM\\烟花爆竹\\.agents\\worktrees\\stability-closeout\\docs\\09-架构概览.md",
+      "historical_original_preserved": true
+    },
+    {
+      "category": "tracked",
+      "path": "docs/ux-audit-report-20261112.md",
+      "bytes": 22431,
+      "sha256": "70f25556e08984b511fc3fc183e47757894f507f6c9ffcae33073262a66f867f",
+      "preserved_path": "F:\\AIXM\\烟花爆竹-closeout-evidence-20261115\\tracked\\docs\\ux-audit-report-20261112.md",
+      "disposition": "已整合",
+      "reason": "历史审计和证据保全前缀合入；旧脚本原件外置保全",
+      "candidate_path": "F:\\AIXM\\烟花爆竹\\.agents\\worktrees\\stability-closeout\\docs\\ux-audit-report-20261112.md",
+      "historical_original_preserved": true
+    },
+    {
+      "category": "tracked",
+      "path": "docs/ux-audit-sync-20261112.md",
+      "bytes": 27127,
+      "sha256": "da171f35e46d5508eef0935054f21e5250f0cf98d1467cb8498e86e14dc76443",
+      "preserved_path": "F:\\AIXM\\烟花爆竹-closeout-evidence-20261115\\tracked\\docs\\ux-audit-sync-20261112.md",
+      "disposition": "已整合",
+      "reason": "历史fake后端范围/证据保全前缀合入",
+      "candidate_path": "F:\\AIXM\\烟花爆竹\\.agents\\worktrees\\stability-closeout\\docs\\ux-audit-sync-20261112.md",
+      "historical_original_preserved": true
+    },
+    {
+      "category": "tracked",
+      "path": "docs/ux-consistency-20261112.md",
+      "bytes": 28827,
+      "sha256": "b5f4cb1ab9b54a961d3c3f142e6a6a279585c58dbe6f20d6a4ddf0fd0a8c221b",
+      "preserved_path": "F:\\AIXM\\烟花爆竹-closeout-evidence-20261115\\tracked\\docs\\ux-consistency-20261112.md",
+      "disposition": "已整合",
+      "reason": "历史日期/修复记录/证据前缀合入",
+      "candidate_path": "F:\\AIXM\\烟花爆竹\\.agents\\worktrees\\stability-closeout\\docs\\ux-consistency-20261112.md",
+      "historical_original_preserved": true
+    },
+    {
+      "category": "tracked",
+      "path": "docs/ux-proactive-20261112.md",
+      "bytes": 32177,
+      "sha256": "49bcd1b3f957f110936f396480b660e307d6ed3db993004c1bffb8eabd478e71",
+      "preserved_path": "F:\\AIXM\\烟花爆竹-closeout-evidence-20261115\\tracked\\docs\\ux-proactive-20261112.md",
+      "disposition": "已整合",
+      "reason": "历史移动视口/证据前缀合入，原删除建议不适用于本轮",
+      "candidate_path": "F:\\AIXM\\烟花爆竹\\.agents\\worktrees\\stability-closeout\\docs\\ux-proactive-20261112.md",
+      "historical_original_preserved": true
+    },
+    {
+      "category": "tracked",
+      "path": "docs/代码异味基线-20261110.md",
+      "bytes": 59071,
+      "sha256": "d21b499653533d9471c52a5d9f09a5118c64ea266f2d911588ee53f3f76c8e2b",
+      "preserved_path": "F:\\AIXM\\烟花爆竹-closeout-evidence-20261115\\tracked\\docs\\代码异味基线-20261110.md",
+      "disposition": "已整合",
+      "reason": "已完成costIncomplete状态合入，C8独立Minor不重构，现役门禁单源",
+      "candidate_path": "F:\\AIXM\\烟花爆竹\\.agents\\worktrees\\stability-closeout\\docs\\代码异味基线-20261110.md",
+      "historical_original_preserved": true
+    },
+    {
+      "category": "tracked",
+      "path": "docs/代码异味检测入口.md",
+      "bytes": 4538,
+      "sha256": "639faae8df4635a0b7037d3f922b3c65f573f24fa95a67d528ab81d9711bbf3c",
+      "preserved_path": "F:\\AIXM\\烟花爆竹-closeout-evidence-20261115\\tracked\\docs\\代码异味检测入口.md",
+      "disposition": "已整合",
+      "reason": "移除已完成功能待办与旧测试数，避免重复修复",
+      "candidate_path": "F:\\AIXM\\烟花爆竹\\.agents\\worktrees\\stability-closeout\\docs\\代码异味检测入口.md",
+      "historical_original_preserved": true
+    },
+    {
+      "category": "untracked",
+      "path": "docs/screenshots/audit-report/01-report-first-screen.png",
+      "bytes": 1080880,
+      "sha256": "d7159a4a89dcac4d84eb67d1e45ca608dd248afb5ab73f687639982f0bafc832",
+      "preserved_path": "F:\\AIXM\\烟花爆竹-closeout-evidence-20261115\\untracked\\docs\\screenshots\\audit-report\\01-report-first-screen.png",
+      "disposition": "应保留",
+      "reason": "候选仓库无同 SHA256 图片；图片是历史运行截图/报告证据，路径与哈希保留在外置快照。未逐张视觉检查。",
+      "candidate_path_status": "missing",
+      "referenced_by": [
+        {
+          "from": "docs/ux-audit-report-20261112.md",
+          "line": 41,
+          "relation": "literal basename; resolve in context"
+        },
+        {
+          "from": "docs/ux-audit-report-20261112.md",
+          "line": 110,
+          "relation": "literal basename; resolve in context"
+        }
+      ],
+      "exact_duplicate_preserved_paths": [],
+      "visual_review": "not-visually-reviewed"
+    },
+    {
+      "category": "untracked",
+      "path": "docs/screenshots/audit-report/02-report-pay-rows.png",
+      "bytes": 1106731,
+      "sha256": "50a51c2a3598d8de71aa9e44037e141bc96942e5c0e48e30d8115909eb14b91d",
+      "preserved_path": "F:\\AIXM\\烟花爆竹-closeout-evidence-20261115\\untracked\\docs\\screenshots\\audit-report\\02-report-pay-rows.png",
+      "disposition": "应保留",
+      "reason": "候选仓库无同 SHA256 图片；图片是历史运行截图/报告证据，路径与哈希保留在外置快照。未逐张视觉检查。",
+      "candidate_path_status": "missing",
+      "referenced_by": [
+        {
+          "from": "docs/ux-audit-report-20261112.md",
+          "line": 61,
+          "relation": "literal basename; resolve in context"
+        }
+      ],
+      "exact_duplicate_preserved_paths": [
+        "docs/screenshots/audit-report/03-report-summary-card.png",
+        "docs/screenshots/audit-report/04-report-margin-table.png",
+        "docs/screenshots/audit-report/09-report-closed-session.png",
+        "docs/screenshots/audit-report/12-report-table-390.png"
+      ],
+      "visual_review": "sampled-read-image"
+    },
+    {
+      "category": "untracked",
+      "path": "docs/screenshots/audit-report/03-report-summary-card.png",
+      "bytes": 1106731,
+      "sha256": "50a51c2a3598d8de71aa9e44037e141bc96942e5c0e48e30d8115909eb14b91d",
+      "preserved_path": "F:\\AIXM\\烟花爆竹-closeout-evidence-20261115\\untracked\\docs\\screenshots\\audit-report\\03-report-summary-card.png",
+      "disposition": "重复",
+      "reason": "此路径不是该 SHA256 组代表项；与 docs/screenshots/audit-report/02-report-pay-rows.png 逐字节相同。全组原路径仍在快照，代表项保留，不能称为候选仓库已整合。",
+      "candidate_path_status": "missing",
+      "referenced_by": [
+        {
+          "from": "docs/ux-audit-report-20261112.md",
+          "line": 75,
+          "relation": "literal basename; resolve in context"
+        }
+      ],
+      "exact_duplicate_preserved_paths": [
+        "docs/screenshots/audit-report/02-report-pay-rows.png",
+        "docs/screenshots/audit-report/04-report-margin-table.png",
+        "docs/screenshots/audit-report/09-report-closed-session.png",
+        "docs/screenshots/audit-report/12-report-table-390.png"
+      ],
+      "visual_review": "not-visually-reviewed"
+    },
+    {
+      "category": "untracked",
+      "path": "docs/screenshots/audit-report/04-report-margin-table.png",
+      "bytes": 1106731,
+      "sha256": "50a51c2a3598d8de71aa9e44037e141bc96942e5c0e48e30d8115909eb14b91d",
+      "preserved_path": "F:\\AIXM\\烟花爆竹-closeout-evidence-20261115\\untracked\\docs\\screenshots\\audit-report\\04-report-margin-table.png",
+      "disposition": "重复",
+      "reason": "此路径不是该 SHA256 组代表项；与 docs/screenshots/audit-report/02-report-pay-rows.png 逐字节相同。全组原路径仍在快照，代表项保留，不能称为候选仓库已整合。",
+      "candidate_path_status": "missing",
+      "referenced_by": [
+        {
+          "from": "docs/ux-audit-report-20261112.md",
+          "line": 75,
+          "relation": "literal basename; resolve in context"
+        },
+        {
+          "from": "docs/ux-audit-report-20261112.md",
+          "line": 94,
+          "relation": "literal basename; resolve in context"
+        }
+      ],
+      "exact_duplicate_preserved_paths": [
+        "docs/screenshots/audit-report/02-report-pay-rows.png",
+        "docs/screenshots/audit-report/03-report-summary-card.png",
+        "docs/screenshots/audit-report/09-report-closed-session.png",
+        "docs/screenshots/audit-report/12-report-table-390.png"
+      ],
+      "visual_review": "not-visually-reviewed"
+    },
+    {
+      "category": "untracked",
+      "path": "docs/screenshots/audit-report/05-stock-negative.png",
+      "bytes": 1023950,
+      "sha256": "533c4fb19cba4704d546f03de25deea33cc0dab7755b7e47024f0ca85a59d66d",
+      "preserved_path": "F:\\AIXM\\烟花爆竹-closeout-evidence-20261115\\untracked\\docs\\screenshots\\audit-report\\05-stock-negative.png",
+      "disposition": "应保留",
+      "reason": "候选仓库无同 SHA256 图片；图片是历史运行截图/报告证据，路径与哈希保留在外置快照。未逐张视觉检查。",
+      "candidate_path_status": "missing",
+      "referenced_by": [
+        {
+          "from": "docs/ux-audit-report-20261112.md",
+          "line": 94,
+          "relation": "literal basename; resolve in context"
+        }
+      ],
+      "exact_duplicate_preserved_paths": [],
+      "visual_review": "not-visually-reviewed"
+    },
+    {
+      "category": "untracked",
+      "path": "docs/screenshots/audit-report/06-history-list.png",
+      "bytes": 877835,
+      "sha256": "190b955c8b63011493bb62853eb7a266a00317b06af7c46512e68c5d904f0a6d",
+      "preserved_path": "F:\\AIXM\\烟花爆竹-closeout-evidence-20261115\\untracked\\docs\\screenshots\\audit-report\\06-history-list.png",
+      "disposition": "应保留",
+      "reason": "候选仓库无同 SHA256 图片；图片是历史运行截图/报告证据，路径与哈希保留在外置快照。未逐张视觉检查。",
+      "candidate_path_status": "missing",
+      "referenced_by": [
+        {
+          "from": "docs/ux-audit-report-20261112.md",
+          "line": 94,
+          "relation": "literal basename; resolve in context"
+        }
+      ],
+      "exact_duplicate_preserved_paths": [
+        "docs/screenshots/audit-report/10-history-filters.png"
+      ],
+      "visual_review": "not-visually-reviewed"
+    },
+    {
+      "category": "untracked",
+      "path": "docs/screenshots/audit-report/07-history-order-detail.png",
+      "bytes": 529259,
+      "sha256": "b7e010038231fe64ff258122814301bbd75790ea321375d2902c4a1187097b98",
+      "preserved_path": "F:\\AIXM\\烟花爆竹-closeout-evidence-20261115\\untracked\\docs\\screenshots\\audit-report\\07-history-order-detail.png",
+      "disposition": "应保留",
+      "reason": "候选仓库无同 SHA256 图片；图片是历史运行截图/报告证据，路径与哈希保留在外置快照。未逐张视觉检查。",
+      "candidate_path_status": "missing",
+      "referenced_by": [
+        {
+          "from": "docs/ux-audit-report-20261112.md",
+          "line": 94,
+          "relation": "literal basename; resolve in context"
+        }
+      ],
+      "exact_duplicate_preserved_paths": [],
+      "visual_review": "not-visually-reviewed"
+    },
+    {
+      "category": "untracked",
+      "path": "docs/screenshots/audit-report/08-session-picker.png",
+      "bytes": 535672,
+      "sha256": "29be725f1eb70065c80daccda72f3727e98abb0e23a5b5271ff87c53f228a338",
+      "preserved_path": "F:\\AIXM\\烟花爆竹-closeout-evidence-20261115\\untracked\\docs\\screenshots\\audit-report\\08-session-picker.png",
+      "disposition": "应保留",
+      "reason": "候选仓库无同 SHA256 图片；图片是历史运行截图/报告证据，路径与哈希保留在外置快照。未逐张视觉检查。",
+      "candidate_path_status": "missing",
+      "referenced_by": [
+        {
+          "from": "docs/ux-audit-report-20261112.md",
+          "line": 110,
+          "relation": "literal basename; resolve in context"
+        }
+      ],
+      "exact_duplicate_preserved_paths": [],
+      "visual_review": "not-visually-reviewed"
+    },
+    {
+      "category": "untracked",
+      "path": "docs/screenshots/audit-report/09-report-closed-session.png",
+      "bytes": 1106731,
+      "sha256": "50a51c2a3598d8de71aa9e44037e141bc96942e5c0e48e30d8115909eb14b91d",
+      "preserved_path": "F:\\AIXM\\烟花爆竹-closeout-evidence-20261115\\untracked\\docs\\screenshots\\audit-report\\09-report-closed-session.png",
+      "disposition": "重复",
+      "reason": "此路径不是该 SHA256 组代表项；与 docs/screenshots/audit-report/02-report-pay-rows.png 逐字节相同。全组原路径仍在快照，代表项保留，不能称为候选仓库已整合。",
+      "candidate_path_status": "missing",
+      "referenced_by": [
+        {
+          "from": "docs/ux-audit-report-20261112.md",
+          "line": 110,
+          "relation": "literal basename; resolve in context"
+        }
+      ],
+      "exact_duplicate_preserved_paths": [
+        "docs/screenshots/audit-report/02-report-pay-rows.png",
+        "docs/screenshots/audit-report/03-report-summary-card.png",
+        "docs/screenshots/audit-report/04-report-margin-table.png",
+        "docs/screenshots/audit-report/12-report-table-390.png"
+      ],
+      "visual_review": "not-visually-reviewed"
+    },
+    {
+      "category": "untracked",
+      "path": "docs/screenshots/audit-report/10-history-filters.png",
+      "bytes": 877835,
+      "sha256": "190b955c8b63011493bb62853eb7a266a00317b06af7c46512e68c5d904f0a6d",
+      "preserved_path": "F:\\AIXM\\烟花爆竹-closeout-evidence-20261115\\untracked\\docs\\screenshots\\audit-report\\10-history-filters.png",
+      "disposition": "重复",
+      "reason": "此路径不是该 SHA256 组代表项；与 docs/screenshots/audit-report/06-history-list.png 逐字节相同。全组原路径仍在快照，代表项保留，不能称为候选仓库已整合。",
+      "candidate_path_status": "missing",
+      "referenced_by": [
+        {
+          "from": "docs/ux-audit-report-20261112.md",
+          "line": 131,
+          "relation": "literal basename; resolve in context"
+        }
+      ],
+      "exact_duplicate_preserved_paths": [
+        "docs/screenshots/audit-report/06-history-list.png"
+      ],
+      "visual_review": "not-visually-reviewed"
+    },
+    {
+      "category": "untracked",
+      "path": "docs/screenshots/audit-report/11-settings-export.png",
+      "bytes": 1000277,
+      "sha256": "5fcbcded291dcf9a7749d4bb45786cdd0c43530cc5969ac34c1d9756d8b5067b",
+      "preserved_path": "F:\\AIXM\\烟花爆竹-closeout-evidence-20261115\\untracked\\docs\\screenshots\\audit-report\\11-settings-export.png",
+      "disposition": "应保留",
+      "reason": "候选仓库无同 SHA256 图片；图片是历史运行截图/报告证据，路径与哈希保留在外置快照。未逐张视觉检查。",
+      "candidate_path_status": "missing",
+      "referenced_by": [
+        {
+          "from": "docs/ux-audit-report-20261112.md",
+          "line": 131,
+          "relation": "literal basename; resolve in context"
+        }
+      ],
+      "exact_duplicate_preserved_paths": [],
+      "visual_review": "not-visually-reviewed"
+    },
+    {
+      "category": "untracked",
+      "path": "docs/screenshots/audit-report/12-report-table-390.png",
+      "bytes": 1106731,
+      "sha256": "50a51c2a3598d8de71aa9e44037e141bc96942e5c0e48e30d8115909eb14b91d",
+      "preserved_path": "F:\\AIXM\\烟花爆竹-closeout-evidence-20261115\\untracked\\docs\\screenshots\\audit-report\\12-report-table-390.png",
+      "disposition": "重复",
+      "reason": "此路径不是该 SHA256 组代表项；与 docs/screenshots/audit-report/02-report-pay-rows.png 逐字节相同。全组原路径仍在快照，代表项保留，不能称为候选仓库已整合。",
+      "candidate_path_status": "missing",
+      "referenced_by": [
+        {
+          "from": "docs/ux-audit-report-20261112.md",
+          "line": 143,
+          "relation": "literal basename; resolve in context"
+        }
+      ],
+      "exact_duplicate_preserved_paths": [
+        "docs/screenshots/audit-report/02-report-pay-rows.png",
+        "docs/screenshots/audit-report/03-report-summary-card.png",
+        "docs/screenshots/audit-report/04-report-margin-table.png",
+        "docs/screenshots/audit-report/09-report-closed-session.png"
+      ],
+      "visual_review": "not-visually-reviewed"
+    },
+    {
+      "category": "untracked",
+      "path": "docs/screenshots/audit-report/13-report-actions.png",
+      "bytes": 1017053,
+      "sha256": "2e837c0cae0dde890d9cc280b4e85a21ff069363e6b4ffc58c6fcfd150da4bdb",
+      "preserved_path": "F:\\AIXM\\烟花爆竹-closeout-evidence-20261115\\untracked\\docs\\screenshots\\audit-report\\13-report-actions.png",
+      "disposition": "应保留",
+      "reason": "候选仓库无同 SHA256 图片；图片是历史运行截图/报告证据，路径与哈希保留在外置快照。未逐张视觉检查。",
+      "candidate_path_status": "missing",
+      "referenced_by": [
+        {
+          "from": "docs/ux-audit-report-20261112.md",
+          "line": 131,
+          "relation": "literal basename; resolve in context"
+        }
+      ],
+      "exact_duplicate_preserved_paths": [
+        "docs/screenshots/audit-report/19-table-header-at-1200.png",
+        "docs/screenshots/audit-report/21-report-bottom.png"
+      ],
+      "visual_review": "not-visually-reviewed"
+    },
+    {
+      "category": "untracked",
+      "path": "docs/screenshots/audit-report/14-table-header-scrolled.png",
+      "bytes": 1136223,
+      "sha256": "e8f87559e864f394c4c4e56aceea71313aed0157de22f65dbb69854da5962be6",
+      "preserved_path": "F:\\AIXM\\烟花爆竹-closeout-evidence-20261115\\untracked\\docs\\screenshots\\audit-report\\14-table-header-scrolled.png",
+      "disposition": "应保留",
+      "reason": "候选仓库无同 SHA256 图片；图片是历史运行截图/报告证据，路径与哈希保留在外置快照。未逐张视觉检查。",
+      "candidate_path_status": "missing",
+      "referenced_by": [
+        {
+          "from": "docs/ux-audit-report-20261112.md",
+          "line": 143,
+          "relation": "literal basename; resolve in context"
+        }
+      ],
+      "exact_duplicate_preserved_paths": [],
+      "visual_review": "not-visually-reviewed"
+    },
+    {
+      "category": "untracked",
+      "path": "docs/screenshots/audit-report/15-history-voided-rows.png",
+      "bytes": 946768,
+      "sha256": "6757f6dce6c61c964fdd3e49b476485cf30fdfe17951789251b9ed9f2d61141f",
+      "preserved_path": "F:\\AIXM\\烟花爆竹-closeout-evidence-20261115\\untracked\\docs\\screenshots\\audit-report\\15-history-voided-rows.png",
+      "disposition": "应保留",
+      "reason": "候选仓库无同 SHA256 图片；图片是历史运行截图/报告证据，路径与哈希保留在外置快照。未逐张视觉检查。",
+      "candidate_path_status": "missing",
+      "referenced_by": [
+        {
+          "from": "docs/ux-audit-report-20261112.md",
+          "line": 131,
+          "relation": "literal basename; resolve in context"
+        }
+      ],
+      "exact_duplicate_preserved_paths": [],
+      "visual_review": "not-visually-reviewed"
+    },
+    {
+      "category": "untracked",
+      "path": "docs/screenshots/audit-report/16-edge-empty.png",
+      "bytes": 1109747,
+      "sha256": "82a277c3db4c582298bbd82c133cebc813c664b5d5df846f2fcf7ab6f634b4a2",
+      "preserved_path": "F:\\AIXM\\烟花爆竹-closeout-evidence-20261115\\untracked\\docs\\screenshots\\audit-report\\16-edge-empty.png",
+      "disposition": "应保留",
+      "reason": "候选仓库无同 SHA256 图片；图片是历史运行截图/报告证据，路径与哈希保留在外置快照。未逐张视觉检查。",
+      "candidate_path_status": "missing",
+      "referenced_by": [
+        {
+          "from": "docs/ux-audit-report-20261112.md",
+          "line": 143,
+          "relation": "literal basename; resolve in context"
+        }
+      ],
+      "exact_duplicate_preserved_paths": [
+        "docs/screenshots/proactive/E5-report-empty.png"
+      ],
+      "visual_review": "not-visually-reviewed"
+    },
+    {
+      "category": "untracked",
+      "path": "docs/screenshots/audit-report/17-edge-one-order.png",
+      "bytes": 1077043,
+      "sha256": "eb6bfcedde8ed494abd3b10055e7acfec81df7e16dd100c562e1bbd1249330d5",
+      "preserved_path": "F:\\AIXM\\烟花爆竹-closeout-evidence-20261115\\untracked\\docs\\screenshots\\audit-report\\17-edge-one-order.png",
+      "disposition": "应保留",
+      "reason": "候选仓库无同 SHA256 图片；图片是历史运行截图/报告证据，路径与哈希保留在外置快照。未逐张视觉检查。",
+      "candidate_path_status": "missing",
+      "referenced_by": [
+        {
+          "from": "docs/ux-audit-report-20261112.md",
+          "line": 143,
+          "relation": "literal basename; resolve in context"
+        }
+      ],
+      "exact_duplicate_preserved_paths": [],
+      "visual_review": "not-visually-reviewed"
+    },
+    {
+      "category": "untracked",
+      "path": "docs/screenshots/audit-report/18-edge-only-voided.png",
+      "bytes": 1033282,
+      "sha256": "f98a4687c3d8d6d443a178630e0c9342e9d8276701b5afb67de4597be56db6ea",
+      "preserved_path": "F:\\AIXM\\烟花爆竹-closeout-evidence-20261115\\untracked\\docs\\screenshots\\audit-report\\18-edge-only-voided.png",
+      "disposition": "应保留",
+      "reason": "候选仓库无同 SHA256 图片；图片是历史运行截图/报告证据，路径与哈希保留在外置快照。未逐张视觉检查。",
+      "candidate_path_status": "missing",
+      "referenced_by": [
+        {
+          "from": "docs/ux-audit-report-20261112.md",
+          "line": 143,
+          "relation": "literal basename; resolve in context"
+        },
+        {
+          "from": "docs/ux-audit-report-20261112.md",
+          "line": 167,
+          "relation": "literal basename; resolve in context"
+        }
+      ],
+      "exact_duplicate_preserved_paths": [],
+      "visual_review": "not-visually-reviewed"
+    },
+    {
+      "category": "untracked",
+      "path": "docs/screenshots/audit-report/19-table-header-at-1200.png",
+      "bytes": 1017053,
+      "sha256": "2e837c0cae0dde890d9cc280b4e85a21ff069363e6b4ffc58c6fcfd150da4bdb",
+      "preserved_path": "F:\\AIXM\\烟花爆竹-closeout-evidence-20261115\\untracked\\docs\\screenshots\\audit-report\\19-table-header-at-1200.png",
+      "disposition": "重复",
+      "reason": "此路径不是该 SHA256 组代表项；与 docs/screenshots/audit-report/13-report-actions.png 逐字节相同。全组原路径仍在快照，代表项保留，不能称为候选仓库已整合。",
+      "candidate_path_status": "missing",
+      "referenced_by": [
+        {
+          "from": "docs/ux-audit-report-20261112.md",
+          "line": 143,
+          "relation": "literal basename; resolve in context"
+        },
+        {
+          "from": "scripts/ux-audit-20261112/sticky_controls.py",
+          "line": 108,
+          "relation": "literal basename; resolve in context"
+        }
+      ],
+      "exact_duplicate_preserved_paths": [
+        "docs/screenshots/audit-report/13-report-actions.png",
+        "docs/screenshots/audit-report/21-report-bottom.png"
+      ],
+      "visual_review": "not-visually-reviewed"
+    },
+    {
+      "category": "untracked",
+      "path": "docs/screenshots/audit-report/20-report-margin-table-390.png",
+      "bytes": 1043201,
+      "sha256": "fb796489f02b950c217b087692b8252076825d63aacb4fc7420768cb6b6bccf4",
+      "preserved_path": "F:\\AIXM\\烟花爆竹-closeout-evidence-20261115\\untracked\\docs\\screenshots\\audit-report\\20-report-margin-table-390.png",
+      "disposition": "应保留",
+      "reason": "候选仓库无同 SHA256 图片；图片是历史运行截图/报告证据，路径与哈希保留在外置快照。未逐张视觉检查。",
+      "candidate_path_status": "missing",
+      "referenced_by": [
+        {
+          "from": "docs/ux-audit-report-20261112.md",
+          "line": 94,
+          "relation": "literal basename; resolve in context"
+        },
+        {
+          "from": "scripts/ux-audit-20261112/extra_shots.py",
+          "line": 39,
+          "relation": "literal basename; resolve in context"
+        }
+      ],
+      "exact_duplicate_preserved_paths": [],
+      "visual_review": "not-visually-reviewed"
+    },
+    {
+      "category": "untracked",
+      "path": "docs/screenshots/audit-report/21-report-bottom.png",
+      "bytes": 1017053,
+      "sha256": "2e837c0cae0dde890d9cc280b4e85a21ff069363e6b4ffc58c6fcfd150da4bdb",
+      "preserved_path": "F:\\AIXM\\烟花爆竹-closeout-evidence-20261115\\untracked\\docs\\screenshots\\audit-report\\21-report-bottom.png",
+      "disposition": "重复",
+      "reason": "此路径不是该 SHA256 组代表项；与 docs/screenshots/audit-report/13-report-actions.png 逐字节相同。全组原路径仍在快照，代表项保留，不能称为候选仓库已整合。",
+      "candidate_path_status": "missing",
+      "referenced_by": [
+        {
+          "from": "docs/ux-audit-report-20261112.md",
+          "line": 143,
+          "relation": "literal basename; resolve in context"
+        },
+        {
+          "from": "scripts/ux-audit-20261112/extra_shots.py",
+          "line": 48,
+          "relation": "literal basename; resolve in context"
+        }
+      ],
+      "exact_duplicate_preserved_paths": [
+        "docs/screenshots/audit-report/13-report-actions.png",
+        "docs/screenshots/audit-report/19-table-header-at-1200.png"
+      ],
+      "visual_review": "not-visually-reviewed"
+    },
+    {
+      "category": "untracked",
+      "path": "docs/screenshots/audit-sync/final-8-h3-toast.png",
+      "bytes": 790612,
+      "sha256": "bfc6b91b41bcda38f2967002e5f3358b1d7693c752afa9a6d01a05688be19b62",
+      "preserved_path": "F:\\AIXM\\烟花爆竹-closeout-evidence-20261115\\untracked\\docs\\screenshots\\audit-sync\\final-8-h3-toast.png",
+      "disposition": "应保留",
+      "reason": "候选仓库无同 SHA256 图片；图片是历史运行截图/报告证据，路径与哈希保留在外置快照。未逐张视觉检查。",
+      "candidate_path_status": "missing",
+      "referenced_by": [
+        {
+          "from": "scripts/ux-probe-20261112/final_sync_regress.py",
+          "line": 215,
+          "relation": "literal basename; resolve in context"
+        }
+      ],
+      "exact_duplicate_preserved_paths": [],
+      "visual_review": "not-visually-reviewed"
+    },
+    {
+      "category": "untracked",
+      "path": "docs/screenshots/audit-sync/s1-a-改价中.png",
+      "bytes": 630368,
+      "sha256": "f7bce794b689b0e14940c050e047ce9c5554bef8e843a1b91ad91cd114f292ab",
+      "preserved_path": "F:\\AIXM\\烟花爆竹-closeout-evidence-20261115\\untracked\\docs\\screenshots\\audit-sync\\s1-a-改价中.png",
+      "disposition": "应保留",
+      "reason": "候选仓库无同 SHA256 图片；图片是历史运行截图/报告证据，路径与哈希保留在外置快照。未逐张视觉检查。",
+      "candidate_path_status": "missing",
+      "referenced_by": [
+        {
+          "from": "docs/ux-audit-sync-20261112.md",
+          "line": 82,
+          "relation": "literal basename; resolve in context"
+        },
+        {
+          "from": "scripts/ux-audit-sync-20261112/audit_sync.py",
+          "line": 155,
+          "relation": "literal basename; resolve in context"
+        }
+      ],
+      "exact_duplicate_preserved_paths": [],
+      "visual_review": "not-visually-reviewed"
+    },
+    {
+      "category": "untracked",
+      "path": "docs/screenshots/audit-sync/s1-a-最终价格.png",
+      "bytes": 945239,
+      "sha256": "66a74facd82925d4fc5ec9e9f1757f3b5e0d62a317c40663191c71ef35a8b8cf",
+      "preserved_path": "F:\\AIXM\\烟花爆竹-closeout-evidence-20261115\\untracked\\docs\\screenshots\\audit-sync\\s1-a-最终价格.png",
+      "disposition": "应保留",
+      "reason": "候选仓库无同 SHA256 图片；图片是历史运行截图/报告证据，路径与哈希保留在外置快照。未逐张视觉检查。",
+      "candidate_path_status": "missing",
+      "referenced_by": [
+        {
+          "from": "docs/ux-audit-sync-20261112.md",
+          "line": 82,
+          "relation": "literal basename; resolve in context"
+        },
+        {
+          "from": "scripts/ux-audit-sync-20261112/audit_sync.py",
+          "line": 175,
+          "relation": "literal basename; resolve in context"
+        }
+      ],
+      "exact_duplicate_preserved_paths": [
+        "docs/screenshots/audit-sync/s1-b-最终价格.png"
+      ],
+      "visual_review": "not-visually-reviewed"
+    },
+    {
+      "category": "untracked",
+      "path": "docs/screenshots/audit-sync/s1-b-改价中.png",
+      "bytes": 630063,
+      "sha256": "e3b78948d8184b6a5228e849299b9156ab94063e59284eb53eec7067af66f137",
+      "preserved_path": "F:\\AIXM\\烟花爆竹-closeout-evidence-20261115\\untracked\\docs\\screenshots\\audit-sync\\s1-b-改价中.png",
+      "disposition": "应保留",
+      "reason": "候选仓库无同 SHA256 图片；图片是历史运行截图/报告证据，路径与哈希保留在外置快照。未逐张视觉检查。",
+      "candidate_path_status": "missing",
+      "referenced_by": [
+        {
+          "from": "docs/ux-audit-sync-20261112.md",
+          "line": 82,
+          "relation": "literal basename; resolve in context"
+        },
+        {
+          "from": "scripts/ux-audit-sync-20261112/audit_sync.py",
+          "line": 156,
+          "relation": "literal basename; resolve in context"
+        }
+      ],
+      "exact_duplicate_preserved_paths": [],
+      "visual_review": "not-visually-reviewed"
+    },
+    {
+      "category": "untracked",
+      "path": "docs/screenshots/audit-sync/s1-b-改数量不联动金额.png",
+      "bytes": 1718345,
+      "sha256": "337292ec1f01c43c0b64faa25325d59fcc336370bd1af513b0942ff0f32a4365",
+      "preserved_path": "F:\\AIXM\\烟花爆竹-closeout-evidence-20261115\\untracked\\docs\\screenshots\\audit-sync\\s1-b-改数量不联动金额.png",
+      "disposition": "应保留",
+      "reason": "候选仓库无同 SHA256 图片；图片是历史运行截图/报告证据，路径与哈希保留在外置快照。未逐张视觉检查。",
+      "candidate_path_status": "missing",
+      "referenced_by": [
+        {
+          "from": "docs/ux-audit-sync-20261112.md",
+          "line": 82,
+          "relation": "literal basename; resolve in context"
+        },
+        {
+          "from": "docs/ux-audit-sync-20261112.md",
+          "line": 321,
+          "relation": "literal basename; resolve in context"
+        }
+      ],
+      "exact_duplicate_preserved_paths": [],
+      "visual_review": "not-visually-reviewed"
+    },
+    {
+      "category": "untracked",
+      "path": "docs/screenshots/audit-sync/s1-b-最终价格.png",
+      "bytes": 945239,
+      "sha256": "66a74facd82925d4fc5ec9e9f1757f3b5e0d62a317c40663191c71ef35a8b8cf",
+      "preserved_path": "F:\\AIXM\\烟花爆竹-closeout-evidence-20261115\\untracked\\docs\\screenshots\\audit-sync\\s1-b-最终价格.png",
+      "disposition": "重复",
+      "reason": "此路径不是该 SHA256 组代表项；与 docs/screenshots/audit-sync/s1-a-最终价格.png 逐字节相同。全组原路径仍在快照，代表项保留，不能称为候选仓库已整合。",
+      "candidate_path_status": "missing",
+      "referenced_by": [
+        {
+          "from": "docs/ux-audit-sync-20261112.md",
+          "line": 82,
+          "relation": "literal basename; resolve in context"
+        },
+        {
+          "from": "scripts/ux-audit-sync-20261112/audit_sync.py",
+          "line": 176,
+          "relation": "literal basename; resolve in context"
+        }
+      ],
+      "exact_duplicate_preserved_paths": [
+        "docs/screenshots/audit-sync/s1-a-最终价格.png"
+      ],
+      "visual_review": "not-visually-reviewed"
+    },
+    {
+      "category": "untracked",
+      "path": "docs/screenshots/audit-sync/s1-b-记账页看不到A的单.png",
+      "bytes": 1484121,
+      "sha256": "88b90b2d0c6a64ebf90b6ad49e1a09d08a91cedf553c103174e0f302d021138b",
+      "preserved_path": "F:\\AIXM\\烟花爆竹-closeout-evidence-20261115\\untracked\\docs\\screenshots\\audit-sync\\s1-b-记账页看不到A的单.png",
+      "disposition": "应保留",
+      "reason": "候选仓库无同 SHA256 图片；图片是历史运行截图/报告证据，路径与哈希保留在外置快照。未逐张视觉检查。",
+      "candidate_path_status": "missing",
+      "referenced_by": [
+        {
+          "from": "docs/ux-audit-sync-20261112.md",
+          "line": 82,
+          "relation": "literal basename; resolve in context"
+        },
+        {
+          "from": "scripts/ux-audit-sync-20261112/audit_sync.py",
+          "line": 125,
+          "relation": "literal basename; resolve in context"
+        }
+      ],
+      "exact_duplicate_preserved_paths": [],
+      "visual_review": "not-visually-reviewed"
+    },
+    {
+      "category": "untracked",
+      "path": "docs/screenshots/audit-sync/s1-b-销售记录单据详情只读.png",
+      "bytes": 368797,
+      "sha256": "7f539364ccb68474002ddbec8fd5db7d3a216f0be3b014700df368db82c5d029",
+      "preserved_path": "F:\\AIXM\\烟花爆竹-closeout-evidence-20261115\\untracked\\docs\\screenshots\\audit-sync\\s1-b-销售记录单据详情只读.png",
+      "disposition": "应保留",
+      "reason": "候选仓库无同 SHA256 图片；图片是历史运行截图/报告证据，路径与哈希保留在外置快照。未逐张视觉检查。",
+      "candidate_path_status": "missing",
+      "referenced_by": [
+        {
+          "from": "docs/ux-audit-sync-20261112.md",
+          "line": 82,
+          "relation": "literal basename; resolve in context"
+        },
+        {
+          "from": "scripts/ux-audit-sync-20261112/audit_sync.py",
+          "line": 134,
+          "relation": "literal basename; resolve in context"
+        }
+      ],
+      "exact_duplicate_preserved_paths": [],
+      "visual_review": "not-visually-reviewed"
+    },
+    {
+      "category": "untracked",
+      "path": "docs/screenshots/audit-sync/s2-a-删除后.png",
+      "bytes": 1876171,
+      "sha256": "16b4dfe808bea7e7624f844c79abb2746a614a2462cfd2866ea4f64b4e96ea24",
+      "preserved_path": "F:\\AIXM\\烟花爆竹-closeout-evidence-20261115\\untracked\\docs\\screenshots\\audit-sync\\s2-a-删除后.png",
+      "disposition": "应保留",
+      "reason": "候选仓库无同 SHA256 图片；图片是历史运行截图/报告证据，路径与哈希保留在外置快照。未逐张视觉检查。",
+      "candidate_path_status": "missing",
+      "referenced_by": [
+        {
+          "from": "docs/ux-audit-sync-20261112.md",
+          "line": 121,
+          "relation": "literal basename; resolve in context"
+        },
+        {
+          "from": "scripts/ux-audit-sync-20261112/audit_sync.py",
+          "line": 232,
+          "relation": "literal basename; resolve in context"
+        }
+      ],
+      "exact_duplicate_preserved_paths": [],
+      "visual_review": "not-visually-reviewed"
+    },
+    {
+      "category": "untracked",
+      "path": "docs/screenshots/audit-sync/s2-a-同步后.png",
+      "bytes": 1460982,
+      "sha256": "82365134b67617677788ffed918b5914b0ca20aa1d668de21c3c973aa429d1e4",
+      "preserved_path": "F:\\AIXM\\烟花爆竹-closeout-evidence-20261115\\untracked\\docs\\screenshots\\audit-sync\\s2-a-同步后.png",
+      "disposition": "应保留",
+      "reason": "候选仓库无同 SHA256 图片；图片是历史运行截图/报告证据，路径与哈希保留在外置快照。未逐张视觉检查。",
+      "candidate_path_status": "missing",
+      "referenced_by": [
+        {
+          "from": "docs/ux-audit-sync-20261112.md",
+          "line": 121,
+          "relation": "literal basename; resolve in context"
+        },
+        {
+          "from": "scripts/ux-audit-sync-20261112/audit_sync.py",
+          "line": 257,
+          "relation": "literal basename; resolve in context"
+        }
+      ],
+      "exact_duplicate_preserved_paths": [],
+      "visual_review": "not-visually-reviewed"
+    },
+    {
+      "category": "untracked",
+      "path": "docs/screenshots/audit-sync/s2-a-销售记录最终.png",
+      "bytes": 1679102,
+      "sha256": "ac5b8f236c6a1536265cf984686f590e5254bdf4409561f59dea81843e52544b",
+      "preserved_path": "F:\\AIXM\\烟花爆竹-closeout-evidence-20261115\\untracked\\docs\\screenshots\\audit-sync\\s2-a-销售记录最终.png",
+      "disposition": "应保留",
+      "reason": "候选仓库无同 SHA256 图片；图片是历史运行截图/报告证据，路径与哈希保留在外置快照。未逐张视觉检查。",
+      "candidate_path_status": "missing",
+      "referenced_by": [
+        {
+          "from": "docs/ux-audit-sync-20261112.md",
+          "line": 121,
+          "relation": "literal basename; resolve in context"
+        },
+        {
+          "from": "scripts/ux-audit-sync-20261112/audit_sync.py",
+          "line": 260,
+          "relation": "literal basename; resolve in context"
+        }
+      ],
+      "exact_duplicate_preserved_paths": [],
+      "visual_review": "not-visually-reviewed"
+    },
+    {
+      "category": "untracked",
+      "path": "docs/screenshots/audit-sync/s2-b-撤销删除后.png",
+      "bytes": 1694031,
+      "sha256": "99508ccad37fc168b2093762e00425287de8126fbd677b9d0cd0365c6f4cc602",
+      "preserved_path": "F:\\AIXM\\烟花爆竹-closeout-evidence-20261115\\untracked\\docs\\screenshots\\audit-sync\\s2-b-撤销删除后.png",
+      "disposition": "应保留",
+      "reason": "候选仓库无同 SHA256 图片；图片是历史运行截图/报告证据，路径与哈希保留在外置快照。未逐张视觉检查。",
+      "candidate_path_status": "missing",
+      "referenced_by": [
+        {
+          "from": "docs/ux-audit-sync-20261112.md",
+          "line": 121,
+          "relation": "literal basename; resolve in context"
+        },
+        {
+          "from": "scripts/ux-audit-sync-20261112/audit_sync.py",
+          "line": 248,
+          "relation": "literal basename; resolve in context"
+        }
+      ],
+      "exact_duplicate_preserved_paths": [],
+      "visual_review": "not-visually-reviewed"
+    },
+    {
+      "category": "untracked",
+      "path": "docs/screenshots/audit-sync/s2-b-看到已删除.png",
+      "bytes": 1867949,
+      "sha256": "6b7bb0f89a389496e51132853fec1660b014faf155ac660924a0e184ac28f867",
+      "preserved_path": "F:\\AIXM\\烟花爆竹-closeout-evidence-20261115\\untracked\\docs\\screenshots\\audit-sync\\s2-b-看到已删除.png",
+      "disposition": "应保留",
+      "reason": "候选仓库无同 SHA256 图片；图片是历史运行截图/报告证据，路径与哈希保留在外置快照。未逐张视觉检查。",
+      "candidate_path_status": "missing",
+      "referenced_by": [
+        {
+          "from": "docs/ux-audit-sync-20261112.md",
+          "line": 121,
+          "relation": "literal basename; resolve in context"
+        },
+        {
+          "from": "scripts/ux-audit-sync-20261112/audit_sync.py",
+          "line": 238,
+          "relation": "literal basename; resolve in context"
+        }
+      ],
+      "exact_duplicate_preserved_paths": [],
+      "visual_review": "not-visually-reviewed"
+    },
+    {
+      "category": "untracked",
+      "path": "docs/screenshots/audit-sync/s3-a-恢复后.png",
+      "bytes": 1446945,
+      "sha256": "1e32dc4e2c22efa267f16ba254e33bb8afcd89da0b1ae36a0dd49103141010e0",
+      "preserved_path": "F:\\AIXM\\烟花爆竹-closeout-evidence-20261115\\untracked\\docs\\screenshots\\audit-sync\\s3-a-恢复后.png",
+      "disposition": "应保留",
+      "reason": "候选仓库无同 SHA256 图片；图片是历史运行截图/报告证据，路径与哈希保留在外置快照。未逐张视觉检查。",
+      "candidate_path_status": "missing",
+      "referenced_by": [
+        {
+          "from": "docs/ux-audit-sync-20261112.md",
+          "line": 157,
+          "relation": "literal basename; resolve in context"
+        },
+        {
+          "from": "scripts/ux-audit-sync-20261112/audit_sync.py",
+          "line": 345,
+          "relation": "literal basename; resolve in context"
+        }
+      ],
+      "exact_duplicate_preserved_paths": [],
+      "visual_review": "not-visually-reviewed"
+    },
+    {
+      "category": "untracked",
+      "path": "docs/screenshots/audit-sync/s3-a-离线改完.png",
+      "bytes": 1415540,
+      "sha256": "1d4c6a4853b40bc39bc04c5973742f7fba51c06304fc4a0b862c19125769f2dc",
+      "preserved_path": "F:\\AIXM\\烟花爆竹-closeout-evidence-20261115\\untracked\\docs\\screenshots\\audit-sync\\s3-a-离线改完.png",
+      "disposition": "应保留",
+      "reason": "候选仓库无同 SHA256 图片；图片是历史运行截图/报告证据，路径与哈希保留在外置快照。未逐张视觉检查。",
+      "candidate_path_status": "missing",
+      "referenced_by": [
+        {
+          "from": "docs/ux-audit-sync-20261112.md",
+          "line": 157,
+          "relation": "literal basename; resolve in context"
+        },
+        {
+          "from": "scripts/ux-audit-sync-20261112/audit_sync.py",
+          "line": 333,
+          "relation": "literal basename; resolve in context"
+        }
+      ],
+      "exact_duplicate_preserved_paths": [],
+      "visual_review": "not-visually-reviewed"
+    },
+    {
+      "category": "untracked",
+      "path": "docs/screenshots/audit-sync/s3-a-销售记录.png",
+      "bytes": 1680813,
+      "sha256": "d2db0b952f2f9801e4e2e5ccfbd95f7ece3b628152bea6f576e7a9c932304620",
+      "preserved_path": "F:\\AIXM\\烟花爆竹-closeout-evidence-20261115\\untracked\\docs\\screenshots\\audit-sync\\s3-a-销售记录.png",
+      "disposition": "应保留",
+      "reason": "候选仓库无同 SHA256 图片；图片是历史运行截图/报告证据，路径与哈希保留在外置快照。未逐张视觉检查。",
+      "candidate_path_status": "missing",
+      "referenced_by": [
+        {
+          "from": "docs/ux-audit-sync-20261112.md",
+          "line": 157,
+          "relation": "literal basename; resolve in context"
+        },
+        {
+          "from": "scripts/ux-audit-sync-20261112/audit_sync.py",
+          "line": 350,
+          "relation": "literal basename; resolve in context"
+        }
+      ],
+      "exact_duplicate_preserved_paths": [
+        "docs/screenshots/audit-sync/s3-b-销售记录.png"
+      ],
+      "visual_review": "not-visually-reviewed"
+    },
+    {
+      "category": "untracked",
+      "path": "docs/screenshots/audit-sync/s3-b-恢复后.png",
+      "bytes": 1440488,
+      "sha256": "933624661e42f15c6681f8500a083c880c112da574e4b4155d6fab89ddb52e69",
+      "preserved_path": "F:\\AIXM\\烟花爆竹-closeout-evidence-20261115\\untracked\\docs\\screenshots\\audit-sync\\s3-b-恢复后.png",
+      "disposition": "应保留",
+      "reason": "候选仓库无同 SHA256 图片；图片是历史运行截图/报告证据，路径与哈希保留在外置快照。未逐张视觉检查。",
+      "candidate_path_status": "missing",
+      "referenced_by": [
+        {
+          "from": "docs/ux-audit-sync-20261112.md",
+          "line": 157,
+          "relation": "literal basename; resolve in context"
+        },
+        {
+          "from": "scripts/ux-audit-sync-20261112/audit_sync.py",
+          "line": 346,
+          "relation": "literal basename; resolve in context"
+        }
+      ],
+      "exact_duplicate_preserved_paths": [],
+      "visual_review": "not-visually-reviewed"
+    },
+    {
+      "category": "untracked",
+      "path": "docs/screenshots/audit-sync/s3-b-离线改完.png",
+      "bytes": 1409276,
+      "sha256": "ba928000b1d2d7b330b7bb3180ca0b75b6045ac0c4e39fe70f58f39d053d1f78",
+      "preserved_path": "F:\\AIXM\\烟花爆竹-closeout-evidence-20261115\\untracked\\docs\\screenshots\\audit-sync\\s3-b-离线改完.png",
+      "disposition": "应保留",
+      "reason": "候选仓库无同 SHA256 图片；图片是历史运行截图/报告证据，路径与哈希保留在外置快照。未逐张视觉检查。",
+      "candidate_path_status": "missing",
+      "referenced_by": [
+        {
+          "from": "docs/ux-audit-sync-20261112.md",
+          "line": 157,
+          "relation": "literal basename; resolve in context"
+        },
+        {
+          "from": "scripts/ux-audit-sync-20261112/audit_sync.py",
+          "line": 334,
+          "relation": "literal basename; resolve in context"
+        }
+      ],
+      "exact_duplicate_preserved_paths": [],
+      "visual_review": "not-visually-reviewed"
+    },
+    {
+      "category": "untracked",
+      "path": "docs/screenshots/audit-sync/s3-b-销售记录.png",
+      "bytes": 1680813,
+      "sha256": "d2db0b952f2f9801e4e2e5ccfbd95f7ece3b628152bea6f576e7a9c932304620",
+      "preserved_path": "F:\\AIXM\\烟花爆竹-closeout-evidence-20261115\\untracked\\docs\\screenshots\\audit-sync\\s3-b-销售记录.png",
+      "disposition": "重复",
+      "reason": "此路径不是该 SHA256 组代表项；与 docs/screenshots/audit-sync/s3-a-销售记录.png 逐字节相同。全组原路径仍在快照，代表项保留，不能称为候选仓库已整合。",
+      "candidate_path_status": "missing",
+      "referenced_by": [
+        {
+          "from": "docs/ux-audit-sync-20261112.md",
+          "line": 157,
+          "relation": "literal basename; resolve in context"
+        },
+        {
+          "from": "scripts/ux-audit-sync-20261112/audit_sync.py",
+          "line": 355,
+          "relation": "literal basename; resolve in context"
+        }
+      ],
+      "exact_duplicate_preserved_paths": [
+        "docs/screenshots/audit-sync/s3-a-销售记录.png"
+      ],
+      "visual_review": "not-visually-reviewed"
+    },
+    {
+      "category": "untracked",
+      "path": "docs/screenshots/audit-sync/s4-记账页没有任何提示.png",
+      "bytes": 1461463,
+      "sha256": "44d6bd8e5aff7d6080e16f6cb77bca651a03f1b9711992eb3915c0a2ea3086f2",
+      "preserved_path": "F:\\AIXM\\烟花爆竹-closeout-evidence-20261115\\untracked\\docs\\screenshots\\audit-sync\\s4-记账页没有任何提示.png",
+      "disposition": "应保留",
+      "reason": "候选仓库无同 SHA256 图片；图片是历史运行截图/报告证据，路径与哈希保留在外置快照。未逐张视觉检查。",
+      "candidate_path_status": "missing",
+      "referenced_by": [
+        {
+          "from": "docs/ux-audit-sync-20261112.md",
+          "line": 194,
+          "relation": "literal basename; resolve in context"
+        },
+        {
+          "from": "scripts/ux-audit-sync-20261112/audit_sync.py",
+          "line": 420,
+          "relation": "literal basename; resolve in context"
+        }
+      ],
+      "exact_duplicate_preserved_paths": [],
+      "visual_review": "not-visually-reviewed"
+    },
+    {
+      "category": "untracked",
+      "path": "docs/screenshots/audit-sync/s4-设置页冲突卡.png",
+      "bytes": 1193936,
+      "sha256": "5dc3d62c88f2f69d9dfaeed3a3359069493e5061e0f1783ee2453e0496672af9",
+      "preserved_path": "F:\\AIXM\\烟花爆竹-closeout-evidence-20261115\\untracked\\docs\\screenshots\\audit-sync\\s4-设置页冲突卡.png",
+      "disposition": "应保留",
+      "reason": "候选仓库无同 SHA256 图片；图片是历史运行截图/报告证据，路径与哈希保留在外置快照。未逐张视觉检查。",
+      "candidate_path_status": "missing",
+      "referenced_by": [
+        {
+          "from": "docs/ux-audit-sync-20261112.md",
+          "line": 194,
+          "relation": "literal basename; resolve in context"
+        },
+        {
+          "from": "scripts/ux-audit-sync-20261112/audit_sync.py",
+          "line": 411,
+          "relation": "literal basename; resolve in context"
+        }
+      ],
+      "exact_duplicate_preserved_paths": [],
+      "visual_review": "not-visually-reviewed"
+    },
+    {
+      "category": "untracked",
+      "path": "docs/screenshots/audit-sync/s5-a-再同步后.png",
+      "bytes": 1855238,
+      "sha256": "e8a1be648d107d8e7369c06ce933b65808ae33d517499e413644e2af19bca017",
+      "preserved_path": "F:\\AIXM\\烟花爆竹-closeout-evidence-20261115\\untracked\\docs\\screenshots\\audit-sync\\s5-a-再同步后.png",
+      "disposition": "应保留",
+      "reason": "候选仓库无同 SHA256 图片；图片是历史运行截图/报告证据，路径与哈希保留在外置快照。未逐张视觉检查。",
+      "candidate_path_status": "missing",
+      "referenced_by": [
+        {
+          "from": "docs/ux-audit-sync-20261112.md",
+          "line": 231,
+          "relation": "literal basename; resolve in context"
+        },
+        {
+          "from": "scripts/ux-audit-sync-20261112/audit_sync.py",
+          "line": 513,
+          "relation": "literal basename; resolve in context"
+        }
+      ],
+      "exact_duplicate_preserved_paths": [
+        "docs/screenshots/audit-sync/s5-b-销售记录.png"
+      ],
+      "visual_review": "not-visually-reviewed"
+    },
+    {
+      "category": "untracked",
+      "path": "docs/screenshots/audit-sync/s5-a-清空后.png",
+      "bytes": 1162511,
+      "sha256": "6f078e1a95ea349125fb9f81c0926f16a614df161428a0805a7c95101615dbe0",
+      "preserved_path": "F:\\AIXM\\烟花爆竹-closeout-evidence-20261115\\untracked\\docs\\screenshots\\audit-sync\\s5-a-清空后.png",
+      "disposition": "应保留",
+      "reason": "候选仓库无同 SHA256 图片；图片是历史运行截图/报告证据，路径与哈希保留在外置快照。未逐张视觉检查。",
+      "candidate_path_status": "missing",
+      "referenced_by": [
+        {
+          "from": "docs/ux-audit-sync-20261112.md",
+          "line": 231,
+          "relation": "literal basename; resolve in context"
+        },
+        {
+          "from": "scripts/ux-audit-sync-20261112/audit_sync.py",
+          "line": 485,
+          "relation": "literal basename; resolve in context"
+        },
+        {
+          "from": "scripts/ux-audit-sync-20261112/verify_h3.py",
+          "line": 283,
+          "relation": "literal basename; resolve in context"
+        }
+      ],
+      "exact_duplicate_preserved_paths": [],
+      "visual_review": "not-visually-reviewed"
+    },
+    {
+      "category": "untracked",
+      "path": "docs/screenshots/audit-sync/s5-b-恢复后.png",
+      "bytes": 1467847,
+      "sha256": "93125ff8ffec45f119d1e6ef3e714fad437c7123d325380a578dca0b5ed806f4",
+      "preserved_path": "F:\\AIXM\\烟花爆竹-closeout-evidence-20261115\\untracked\\docs\\screenshots\\audit-sync\\s5-b-恢复后.png",
+      "disposition": "应保留",
+      "reason": "候选仓库无同 SHA256 图片；图片是历史运行截图/报告证据，路径与哈希保留在外置快照。未逐张视觉检查。",
+      "candidate_path_status": "missing",
+      "referenced_by": [
+        {
+          "from": "docs/ux-audit-sync-20261112.md",
+          "line": 231,
+          "relation": "literal basename; resolve in context"
+        },
+        {
+          "from": "scripts/ux-audit-sync-20261112/audit_sync.py",
+          "line": 499,
+          "relation": "literal basename; resolve in context"
+        }
+      ],
+      "exact_duplicate_preserved_paths": [],
+      "visual_review": "not-visually-reviewed"
+    },
+    {
+      "category": "untracked",
+      "path": "docs/screenshots/audit-sync/s5-b-销售记录.png",
+      "bytes": 1855238,
+      "sha256": "e8a1be648d107d8e7369c06ce933b65808ae33d517499e413644e2af19bca017",
+      "preserved_path": "F:\\AIXM\\烟花爆竹-closeout-evidence-20261115\\untracked\\docs\\screenshots\\audit-sync\\s5-b-销售记录.png",
+      "disposition": "重复",
+      "reason": "此路径不是该 SHA256 组代表项；与 docs/screenshots/audit-sync/s5-a-再同步后.png 逐字节相同。全组原路径仍在快照，代表项保留，不能称为候选仓库已整合。",
+      "candidate_path_status": "missing",
+      "referenced_by": [
+        {
+          "from": "docs/ux-audit-sync-20261112.md",
+          "line": 231,
+          "relation": "literal basename; resolve in context"
+        },
+        {
+          "from": "scripts/ux-audit-sync-20261112/audit_sync.py",
+          "line": 503,
+          "relation": "literal basename; resolve in context"
+        }
+      ],
+      "exact_duplicate_preserved_paths": [
+        "docs/screenshots/audit-sync/s5-a-再同步后.png"
+      ],
+      "visual_review": "not-visually-reviewed"
+    },
+    {
+      "category": "untracked",
+      "path": "docs/screenshots/audit-sync/s6-c-2s.png",
+      "bytes": 1525404,
+      "sha256": "738e4a6badf36f2be2b772e54efd10229198fe1409ef75c720e82e143a67d781",
+      "preserved_path": "F:\\AIXM\\烟花爆竹-closeout-evidence-20261115\\untracked\\docs\\screenshots\\audit-sync\\s6-c-2s.png",
+      "disposition": "应保留",
+      "reason": "候选仓库无同 SHA256 图片；图片是历史运行截图/报告证据，路径与哈希保留在外置快照。未逐张视觉检查。",
+      "candidate_path_status": "missing",
+      "referenced_by": [
+        {
+          "from": "docs/ux-audit-sync-20261112.md",
+          "line": 265,
+          "relation": "literal basename; resolve in context"
+        },
+        {
+          "from": "scripts/ux-audit-sync-20261112/audit_sync.py",
+          "line": 575,
+          "relation": "literal basename; resolve in context"
+        }
+      ],
+      "exact_duplicate_preserved_paths": [],
+      "visual_review": "not-visually-reviewed"
+    },
+    {
+      "category": "untracked",
+      "path": "docs/screenshots/audit-sync/s6-c-数据到齐.png",
+      "bytes": 1136399,
+      "sha256": "6addd686a64629212c515c495a9e1e836b3cb7d76bab92c98ca1e9b809e6f2b0",
+      "preserved_path": "F:\\AIXM\\烟花爆竹-closeout-evidence-20261115\\untracked\\docs\\screenshots\\audit-sync\\s6-c-数据到齐.png",
+      "disposition": "应保留",
+      "reason": "候选仓库无同 SHA256 图片；图片是历史运行截图/报告证据，路径与哈希保留在外置快照。未逐张视觉检查。",
+      "candidate_path_status": "missing",
+      "referenced_by": [
+        {
+          "from": "docs/ux-audit-sync-20261112.md",
+          "line": 265,
+          "relation": "literal basename; resolve in context"
+        },
+        {
+          "from": "scripts/ux-audit-sync-20261112/audit_sync.py",
+          "line": 591,
+          "relation": "literal basename; resolve in context"
+        }
+      ],
+      "exact_duplicate_preserved_paths": [],
+      "visual_review": "not-visually-reviewed"
+    },
+    {
+      "category": "untracked",
+      "path": "docs/screenshots/audit-sync/s6-c-销售记录.png",
+      "bytes": 1136043,
+      "sha256": "8e71a82d610fc6d622f2d3d342b65d8358060fef5cb3bd594dd58261c87be211",
+      "preserved_path": "F:\\AIXM\\烟花爆竹-closeout-evidence-20261115\\untracked\\docs\\screenshots\\audit-sync\\s6-c-销售记录.png",
+      "disposition": "应保留",
+      "reason": "候选仓库无同 SHA256 图片；图片是历史运行截图/报告证据，路径与哈希保留在外置快照。未逐张视觉检查。",
+      "candidate_path_status": "missing",
+      "referenced_by": [
+        {
+          "from": "docs/ux-audit-sync-20261112.md",
+          "line": 265,
+          "relation": "literal basename; resolve in context"
+        },
+        {
+          "from": "scripts/ux-audit-sync-20261112/audit_sync.py",
+          "line": 593,
+          "relation": "literal basename; resolve in context"
+        }
+      ],
+      "exact_duplicate_preserved_paths": [],
+      "visual_review": "not-visually-reviewed"
+    },
+    {
+      "category": "untracked",
+      "path": "docs/screenshots/audit-sync/s6-c-首屏0s.png",
+      "bytes": 1525151,
+      "sha256": "3ba953941ad6511dc5d84ed2d79eb649c6e0d38ff89dd4993f5dfc430ef44a12",
+      "preserved_path": "F:\\AIXM\\烟花爆竹-closeout-evidence-20261115\\untracked\\docs\\screenshots\\audit-sync\\s6-c-首屏0s.png",
+      "disposition": "应保留",
+      "reason": "候选仓库无同 SHA256 图片；图片是历史运行截图/报告证据，路径与哈希保留在外置快照。未逐张视觉检查。",
+      "candidate_path_status": "missing",
+      "referenced_by": [
+        {
+          "from": "docs/ux-audit-sync-20261112.md",
+          "line": 265,
+          "relation": "literal basename; resolve in context"
+        },
+        {
+          "from": "scripts/ux-audit-sync-20261112/audit_sync.py",
+          "line": 568,
+          "relation": "literal basename; resolve in context"
+        }
+      ],
+      "exact_duplicate_preserved_paths": [],
+      "visual_review": "not-visually-reviewed"
+    },
+    {
+      "category": "untracked",
+      "path": "docs/screenshots/consistency/01-record.png",
+      "bytes": 791024,
+      "sha256": "afa7abf9567315f2bb6ce86fa4018eeb7b748500792180fb18967fa46e11f2e3",
+      "preserved_path": "F:\\AIXM\\烟花爆竹-closeout-evidence-20261115\\untracked\\docs\\screenshots\\consistency\\01-record.png",
+      "disposition": "应保留",
+      "reason": "候选仓库无同 SHA256 图片；图片是历史运行截图/报告证据，路径与哈希保留在外置快照。未逐张视觉检查。",
+      "candidate_path_status": "missing",
+      "referenced_by": [],
+      "exact_duplicate_preserved_paths": [],
+      "visual_review": "not-visually-reviewed"
+    },
+    {
+      "category": "untracked",
+      "path": "docs/screenshots/consistency/02-purchase.png",
+      "bytes": 711441,
+      "sha256": "c612f76eb481f2964d5f557e010ae412d4259f1bf65f2d87a5d7472c4e10ac6b",
+      "preserved_path": "F:\\AIXM\\烟花爆竹-closeout-evidence-20261115\\untracked\\docs\\screenshots\\consistency\\02-purchase.png",
+      "disposition": "应保留",
+      "reason": "候选仓库无同 SHA256 图片；图片是历史运行截图/报告证据，路径与哈希保留在外置快照。未逐张视觉检查。",
+      "candidate_path_status": "missing",
+      "referenced_by": [],
+      "exact_duplicate_preserved_paths": [],
+      "visual_review": "not-visually-reviewed"
+    },
+    {
+      "category": "untracked",
+      "path": "docs/screenshots/consistency/03-purchase-dates.png",
+      "bytes": 567842,
+      "sha256": "76b2b2451682f2ae6442ecef17733884e4604c41831ed42365775d25fcba7073",
+      "preserved_path": "F:\\AIXM\\烟花爆竹-closeout-evidence-20261115\\untracked\\docs\\screenshots\\consistency\\03-purchase-dates.png",
+      "disposition": "应保留",
+      "reason": "候选仓库无同 SHA256 图片；图片是历史运行截图/报告证据，路径与哈希保留在外置快照。未逐张视觉检查。",
+      "candidate_path_status": "missing",
+      "referenced_by": [],
+      "exact_duplicate_preserved_paths": [],
+      "visual_review": "not-visually-reviewed"
+    },
+    {
+      "category": "untracked",
+      "path": "docs/screenshots/consistency/04-date-input.png",
+      "bytes": 39033,
+      "sha256": "b769287ef1af86a834dc515aa0a5f5ada77faa4977401106d3303d464ee5cd71",
+      "preserved_path": "F:\\AIXM\\烟花爆竹-closeout-evidence-20261115\\untracked\\docs\\screenshots\\consistency\\04-date-input.png",
+      "disposition": "应保留",
+      "reason": "候选仓库无同 SHA256 图片；图片是历史运行截图/报告证据，路径与哈希保留在外置快照。未逐张视觉检查。",
+      "candidate_path_status": "missing",
+      "referenced_by": [
+        {
+          "from": "docs/ux-consistency-20261112.md",
+          "line": 31,
+          "relation": "literal basename; resolve in context"
+        },
+        {
+          "from": "scripts/ux-audit-consistency-20261112/probe.py",
+          "line": 134,
+          "relation": "literal basename; resolve in context"
+        }
+      ],
+      "exact_duplicate_preserved_paths": [],
+      "visual_review": "not-visually-reviewed"
+    },
+    {
+      "category": "untracked",
+      "path": "docs/screenshots/consistency/05-stock.png",
+      "bytes": 599963,
+      "sha256": "e6be3853dcdd2ecc0356c04485d5eb20d7ebd4f9057c2e1a478b1f0d019cbe0d",
+      "preserved_path": "F:\\AIXM\\烟花爆竹-closeout-evidence-20261115\\untracked\\docs\\screenshots\\consistency\\05-stock.png",
+      "disposition": "应保留",
+      "reason": "候选仓库无同 SHA256 图片；图片是历史运行截图/报告证据，路径与哈希保留在外置快照。未逐张视觉检查。",
+      "candidate_path_status": "missing",
+      "referenced_by": [],
+      "exact_duplicate_preserved_paths": [],
+      "visual_review": "not-visually-reviewed"
+    },
+    {
+      "category": "untracked",
+      "path": "docs/screenshots/consistency/06-report.png",
+      "bytes": 623344,
+      "sha256": "47f92119516960a167cecd0d4242d41f9a8bd9aad240e75baf527e1fb6a977ad",
+      "preserved_path": "F:\\AIXM\\烟花爆竹-closeout-evidence-20261115\\untracked\\docs\\screenshots\\consistency\\06-report.png",
+      "disposition": "应保留",
+      "reason": "候选仓库无同 SHA256 图片；图片是历史运行截图/报告证据，路径与哈希保留在外置快照。未逐张视觉检查。",
+      "candidate_path_status": "missing",
+      "referenced_by": [],
+      "exact_duplicate_preserved_paths": [],
+      "visual_review": "not-visually-reviewed"
+    },
+    {
+      "category": "untracked",
+      "path": "docs/screenshots/consistency/07-more.png",
+      "bytes": 759037,
+      "sha256": "883b92ccee62f121d8e1b729d8cacf0b13ee06703681acd6dabb39c5bf46192e",
+      "preserved_path": "F:\\AIXM\\烟花爆竹-closeout-evidence-20261115\\untracked\\docs\\screenshots\\consistency\\07-more.png",
+      "disposition": "应保留",
+      "reason": "候选仓库无同 SHA256 图片；图片是历史运行截图/报告证据，路径与哈希保留在外置快照。未逐张视觉检查。",
+      "candidate_path_status": "missing",
+      "referenced_by": [],
+      "exact_duplicate_preserved_paths": [],
+      "visual_review": "not-visually-reviewed"
+    },
+    {
+      "category": "untracked",
+      "path": "docs/screenshots/consistency/08-products.png",
+      "bytes": 543894,
+      "sha256": "37cec7968626dccd1a280d83fac6027855ec5dfe093fbe9d08e6c2b7c30f909a",
+      "preserved_path": "F:\\AIXM\\烟花爆竹-closeout-evidence-20261115\\untracked\\docs\\screenshots\\consistency\\08-products.png",
+      "disposition": "应保留",
+      "reason": "候选仓库无同 SHA256 图片；图片是历史运行截图/报告证据，路径与哈希保留在外置快照。未逐张视觉检查。",
+      "candidate_path_status": "missing",
+      "referenced_by": [],
+      "exact_duplicate_preserved_paths": [],
+      "visual_review": "not-visually-reviewed"
+    },
+    {
+      "category": "untracked",
+      "path": "docs/screenshots/consistency/09-history.png",
+      "bytes": 965161,
+      "sha256": "b17ecbfaab3cbaf8e802134e923ede08af65633308a62db85052642796312785",
+      "preserved_path": "F:\\AIXM\\烟花爆竹-closeout-evidence-20261115\\untracked\\docs\\screenshots\\consistency\\09-history.png",
+      "disposition": "应保留",
+      "reason": "候选仓库无同 SHA256 图片；图片是历史运行截图/报告证据，路径与哈希保留在外置快照。未逐张视觉检查。",
+      "candidate_path_status": "missing",
+      "referenced_by": [],
+      "exact_duplicate_preserved_paths": [],
+      "visual_review": "not-visually-reviewed"
+    },
+    {
+      "category": "untracked",
+      "path": "docs/screenshots/consistency/10-settings.png",
+      "bytes": 562959,
+      "sha256": "0aaca54d9086463d85d3cb8a2dc7960726ae6abc2da330dc659ca8c5efe66c75",
+      "preserved_path": "F:\\AIXM\\烟花爆竹-closeout-evidence-20261115\\untracked\\docs\\screenshots\\consistency\\10-settings.png",
+      "disposition": "应保留",
+      "reason": "候选仓库无同 SHA256 图片；图片是历史运行截图/报告证据，路径与哈希保留在外置快照。未逐张视觉检查。",
+      "candidate_path_status": "missing",
+      "referenced_by": [],
+      "exact_duplicate_preserved_paths": [],
+      "visual_review": "not-visually-reviewed"
+    },
+    {
+      "category": "untracked",
+      "path": "docs/screenshots/consistency/11-settings-file.png",
+      "bytes": 739715,
+      "sha256": "e727bfc624424f2caf4bb575c75b6e701030e62d86a4d897fa1a3655f3beed0b",
+      "preserved_path": "F:\\AIXM\\烟花爆竹-closeout-evidence-20261115\\untracked\\docs\\screenshots\\consistency\\11-settings-file.png",
+      "disposition": "应保留",
+      "reason": "候选仓库无同 SHA256 图片；图片是历史运行截图/报告证据，路径与哈希保留在外置快照。未逐张视觉检查。",
+      "candidate_path_status": "missing",
+      "referenced_by": [],
+      "exact_duplicate_preserved_paths": [],
+      "visual_review": "not-visually-reviewed"
+    },
+    {
+      "category": "untracked",
+      "path": "docs/screenshots/consistency/13-product-picker.png",
+      "bytes": 361285,
+      "sha256": "e95bc190c9452334d3ed9d32b05b8af5bd61f5cbfe0bf8ceeb6f6f91e7065abd",
+      "preserved_path": "F:\\AIXM\\烟花爆竹-closeout-evidence-20261115\\untracked\\docs\\screenshots\\consistency\\13-product-picker.png",
+      "disposition": "应保留",
+      "reason": "候选仓库无同 SHA256 图片；图片是历史运行截图/报告证据，路径与哈希保留在外置快照。未逐张视觉检查。",
+      "candidate_path_status": "missing",
+      "referenced_by": [],
+      "exact_duplicate_preserved_paths": [],
+      "visual_review": "not-visually-reviewed"
+    },
+    {
+      "category": "untracked",
+      "path": "docs/screenshots/consistency/14-record-line.png",
+      "bytes": 375766,
+      "sha256": "d2f6b78ac3fa0a5e2822ecbe77d3abafe9a5453bbcff31be42b55f4d272b5243",
+      "preserved_path": "F:\\AIXM\\烟花爆竹-closeout-evidence-20261115\\untracked\\docs\\screenshots\\consistency\\14-record-line.png",
+      "disposition": "应保留",
+      "reason": "候选仓库无同 SHA256 图片；图片是历史运行截图/报告证据，路径与哈希保留在外置快照。未逐张视觉检查。",
+      "candidate_path_status": "missing",
+      "referenced_by": [],
+      "exact_duplicate_preserved_paths": [],
+      "visual_review": "not-visually-reviewed"
+    },
+    {
+      "category": "untracked",
+      "path": "docs/screenshots/consistency/15-picker-measured.png",
+      "bytes": 399842,
+      "sha256": "a894c26f607c9aad2c0534d76dec6e7bfc04be4cc220ecb5c02a450f316e0f37",
+      "preserved_path": "F:\\AIXM\\烟花爆竹-closeout-evidence-20261115\\untracked\\docs\\screenshots\\consistency\\15-picker-measured.png",
+      "disposition": "应保留",
+      "reason": "候选仓库无同 SHA256 图片；图片是历史运行截图/报告证据，路径与哈希保留在外置快照。未逐张视觉检查。",
+      "candidate_path_status": "missing",
+      "referenced_by": [],
+      "exact_duplicate_preserved_paths": [],
+      "visual_review": "not-visually-reviewed"
+    },
+    {
+      "category": "untracked",
+      "path": "docs/screenshots/consistency/16-record-with-order.png",
+      "bytes": 402474,
+      "sha256": "d5d0efb9d2d9623311e867d941ac1100a80d9b50bdcae961d1197ee4cbc68925",
+      "preserved_path": "F:\\AIXM\\烟花爆竹-closeout-evidence-20261115\\untracked\\docs\\screenshots\\consistency\\16-record-with-order.png",
+      "disposition": "应保留",
+      "reason": "候选仓库无同 SHA256 图片；图片是历史运行截图/报告证据，路径与哈希保留在外置快照。未逐张视觉检查。",
+      "candidate_path_status": "missing",
+      "referenced_by": [],
+      "exact_duplicate_preserved_paths": [],
+      "visual_review": "not-visually-reviewed"
+    },
+    {
+      "category": "untracked",
+      "path": "docs/screenshots/consistency/17-stock-sheet.png",
+      "bytes": 351732,
+      "sha256": "80db77d927468b39f4c7ec5951a6be740d86edc641c933aa0cd44e26d1ce6b63",
+      "preserved_path": "F:\\AIXM\\烟花爆竹-closeout-evidence-20261115\\untracked\\docs\\screenshots\\consistency\\17-stock-sheet.png",
+      "disposition": "应保留",
+      "reason": "候选仓库无同 SHA256 图片；图片是历史运行截图/报告证据，路径与哈希保留在外置快照。未逐张视觉检查。",
+      "candidate_path_status": "missing",
+      "referenced_by": [],
+      "exact_duplicate_preserved_paths": [],
+      "visual_review": "not-visually-reviewed"
+    },
+    {
+      "category": "untracked",
+      "path": "docs/screenshots/consistency/18-report-with-order.png",
+      "bytes": 612413,
+      "sha256": "fa162f4ae1a8c045d20d9d708152c4e6742ff0f0933334788dbdad51c2e5b6a0",
+      "preserved_path": "F:\\AIXM\\烟花爆竹-closeout-evidence-20261115\\untracked\\docs\\screenshots\\consistency\\18-report-with-order.png",
+      "disposition": "应保留",
+      "reason": "候选仓库无同 SHA256 图片；图片是历史运行截图/报告证据，路径与哈希保留在外置快照。未逐张视觉检查。",
+      "candidate_path_status": "missing",
+      "referenced_by": [],
+      "exact_duplicate_preserved_paths": [],
+      "visual_review": "not-visually-reviewed"
+    },
+    {
+      "category": "untracked",
+      "path": "docs/screenshots/consistency/20-history-sheet.png",
+      "bytes": 218658,
+      "sha256": "2d37375a15daca74b8484b948c2dd9ec6734ecd4a7cc157a8be2547f8faf351e",
+      "preserved_path": "F:\\AIXM\\烟花爆竹-closeout-evidence-20261115\\untracked\\docs\\screenshots\\consistency\\20-history-sheet.png",
+      "disposition": "应保留",
+      "reason": "候选仓库无同 SHA256 图片；图片是历史运行截图/报告证据，路径与哈希保留在外置快照。未逐张视觉检查。",
+      "candidate_path_status": "missing",
+      "referenced_by": [],
+      "exact_duplicate_preserved_paths": [],
+      "visual_review": "not-visually-reviewed"
+    },
+    {
+      "category": "untracked",
+      "path": "docs/screenshots/consistency/21-product-form.png",
+      "bytes": 345825,
+      "sha256": "c3105d6121c05dd82a7a230a7fb7ec6ffbfdb84b7c630c32d73cd02c8d4ce862",
+      "preserved_path": "F:\\AIXM\\烟花爆竹-closeout-evidence-20261115\\untracked\\docs\\screenshots\\consistency\\21-product-form.png",
+      "disposition": "应保留",
+      "reason": "候选仓库无同 SHA256 图片；图片是历史运行截图/报告证据，路径与哈希保留在外置快照。未逐张视觉检查。",
+      "candidate_path_status": "missing",
+      "referenced_by": [],
+      "exact_duplicate_preserved_paths": [],
+      "visual_review": "not-visually-reviewed"
+    },
+    {
+      "category": "untracked",
+      "path": "docs/screenshots/consistency/22-today-purchase-sheet.png",
+      "bytes": 289138,
+      "sha256": "8520503a68c99dd4647587c317a91419694c36028ff0dcaffbd4de9c269cc01c",
+      "preserved_path": "F:\\AIXM\\烟花爆竹-closeout-evidence-20261115\\untracked\\docs\\screenshots\\consistency\\22-today-purchase-sheet.png",
+      "disposition": "应保留",
+      "reason": "候选仓库无同 SHA256 图片；图片是历史运行截图/报告证据，路径与哈希保留在外置快照。未逐张视觉检查。",
+      "candidate_path_status": "missing",
+      "referenced_by": [],
+      "exact_duplicate_preserved_paths": [],
+      "visual_review": "not-visually-reviewed"
+    },
+    {
+      "category": "untracked",
+      "path": "docs/screenshots/proactive-fix/P1-after-5taps.png",
+      "bytes": 416074,
+      "sha256": "d9b9df4e92715587b955a4ec2a19d1a012860f23c92799e034c64346ee3d10c3",
+      "preserved_path": "F:\\AIXM\\烟花爆竹-closeout-evidence-20261115\\untracked\\docs\\screenshots\\proactive-fix\\P1-after-5taps.png",
+      "disposition": "应保留",
+      "reason": "候选仓库无同 SHA256 图片；图片是历史运行截图/报告证据，路径与哈希保留在外置快照。未逐张视觉检查。",
+      "candidate_path_status": "missing",
+      "referenced_by": [
+        {
+          "from": "scripts/ux-probe-20261112/verify-fix-batch1.py",
+          "line": 97,
+          "relation": "literal basename; resolve in context"
+        }
+      ],
+      "exact_duplicate_preserved_paths": [],
+      "visual_review": "not-visually-reviewed"
+    },
+    {
+      "category": "untracked",
+      "path": "docs/screenshots/proactive-fix/P1-home.png",
+      "bytes": 755095,
+      "sha256": "0ef5ad1e92e6a10a35bb94253d9636dd322994b4798a5e65e1dd0e56b099e08b",
+      "preserved_path": "F:\\AIXM\\烟花爆竹-closeout-evidence-20261115\\untracked\\docs\\screenshots\\proactive-fix\\P1-home.png",
+      "disposition": "应保留",
+      "reason": "候选仓库无同 SHA256 图片；图片是历史运行截图/报告证据，路径与哈希保留在外置快照。未逐张视觉检查。",
+      "candidate_path_status": "missing",
+      "referenced_by": [
+        {
+          "from": "scripts/ux-probe-20261112/verify-fix-batch1.py",
+          "line": 118,
+          "relation": "literal basename; resolve in context"
+        }
+      ],
+      "exact_duplicate_preserved_paths": [],
+      "visual_review": "not-visually-reviewed"
+    },
+    {
+      "category": "untracked",
+      "path": "docs/screenshots/proactive-fix/P10-negative-stock.png",
+      "bytes": 600902,
+      "sha256": "1544904eb4308255934f87e4474e6d7bde122493dcbaf19040e343f4e9d6233f",
+      "preserved_path": "F:\\AIXM\\烟花爆竹-closeout-evidence-20261115\\untracked\\docs\\screenshots\\proactive-fix\\P10-negative-stock.png",
+      "disposition": "应保留",
+      "reason": "候选仓库无同 SHA256 图片；图片是历史运行截图/报告证据，路径与哈希保留在外置快照。未逐张视觉检查。",
+      "candidate_path_status": "missing",
+      "referenced_by": [
+        {
+          "from": "scripts/ux-probe-20261112/verify-fix-batch1.py",
+          "line": 356,
+          "relation": "literal basename; resolve in context"
+        }
+      ],
+      "exact_duplicate_preserved_paths": [],
+      "visual_review": "not-visually-reviewed"
+    },
+    {
+      "category": "untracked",
+      "path": "docs/screenshots/proactive-fix/P2-purchase-qty.png",
+      "bytes": 594286,
+      "sha256": "08bf7e8257b45f35c220b2e29208ce5859b51a7dccf8fb1c5b5eb6005797dcb8",
+      "preserved_path": "F:\\AIXM\\烟花爆竹-closeout-evidence-20261115\\untracked\\docs\\screenshots\\proactive-fix\\P2-purchase-qty.png",
+      "disposition": "应保留",
+      "reason": "候选仓库无同 SHA256 图片；图片是历史运行截图/报告证据，路径与哈希保留在外置快照。未逐张视觉检查。",
+      "candidate_path_status": "missing",
+      "referenced_by": [
+        {
+          "from": "scripts/ux-probe-20261112/verify-fix-batch1.py",
+          "line": 134,
+          "relation": "literal basename; resolve in context"
+        }
+      ],
+      "exact_duplicate_preserved_paths": [],
+      "visual_review": "not-visually-reviewed"
+    },
+    {
+      "category": "untracked",
+      "path": "docs/screenshots/proactive-fix/P2-stock-adjust.png",
+      "bytes": 341446,
+      "sha256": "a0f79c279937b72b76c74479e31793a7d9ddb77e15905d592c8c6d0a788aee10",
+      "preserved_path": "F:\\AIXM\\烟花爆竹-closeout-evidence-20261115\\untracked\\docs\\screenshots\\proactive-fix\\P2-stock-adjust.png",
+      "disposition": "应保留",
+      "reason": "候选仓库无同 SHA256 图片；图片是历史运行截图/报告证据，路径与哈希保留在外置快照。未逐张视觉检查。",
+      "candidate_path_status": "missing",
+      "referenced_by": [
+        {
+          "from": "scripts/ux-probe-20261112/verify-fix-batch1.py",
+          "line": 152,
+          "relation": "literal basename; resolve in context"
+        }
+      ],
+      "exact_duplicate_preserved_paths": [],
+      "visual_review": "not-visually-reviewed"
+    },
+    {
+      "category": "untracked",
+      "path": "docs/screenshots/proactive-fix/P3-home-3orders.png",
+      "bytes": 576690,
+      "sha256": "22cacca00d402cc35b086b134cd999947bea388e9bb4547dcabf4c75605af8e6",
+      "preserved_path": "F:\\AIXM\\烟花爆竹-closeout-evidence-20261115\\untracked\\docs\\screenshots\\proactive-fix\\P3-home-3orders.png",
+      "disposition": "应保留",
+      "reason": "候选仓库无同 SHA256 图片；图片是历史运行截图/报告证据，路径与哈希保留在外置快照。未逐张视觉检查。",
+      "candidate_path_status": "missing",
+      "referenced_by": [
+        {
+          "from": "scripts/ux-probe-20261112/verify-fix-batch1.py",
+          "line": 211,
+          "relation": "literal basename; resolve in context"
+        }
+      ],
+      "exact_duplicate_preserved_paths": [],
+      "visual_review": "not-visually-reviewed"
+    },
+    {
+      "category": "untracked",
+      "path": "docs/screenshots/proactive-fix/P3-picker-title.png",
+      "bytes": 373166,
+      "sha256": "5d416b792bf00fb2c56b820b167f78420da5e8b4b3957978c433ca90e2768eab",
+      "preserved_path": "F:\\AIXM\\烟花爆竹-closeout-evidence-20261115\\untracked\\docs\\screenshots\\proactive-fix\\P3-picker-title.png",
+      "disposition": "应保留",
+      "reason": "候选仓库无同 SHA256 图片；图片是历史运行截图/报告证据，路径与哈希保留在外置快照。未逐张视觉检查。",
+      "candidate_path_status": "missing",
+      "referenced_by": [
+        {
+          "from": "docs/ux-proactive-20261112.md",
+          "line": 311,
+          "relation": "literal basename; resolve in context"
+        },
+        {
+          "from": "scripts/ux-probe-20261112/verify-fix-batch1.py",
+          "line": 206,
+          "relation": "literal basename; resolve in context"
+        }
+      ],
+      "exact_duplicate_preserved_paths": [],
+      "visual_review": "not-visually-reviewed"
+    },
+    {
+      "category": "untracked",
+      "path": "docs/screenshots/proactive-fix/P4-offline-editor.png",
+      "bytes": 931296,
+      "sha256": "73c24119d06b77c9f323e7433bb34a6777fc9be6dfc25c3c9ebb07d8a1c6a63c",
+      "preserved_path": "F:\\AIXM\\烟花爆竹-closeout-evidence-20261115\\untracked\\docs\\screenshots\\proactive-fix\\P4-offline-editor.png",
+      "disposition": "应保留",
+      "reason": "候选仓库无同 SHA256 图片；图片是历史运行截图/报告证据，路径与哈希保留在外置快照。未逐张视觉检查。",
+      "candidate_path_status": "missing",
+      "referenced_by": [
+        {
+          "from": "scripts/ux-probe-20261112/verify-fix-batch1.py",
+          "line": 226,
+          "relation": "literal basename; resolve in context"
+        }
+      ],
+      "exact_duplicate_preserved_paths": [],
+      "visual_review": "not-visually-reviewed"
+    },
+    {
+      "category": "untracked",
+      "path": "docs/screenshots/proactive-fix/P4-receipt-offline-sheet.png",
+      "bytes": 378783,
+      "sha256": "18b7cafd92db15293a6145bffd49126750673392c1121e04fd4aebd4eebe45df",
+      "preserved_path": "F:\\AIXM\\烟花爆竹-closeout-evidence-20261115\\untracked\\docs\\screenshots\\proactive-fix\\P4-receipt-offline-sheet.png",
+      "disposition": "应保留",
+      "reason": "候选仓库无同 SHA256 图片；图片是历史运行截图/报告证据，路径与哈希保留在外置快照。未逐张视觉检查。",
+      "candidate_path_status": "missing",
+      "referenced_by": [
+        {
+          "from": "scripts/ux-probe-20261112/verify-fix-batch1.py",
+          "line": 240,
+          "relation": "literal basename; resolve in context"
+        }
+      ],
+      "exact_duplicate_preserved_paths": [],
+      "visual_review": "not-visually-reviewed"
+    },
+    {
+      "category": "untracked",
+      "path": "docs/screenshots/proactive-fix/P4-receipt-offline.png",
+      "bytes": 911319,
+      "sha256": "324ddc68341acd73fdd732c56d4b94b166cc16d820233e6d1193fb1ac02a5e9a",
+      "preserved_path": "F:\\AIXM\\烟花爆竹-closeout-evidence-20261115\\untracked\\docs\\screenshots\\proactive-fix\\P4-receipt-offline.png",
+      "disposition": "应保留",
+      "reason": "候选仓库无同 SHA256 图片；图片是历史运行截图/报告证据，路径与哈希保留在外置快照。未逐张视觉检查。",
+      "candidate_path_status": "missing",
+      "referenced_by": [
+        {
+          "from": "scripts/ux-probe-20261112/verify-fix-batch1.py",
+          "line": 236,
+          "relation": "literal basename; resolve in context"
+        }
+      ],
+      "exact_duplicate_preserved_paths": [],
+      "visual_review": "not-visually-reviewed"
+    },
+    {
+      "category": "untracked",
+      "path": "docs/screenshots/proactive-fix/P6-negative-cost.png",
+      "bytes": 572945,
+      "sha256": "37ab4f62875de726de1dce3809b4c8703bd1762db2bcd9ec2c95b6c5f0a3ed7d",
+      "preserved_path": "F:\\AIXM\\烟花爆竹-closeout-evidence-20261115\\untracked\\docs\\screenshots\\proactive-fix\\P6-negative-cost.png",
+      "disposition": "应保留",
+      "reason": "候选仓库无同 SHA256 图片；图片是历史运行截图/报告证据，路径与哈希保留在外置快照。未逐张视觉检查。",
+      "candidate_path_status": "missing",
+      "referenced_by": [
+        {
+          "from": "scripts/ux-probe-20261112/verify-fix-batch1.py",
+          "line": 269,
+          "relation": "literal basename; resolve in context"
+        }
+      ],
+      "exact_duplicate_preserved_paths": [],
+      "visual_review": "not-visually-reviewed"
+    },
+    {
+      "category": "untracked",
+      "path": "docs/screenshots/proactive-fix/P8-add-entry.png",
+      "bytes": 878302,
+      "sha256": "9c8a76e238e40db5a11fd93776c9ed1a9f4bc29e9879179fcf5159236add4e5c",
+      "preserved_path": "F:\\AIXM\\烟花爆竹-closeout-evidence-20261115\\untracked\\docs\\screenshots\\proactive-fix\\P8-add-entry.png",
+      "disposition": "应保留",
+      "reason": "候选仓库无同 SHA256 图片；图片是历史运行截图/报告证据，路径与哈希保留在外置快照。未逐张视觉检查。",
+      "candidate_path_status": "missing",
+      "referenced_by": [
+        {
+          "from": "scripts/ux-probe-20261112/verify-fix-batch1.py",
+          "line": 314,
+          "relation": "literal basename; resolve in context"
+        }
+      ],
+      "exact_duplicate_preserved_paths": [],
+      "visual_review": "not-visually-reviewed"
+    },
+    {
+      "category": "untracked",
+      "path": "docs/screenshots/proactive/00-record-home.png",
+      "bytes": 1525574,
+      "sha256": "2688b9d1a014781cd2e221c855e76620444a570eedb37cabd094463cedf86f3c",
+      "preserved_path": "F:\\AIXM\\烟花爆竹-closeout-evidence-20261115\\untracked\\docs\\screenshots\\proactive\\00-record-home.png",
+      "disposition": "应保留",
+      "reason": "候选仓库无同 SHA256 图片；图片是历史运行截图/报告证据，路径与哈希保留在外置快照。未逐张视觉检查。",
+      "candidate_path_status": "missing",
+      "referenced_by": [],
+      "exact_duplicate_preserved_paths": [
+        "docs/screenshots/proactive/H1-first-screen.png"
+      ],
+      "visual_review": "not-visually-reviewed"
+    },
+    {
+      "category": "untracked",
+      "path": "docs/screenshots/proactive/A0-editor-empty.png",
+      "bytes": 1799548,
+      "sha256": "3c7749404a02be834a6ffa3cdc2d837205cdabdc64b47bef309c4d61287328a4",
+      "preserved_path": "F:\\AIXM\\烟花爆竹-closeout-evidence-20261115\\untracked\\docs\\screenshots\\proactive\\A0-editor-empty.png",
+      "disposition": "应保留",
+      "reason": "候选仓库无同 SHA256 图片；图片是历史运行截图/报告证据，路径与哈希保留在外置快照。未逐张视觉检查。",
+      "candidate_path_status": "missing",
+      "referenced_by": [],
+      "exact_duplicate_preserved_paths": [],
+      "visual_review": "not-visually-reviewed"
+    },
+    {
+      "category": "untracked",
+      "path": "docs/screenshots/proactive/A1-after-save1.png",
+      "bytes": 711640,
+      "sha256": "f018078cb95f48c11842fff253ed93b37ea82ff20c858823d3f46a5a7563c56b",
+      "preserved_path": "F:\\AIXM\\烟花爆竹-closeout-evidence-20261115\\untracked\\docs\\screenshots\\proactive\\A1-after-save1.png",
+      "disposition": "应保留",
+      "reason": "候选仓库无同 SHA256 图片；图片是历史运行截图/报告证据，路径与哈希保留在外置快照。未逐张视觉检查。",
+      "candidate_path_status": "missing",
+      "referenced_by": [],
+      "exact_duplicate_preserved_paths": [
+        "docs/screenshots/proactive/H2-first-order-saved.png"
+      ],
+      "visual_review": "not-visually-reviewed"
+    },
+    {
+      "category": "untracked",
+      "path": "docs/screenshots/proactive/A2-after-save5.png",
+      "bytes": 712766,
+      "sha256": "1b4035e4c82efd7c22274c274a72693a19b201d6fde5934d939e61162f2e5296",
+      "preserved_path": "F:\\AIXM\\烟花爆竹-closeout-evidence-20261115\\untracked\\docs\\screenshots\\proactive\\A2-after-save5.png",
+      "disposition": "应保留",
+      "reason": "候选仓库无同 SHA256 图片；图片是历史运行截图/报告证据，路径与哈希保留在外置快照。未逐张视觉检查。",
+      "candidate_path_status": "missing",
+      "referenced_by": [],
+      "exact_duplicate_preserved_paths": [],
+      "visual_review": "not-visually-reviewed"
+    },
+    {
+      "category": "untracked",
+      "path": "docs/screenshots/proactive/A3-home-5orders.png",
+      "bytes": 1122680,
+      "sha256": "ea5126b6049fa37bdb2071952b71e2950219b9abb889cfb72c02300c144ad881",
+      "preserved_path": "F:\\AIXM\\烟花爆竹-closeout-evidence-20261115\\untracked\\docs\\screenshots\\proactive\\A3-home-5orders.png",
+      "disposition": "应保留",
+      "reason": "候选仓库无同 SHA256 图片；图片是历史运行截图/报告证据，路径与哈希保留在外置快照。未逐张视觉检查。",
+      "candidate_path_status": "missing",
+      "referenced_by": [],
+      "exact_duplicate_preserved_paths": [],
+      "visual_review": "not-visually-reviewed"
+    },
+    {
+      "category": "untracked",
+      "path": "docs/screenshots/proactive/A4-keyboard-544.png",
+      "bytes": 1045990,
+      "sha256": "f33343870ba4b12e87176051f68b52be54c83f66ffaa080c034ce60bc60b2622",
+      "preserved_path": "F:\\AIXM\\烟花爆竹-closeout-evidence-20261115\\untracked\\docs\\screenshots\\proactive\\A4-keyboard-544.png",
+      "disposition": "应保留",
+      "reason": "候选仓库无同 SHA256 图片；图片是历史运行截图/报告证据，路径与哈希保留在外置快照。未逐张视觉检查。",
+      "candidate_path_status": "missing",
+      "referenced_by": [
+        {
+          "from": "docs/ux-proactive-20261112.md",
+          "line": 47,
+          "relation": "literal basename; resolve in context"
+        }
+      ],
+      "exact_duplicate_preserved_paths": [],
+      "visual_review": "not-visually-reviewed"
+    },
+    {
+      "category": "untracked",
+      "path": "docs/screenshots/proactive/B1-qty-cases.png",
+      "bytes": 1775123,
+      "sha256": "e8c5856b66b9af0b290b84f3bf33abc31b8dd0520ddd08c985e65dd1e45abec4",
+      "preserved_path": "F:\\AIXM\\烟花爆竹-closeout-evidence-20261115\\untracked\\docs\\screenshots\\proactive\\B1-qty-cases.png",
+      "disposition": "应保留",
+      "reason": "候选仓库无同 SHA256 图片；图片是历史运行截图/报告证据，路径与哈希保留在外置快照。未逐张视觉检查。",
+      "candidate_path_status": "missing",
+      "referenced_by": [],
+      "exact_duplicate_preserved_paths": [],
+      "visual_review": "not-visually-reviewed"
+    },
+    {
+      "category": "untracked",
+      "path": "docs/screenshots/proactive/B2-amount-cases.png",
+      "bytes": 1675846,
+      "sha256": "787cf99bfdfa9f54c966af2a9a944cffe01ce6d2bc12e28969f2d32aa43644e3",
+      "preserved_path": "F:\\AIXM\\烟花爆竹-closeout-evidence-20261115\\untracked\\docs\\screenshots\\proactive\\B2-amount-cases.png",
+      "disposition": "应保留",
+      "reason": "候选仓库无同 SHA256 图片；图片是历史运行截图/报告证据，路径与哈希保留在外置快照。未逐张视觉检查。",
+      "candidate_path_status": "missing",
+      "referenced_by": [],
+      "exact_duplicate_preserved_paths": [],
+      "visual_review": "not-visually-reviewed"
+    },
+    {
+      "category": "untracked",
+      "path": "docs/screenshots/proactive/B3-block-zero.png",
+      "bytes": 1788434,
+      "sha256": "45f8923d6a5bcbbc045f4bb6bf38ec242fd9e1d9c1298d53f8614211498e94ac",
+      "preserved_path": "F:\\AIXM\\烟花爆竹-closeout-evidence-20261115\\untracked\\docs\\screenshots\\proactive\\B3-block-zero.png",
+      "disposition": "应保留",
+      "reason": "候选仓库无同 SHA256 图片；图片是历史运行截图/报告证据，路径与哈希保留在外置快照。未逐张视觉检查。",
+      "candidate_path_status": "missing",
+      "referenced_by": [],
+      "exact_duplicate_preserved_paths": [],
+      "visual_review": "not-visually-reviewed"
+    },
+    {
+      "category": "untracked",
+      "path": "docs/screenshots/proactive/B4-purchase-inputs.png",
+      "bytes": 1174555,
+      "sha256": "a8dfd680eb6b72ab2ffc38b9860f5c41e4963eaaf50f222e835072743893c053",
+      "preserved_path": "F:\\AIXM\\烟花爆竹-closeout-evidence-20261115\\untracked\\docs\\screenshots\\proactive\\B4-purchase-inputs.png",
+      "disposition": "应保留",
+      "reason": "候选仓库无同 SHA256 图片；图片是历史运行截图/报告证据，路径与哈希保留在外置快照。未逐张视觉检查。",
+      "candidate_path_status": "missing",
+      "referenced_by": [],
+      "exact_duplicate_preserved_paths": [],
+      "visual_review": "not-visually-reviewed"
+    },
+    {
+      "category": "untracked",
+      "path": "docs/screenshots/proactive/B5-purchase-negative-saved.png",
+      "bytes": 1178442,
+      "sha256": "0af62082d894df0c03dfc2c9b1f657c84cda46a2e356f64220a352bc869de225",
+      "preserved_path": "F:\\AIXM\\烟花爆竹-closeout-evidence-20261115\\untracked\\docs\\screenshots\\proactive\\B5-purchase-negative-saved.png",
+      "disposition": "应保留",
+      "reason": "候选仓库无同 SHA256 图片；图片是历史运行截图/报告证据，路径与哈希保留在外置快照。未逐张视觉检查。",
+      "candidate_path_status": "missing",
+      "referenced_by": [
+        {
+          "from": "docs/ux-proactive-20261112.md",
+          "line": 233,
+          "relation": "literal basename; resolve in context"
+        }
+      ],
+      "exact_duplicate_preserved_paths": [],
+      "visual_review": "not-visually-reviewed"
+    },
+    {
+      "category": "untracked",
+      "path": "docs/screenshots/proactive/B6-stock-list.png",
+      "bytes": 1064285,
+      "sha256": "ec8e010bac6ac62ca825706655caddc47b30a8ecb7612b18c8c69e9313329ddc",
+      "preserved_path": "F:\\AIXM\\烟花爆竹-closeout-evidence-20261115\\untracked\\docs\\screenshots\\proactive\\B6-stock-list.png",
+      "disposition": "应保留",
+      "reason": "候选仓库无同 SHA256 图片；图片是历史运行截图/报告证据，路径与哈希保留在外置快照。未逐张视觉检查。",
+      "candidate_path_status": "missing",
+      "referenced_by": [],
+      "exact_duplicate_preserved_paths": [],
+      "visual_review": "not-visually-reviewed"
+    },
+    {
+      "category": "untracked",
+      "path": "docs/screenshots/proactive/B7-stock-adjust.png",
+      "bytes": 649726,
+      "sha256": "17854d5e52083ac78c8b36470a61c42d4280081311f24e50ab2550da7335cc05",
+      "preserved_path": "F:\\AIXM\\烟花爆竹-closeout-evidence-20261115\\untracked\\docs\\screenshots\\proactive\\B7-stock-adjust.png",
+      "disposition": "应保留",
+      "reason": "候选仓库无同 SHA256 图片；图片是历史运行截图/报告证据，路径与哈希保留在外置快照。未逐张视觉检查。",
+      "candidate_path_status": "missing",
+      "referenced_by": [],
+      "exact_duplicate_preserved_paths": [],
+      "visual_review": "not-visually-reviewed"
+    },
+    {
+      "category": "untracked",
+      "path": "docs/screenshots/proactive/B8-stock-after-adjust.png",
+      "bytes": 1056072,
+      "sha256": "771dfed3dac59d3eaaf46c4557d02612848dfff37a9da21ca70d4a742966fe08",
+      "preserved_path": "F:\\AIXM\\烟花爆竹-closeout-evidence-20261115\\untracked\\docs\\screenshots\\proactive\\B8-stock-after-adjust.png",
+      "disposition": "应保留",
+      "reason": "候选仓库无同 SHA256 图片；图片是历史运行截图/报告证据，路径与哈希保留在外置快照。未逐张视觉检查。",
+      "candidate_path_status": "missing",
+      "referenced_by": [],
+      "exact_duplicate_preserved_paths": [],
+      "visual_review": "not-visually-reviewed"
+    },
+    {
+      "category": "untracked",
+      "path": "docs/screenshots/proactive/C1-delete-line-undo.png",
+      "bytes": 1678717,
+      "sha256": "e74e2db0bf4570b41d5cbd7e8df889341345a403f07f61457c8b12821c11187c",
+      "preserved_path": "F:\\AIXM\\烟花爆竹-closeout-evidence-20261115\\untracked\\docs\\screenshots\\proactive\\C1-delete-line-undo.png",
+      "disposition": "应保留",
+      "reason": "候选仓库无同 SHA256 图片；图片是历史运行截图/报告证据，路径与哈希保留在外置快照。未逐张视觉检查。",
+      "candidate_path_status": "missing",
+      "referenced_by": [],
+      "exact_duplicate_preserved_paths": [],
+      "visual_review": "not-visually-reviewed"
+    },
+    {
+      "category": "untracked",
+      "path": "docs/screenshots/proactive/C10-home-after-close.png",
+      "bytes": 1484225,
+      "sha256": "38e02447d133adb56c564cb8ba02536335d106879b378020bc29a8e319a3239b",
+      "preserved_path": "F:\\AIXM\\烟花爆竹-closeout-evidence-20261115\\untracked\\docs\\screenshots\\proactive\\C10-home-after-close.png",
+      "disposition": "应保留",
+      "reason": "候选仓库无同 SHA256 图片；图片是历史运行截图/报告证据，路径与哈希保留在外置快照。未逐张视觉检查。",
+      "candidate_path_status": "missing",
+      "referenced_by": [],
+      "exact_duplicate_preserved_paths": [],
+      "visual_review": "not-visually-reviewed"
+    },
+    {
+      "category": "untracked",
+      "path": "docs/screenshots/proactive/C11-after-delete.png",
+      "bytes": 1869312,
+      "sha256": "b25597c7a136d807cf2a273db6196c5d632251b13791113e5d95f3053931d2d5",
+      "preserved_path": "F:\\AIXM\\烟花爆竹-closeout-evidence-20261115\\untracked\\docs\\screenshots\\proactive\\C11-after-delete.png",
+      "disposition": "应保留",
+      "reason": "候选仓库无同 SHA256 图片；图片是历史运行截图/报告证据，路径与哈希保留在外置快照。未逐张视觉检查。",
+      "candidate_path_status": "missing",
+      "referenced_by": [],
+      "exact_duplicate_preserved_paths": [],
+      "visual_review": "not-visually-reviewed"
+    },
+    {
+      "category": "untracked",
+      "path": "docs/screenshots/proactive/C12-after-undo.png",
+      "bytes": 404565,
+      "sha256": "6ab1d013e318f0de2d27f47b77a7308d45de432a98e0ae0cdcc93e532af80ac9",
+      "preserved_path": "F:\\AIXM\\烟花爆竹-closeout-evidence-20261115\\untracked\\docs\\screenshots\\proactive\\C12-after-undo.png",
+      "disposition": "应保留",
+      "reason": "候选仓库无同 SHA256 图片；图片是历史运行截图/报告证据，路径与哈希保留在外置快照。未逐张视觉检查。",
+      "candidate_path_status": "missing",
+      "referenced_by": [],
+      "exact_duplicate_preserved_paths": [],
+      "visual_review": "not-visually-reviewed"
+    },
+    {
+      "category": "untracked",
+      "path": "docs/screenshots/proactive/C13-settings-danger.png",
+      "bytes": 1114444,
+      "sha256": "67fabd6452f3d56d33d441b49f5239d0e7848dcac2aea0c948568dbb42a6f918",
+      "preserved_path": "F:\\AIXM\\烟花爆竹-closeout-evidence-20261115\\untracked\\docs\\screenshots\\proactive\\C13-settings-danger.png",
+      "disposition": "应保留",
+      "reason": "候选仓库无同 SHA256 图片；图片是历史运行截图/报告证据，路径与哈希保留在外置快照。未逐张视觉检查。",
+      "candidate_path_status": "missing",
+      "referenced_by": [],
+      "exact_duplicate_preserved_paths": [],
+      "visual_review": "not-visually-reviewed"
+    },
+    {
+      "category": "untracked",
+      "path": "docs/screenshots/proactive/C14-clear-step2.png",
+      "bytes": 499960,
+      "sha256": "9e91c88382a64de8ac5eebdb66e3762d99f1c9306757587eae434b7b4b565105",
+      "preserved_path": "F:\\AIXM\\烟花爆竹-closeout-evidence-20261115\\untracked\\docs\\screenshots\\proactive\\C14-clear-step2.png",
+      "disposition": "应保留",
+      "reason": "候选仓库无同 SHA256 图片；图片是历史运行截图/报告证据，路径与哈希保留在外置快照。未逐张视觉检查。",
+      "candidate_path_status": "missing",
+      "referenced_by": [],
+      "exact_duplicate_preserved_paths": [],
+      "visual_review": "not-visually-reviewed"
+    },
+    {
+      "category": "untracked",
+      "path": "docs/screenshots/proactive/C15-clear-step3.png",
+      "bytes": 523829,
+      "sha256": "17e76031f756b5c520a541c00469e93a9972e2f423db67d27861c4a774d3d3a5",
+      "preserved_path": "F:\\AIXM\\烟花爆竹-closeout-evidence-20261115\\untracked\\docs\\screenshots\\proactive\\C15-clear-step3.png",
+      "disposition": "应保留",
+      "reason": "候选仓库无同 SHA256 图片；图片是历史运行截图/报告证据，路径与哈希保留在外置快照。未逐张视觉检查。",
+      "candidate_path_status": "missing",
+      "referenced_by": [],
+      "exact_duplicate_preserved_paths": [],
+      "visual_review": "not-visually-reviewed"
+    },
+    {
+      "category": "untracked",
+      "path": "docs/screenshots/proactive/C16-after-cancel-step3.png",
+      "bytes": 1324487,
+      "sha256": "a2ad0788f3e968552e1b02fe929d217bcbec6c99ab066183f52f848fada77ee2",
+      "preserved_path": "F:\\AIXM\\烟花爆竹-closeout-evidence-20261115\\untracked\\docs\\screenshots\\proactive\\C16-after-cancel-step3.png",
+      "disposition": "应保留",
+      "reason": "候选仓库无同 SHA256 图片；图片是历史运行截图/报告证据，路径与哈希保留在外置快照。未逐张视觉检查。",
+      "candidate_path_status": "missing",
+      "referenced_by": [],
+      "exact_duplicate_preserved_paths": [],
+      "visual_review": "not-visually-reviewed"
+    },
+    {
+      "category": "untracked",
+      "path": "docs/screenshots/proactive/C2-double-tap-save.png",
+      "bytes": 712431,
+      "sha256": "631cf1cf790e56e6724f28d612d773ef30fb5bf96bf71deb264111aee912bb0c",
+      "preserved_path": "F:\\AIXM\\烟花爆竹-closeout-evidence-20261115\\untracked\\docs\\screenshots\\proactive\\C2-double-tap-save.png",
+      "disposition": "应保留",
+      "reason": "候选仓库无同 SHA256 图片；图片是历史运行截图/报告证据，路径与哈希保留在外置快照。未逐张视觉检查。",
+      "candidate_path_status": "missing",
+      "referenced_by": [],
+      "exact_duplicate_preserved_paths": [],
+      "visual_review": "not-visually-reviewed"
+    },
+    {
+      "category": "untracked",
+      "path": "docs/screenshots/proactive/C3-five-taps.png",
+      "bytes": 712034,
+      "sha256": "76e8e74034d2c302510b115421c4ace0f2d915644da6a564b9557d790aaad7c7",
+      "preserved_path": "F:\\AIXM\\烟花爆竹-closeout-evidence-20261115\\untracked\\docs\\screenshots\\proactive\\C3-five-taps.png",
+      "disposition": "应保留",
+      "reason": "候选仓库无同 SHA256 图片；图片是历史运行截图/报告证据，路径与哈希保留在外置快照。未逐张视觉检查。",
+      "candidate_path_status": "missing",
+      "referenced_by": [
+        {
+          "from": "docs/ux-proactive-20261112.md",
+          "line": 203,
+          "relation": "literal basename; resolve in context"
+        }
+      ],
+      "exact_duplicate_preserved_paths": [],
+      "visual_review": "not-visually-reviewed"
+    },
+    {
+      "category": "untracked",
+      "path": "docs/screenshots/proactive/C4-home-after-5taps.png",
+      "bytes": 1214171,
+      "sha256": "57784cb567dc54926e73069bf4df0efcc47e0c1a66df5d3cceda463e495ebabb",
+      "preserved_path": "F:\\AIXM\\烟花爆竹-closeout-evidence-20261115\\untracked\\docs\\screenshots\\proactive\\C4-home-after-5taps.png",
+      "disposition": "应保留",
+      "reason": "候选仓库无同 SHA256 图片；图片是历史运行截图/报告证据，路径与哈希保留在外置快照。未逐张视觉检查。",
+      "candidate_path_status": "missing",
+      "referenced_by": [
+        {
+          "from": "docs/ux-proactive-20261112.md",
+          "line": 203,
+          "relation": "literal basename; resolve in context"
+        }
+      ],
+      "exact_duplicate_preserved_paths": [],
+      "visual_review": "not-visually-reviewed"
+    },
+    {
+      "category": "untracked",
+      "path": "docs/screenshots/proactive/C5-history.png",
+      "bytes": 1688238,
+      "sha256": "5cb70485b3da837308a67b1277cd1debda5a229e8a77de27c9edf63a3cfb07a9",
+      "preserved_path": "F:\\AIXM\\烟花爆竹-closeout-evidence-20261115\\untracked\\docs\\screenshots\\proactive\\C5-history.png",
+      "disposition": "应保留",
+      "reason": "候选仓库无同 SHA256 图片；图片是历史运行截图/报告证据，路径与哈希保留在外置快照。未逐张视觉检查。",
+      "candidate_path_status": "missing",
+      "referenced_by": [],
+      "exact_duplicate_preserved_paths": [],
+      "visual_review": "not-visually-reviewed"
+    },
+    {
+      "category": "untracked",
+      "path": "docs/screenshots/proactive/C6-delete-confirm.png",
+      "bytes": 337014,
+      "sha256": "8a2824fb77a0eb99026665761714ece4d2c43a9fa5de881124d196e46bf7b2ae",
+      "preserved_path": "F:\\AIXM\\烟花爆竹-closeout-evidence-20261115\\untracked\\docs\\screenshots\\proactive\\C6-delete-confirm.png",
+      "disposition": "应保留",
+      "reason": "候选仓库无同 SHA256 图片；图片是历史运行截图/报告证据，路径与哈希保留在外置快照。未逐张视觉检查。",
+      "candidate_path_status": "missing",
+      "referenced_by": [],
+      "exact_duplicate_preserved_paths": [],
+      "visual_review": "not-visually-reviewed"
+    },
+    {
+      "category": "untracked",
+      "path": "docs/screenshots/proactive/C7-history-voided.png",
+      "bytes": 1694765,
+      "sha256": "e95c349035297db05a9b333c2d23f179759a23954b8d831193e574ddc02004d4",
+      "preserved_path": "F:\\AIXM\\烟花爆竹-closeout-evidence-20261115\\untracked\\docs\\screenshots\\proactive\\C7-history-voided.png",
+      "disposition": "应保留",
+      "reason": "候选仓库无同 SHA256 图片；图片是历史运行截图/报告证据，路径与哈希保留在外置快照。未逐张视觉检查。",
+      "candidate_path_status": "missing",
+      "referenced_by": [],
+      "exact_duplicate_preserved_paths": [],
+      "visual_review": "not-visually-reviewed"
+    },
+    {
+      "category": "untracked",
+      "path": "docs/screenshots/proactive/C8-close-session.png",
+      "bytes": 645456,
+      "sha256": "b7e1947bd409d5f06a73cdf7768e41c0219f4c301f70fa07195dd8553a14203e",
+      "preserved_path": "F:\\AIXM\\烟花爆竹-closeout-evidence-20261115\\untracked\\docs\\screenshots\\proactive\\C8-close-session.png",
+      "disposition": "应保留",
+      "reason": "候选仓库无同 SHA256 图片；图片是历史运行截图/报告证据，路径与哈希保留在外置快照。未逐张视觉检查。",
+      "candidate_path_status": "missing",
+      "referenced_by": [],
+      "exact_duplicate_preserved_paths": [],
+      "visual_review": "not-visually-reviewed"
+    },
+    {
+      "category": "untracked",
+      "path": "docs/screenshots/proactive/C9-close-result.png",
+      "bytes": 581624,
+      "sha256": "fcd201db2b78f1909e50ec986eef1c19a6848d17efceaba2bc6a6a0e3d0c60d0",
+      "preserved_path": "F:\\AIXM\\烟花爆竹-closeout-evidence-20261115\\untracked\\docs\\screenshots\\proactive\\C9-close-result.png",
+      "disposition": "应保留",
+      "reason": "候选仓库无同 SHA256 图片；图片是历史运行截图/报告证据，路径与哈希保留在外置快照。未逐张视觉检查。",
+      "candidate_path_status": "missing",
+      "referenced_by": [],
+      "exact_duplicate_preserved_paths": [],
+      "visual_review": "not-visually-reviewed"
+    },
+    {
+      "category": "untracked",
+      "path": "docs/screenshots/proactive/D1-editor-scrolled-total.png",
+      "bytes": 1492349,
+      "sha256": "5923c219fdc7809df1eea6ea8a3e0083152250763a7fb2da922ddb7b5559ab28",
+      "preserved_path": "F:\\AIXM\\烟花爆竹-closeout-evidence-20261115\\untracked\\docs\\screenshots\\proactive\\D1-editor-scrolled-total.png",
+      "disposition": "应保留",
+      "reason": "候选仓库无同 SHA256 图片；图片是历史运行截图/报告证据，路径与哈希保留在外置快照。未逐张视觉检查。",
+      "candidate_path_status": "missing",
+      "referenced_by": [],
+      "exact_duplicate_preserved_paths": [],
+      "visual_review": "not-visually-reviewed"
+    },
+    {
+      "category": "untracked",
+      "path": "docs/screenshots/proactive/D2-stock-negative.png",
+      "bytes": 1025132,
+      "sha256": "c41c808e297665cde359cb74df139c7f85ca5ec08583d442b3e7e952327e911d",
+      "preserved_path": "F:\\AIXM\\烟花爆竹-closeout-evidence-20261115\\untracked\\docs\\screenshots\\proactive\\D2-stock-negative.png",
+      "disposition": "应保留",
+      "reason": "候选仓库无同 SHA256 图片；图片是历史运行截图/报告证据，路径与哈希保留在外置快照。未逐张视觉检查。",
+      "candidate_path_status": "missing",
+      "referenced_by": [
+        {
+          "from": "docs/ux-proactive-20261112.md",
+          "line": 126,
+          "relation": "literal basename; resolve in context"
+        },
+        {
+          "from": "docs/ux-proactive-20261112.md",
+          "line": 257,
+          "relation": "literal basename; resolve in context"
+        }
+      ],
+      "exact_duplicate_preserved_paths": [],
+      "visual_review": "not-visually-reviewed"
+    },
+    {
+      "category": "untracked",
+      "path": "docs/screenshots/proactive/D3-report.png",
+      "bytes": 1085137,
+      "sha256": "5c7a19f02887a925380811bddcd1a2f7e7a99c271ff8f9758b5bab0259cc2fa1",
+      "preserved_path": "F:\\AIXM\\烟花爆竹-closeout-evidence-20261115\\untracked\\docs\\screenshots\\proactive\\D3-report.png",
+      "disposition": "应保留",
+      "reason": "候选仓库无同 SHA256 图片；图片是历史运行截图/报告证据，路径与哈希保留在外置快照。未逐张视觉检查。",
+      "candidate_path_status": "missing",
+      "referenced_by": [],
+      "exact_duplicate_preserved_paths": [],
+      "visual_review": "not-visually-reviewed"
+    },
+    {
+      "category": "untracked",
+      "path": "docs/screenshots/proactive/D4-history-voided.png",
+      "bytes": 1869782,
+      "sha256": "41b27dd13f61e4b01152977ed5919724ba680b3236b15e34774ff04c8be6c4a1",
+      "preserved_path": "F:\\AIXM\\烟花爆竹-closeout-evidence-20261115\\untracked\\docs\\screenshots\\proactive\\D4-history-voided.png",
+      "disposition": "应保留",
+      "reason": "候选仓库无同 SHA256 图片；图片是历史运行截图/报告证据，路径与哈希保留在外置快照。未逐张视觉检查。",
+      "candidate_path_status": "missing",
+      "referenced_by": [],
+      "exact_duplicate_preserved_paths": [],
+      "visual_review": "not-visually-reviewed"
+    },
+    {
+      "category": "untracked",
+      "path": "docs/screenshots/proactive/E1-offline-home.png",
+      "bytes": 1459305,
+      "sha256": "92e8a139dbae56360c99e7512b82970eab7b1ada77a90ee35df0f1325f92e8cc",
+      "preserved_path": "F:\\AIXM\\烟花爆竹-closeout-evidence-20261115\\untracked\\docs\\screenshots\\proactive\\E1-offline-home.png",
+      "disposition": "应保留",
+      "reason": "候选仓库无同 SHA256 图片；图片是历史运行截图/报告证据，路径与哈希保留在外置快照。未逐张视觉检查。",
+      "candidate_path_status": "missing",
+      "referenced_by": [
+        {
+          "from": "docs/ux-proactive-20261112.md",
+          "line": 221,
+          "relation": "literal basename; resolve in context"
+        }
+      ],
+      "exact_duplicate_preserved_paths": [],
+      "visual_review": "not-visually-reviewed"
+    },
+    {
+      "category": "untracked",
+      "path": "docs/screenshots/proactive/E2-offline-saved.png",
+      "bytes": 1244139,
+      "sha256": "520fc0f7be6b05f6c01317bb17334e1cdb5b96e30efd9fb053dcc7f5853a3ad5",
+      "preserved_path": "F:\\AIXM\\烟花爆竹-closeout-evidence-20261115\\untracked\\docs\\screenshots\\proactive\\E2-offline-saved.png",
+      "disposition": "应保留",
+      "reason": "候选仓库无同 SHA256 图片；图片是历史运行截图/报告证据，路径与哈希保留在外置快照。未逐张视觉检查。",
+      "candidate_path_status": "missing",
+      "referenced_by": [
+        {
+          "from": "docs/ux-proactive-20261112.md",
+          "line": 221,
+          "relation": "literal basename; resolve in context"
+        }
+      ],
+      "exact_duplicate_preserved_paths": [],
+      "visual_review": "not-visually-reviewed"
+    },
+    {
+      "category": "untracked",
+      "path": "docs/screenshots/proactive/E3-back-online.png",
+      "bytes": 1262415,
+      "sha256": "22a8cf9f38b492714fca922edc8e2f041a54f45e19d82af1e5c76a41b448a420",
+      "preserved_path": "F:\\AIXM\\烟花爆竹-closeout-evidence-20261115\\untracked\\docs\\screenshots\\proactive\\E3-back-online.png",
+      "disposition": "应保留",
+      "reason": "候选仓库无同 SHA256 图片；图片是历史运行截图/报告证据，路径与哈希保留在外置快照。未逐张视觉检查。",
+      "candidate_path_status": "missing",
+      "referenced_by": [],
+      "exact_duplicate_preserved_paths": [],
+      "visual_review": "not-visually-reviewed"
+    },
+    {
+      "category": "untracked",
+      "path": "docs/screenshots/proactive/E4-search-empty.png",
+      "bytes": 663488,
+      "sha256": "68908767c45a5307ac80a7d45a0e6fbde0eb246a35c723217f8eff8a78be48ee",
+      "preserved_path": "F:\\AIXM\\烟花爆竹-closeout-evidence-20261115\\untracked\\docs\\screenshots\\proactive\\E4-search-empty.png",
+      "disposition": "应保留",
+      "reason": "候选仓库无同 SHA256 图片；图片是历史运行截图/报告证据，路径与哈希保留在外置快照。未逐张视觉检查。",
+      "candidate_path_status": "missing",
+      "referenced_by": [],
+      "exact_duplicate_preserved_paths": [],
+      "visual_review": "not-visually-reviewed"
+    },
+    {
+      "category": "untracked",
+      "path": "docs/screenshots/proactive/E5-report-empty.png",
+      "bytes": 1109747,
+      "sha256": "82a277c3db4c582298bbd82c133cebc813c664b5d5df846f2fcf7ab6f634b4a2",
+      "preserved_path": "F:\\AIXM\\烟花爆竹-closeout-evidence-20261115\\untracked\\docs\\screenshots\\proactive\\E5-report-empty.png",
+      "disposition": "重复",
+      "reason": "此路径不是该 SHA256 组代表项；与 docs/screenshots/audit-report/16-edge-empty.png 逐字节相同。全组原路径仍在快照，代表项保留，不能称为候选仓库已整合。",
+      "candidate_path_status": "missing",
+      "referenced_by": [],
+      "exact_duplicate_preserved_paths": [
+        "docs/screenshots/audit-report/16-edge-empty.png"
+      ],
+      "visual_review": "not-visually-reviewed"
+    },
+    {
+      "category": "untracked",
+      "path": "docs/screenshots/proactive/E6-history-empty.png",
+      "bytes": 1983625,
+      "sha256": "9699ad7be6f276d3dff515bdbe4413d8d2b44a61b171bd8ce45b190612454537",
+      "preserved_path": "F:\\AIXM\\烟花爆竹-closeout-evidence-20261115\\untracked\\docs\\screenshots\\proactive\\E6-history-empty.png",
+      "disposition": "应保留",
+      "reason": "候选仓库无同 SHA256 图片；图片是历史运行截图/报告证据，路径与哈希保留在外置快照。未逐张视觉检查。",
+      "candidate_path_status": "missing",
+      "referenced_by": [],
+      "exact_duplicate_preserved_paths": [],
+      "visual_review": "not-visually-reviewed"
+    },
+    {
+      "category": "untracked",
+      "path": "docs/screenshots/proactive/E7-home-after-clear.png",
+      "bytes": 1522445,
+      "sha256": "d6fd769a720f8549f9b0fb8a23cb7ddb6572b3c70c51a0df01ae0d0f88fccb58",
+      "preserved_path": "F:\\AIXM\\烟花爆竹-closeout-evidence-20261115\\untracked\\docs\\screenshots\\proactive\\E7-home-after-clear.png",
+      "disposition": "应保留",
+      "reason": "候选仓库无同 SHA256 图片；图片是历史运行截图/报告证据，路径与哈希保留在外置快照。未逐张视觉检查。",
+      "candidate_path_status": "missing",
+      "referenced_by": [],
+      "exact_duplicate_preserved_paths": [],
+      "visual_review": "not-visually-reviewed"
+    },
+    {
+      "category": "untracked",
+      "path": "docs/screenshots/proactive/E8-picker-no-products.png",
+      "bytes": 621984,
+      "sha256": "9b52f0fda74628897919a5fbac294f2d5c5541a14a0d1d7f54f54a771f95d154",
+      "preserved_path": "F:\\AIXM\\烟花爆竹-closeout-evidence-20261115\\untracked\\docs\\screenshots\\proactive\\E8-picker-no-products.png",
+      "disposition": "应保留",
+      "reason": "候选仓库无同 SHA256 图片；图片是历史运行截图/报告证据，路径与哈希保留在外置快照。未逐张视觉检查。",
+      "candidate_path_status": "missing",
+      "referenced_by": [],
+      "exact_duplicate_preserved_paths": [
+        "docs/screenshots/proactive/H3-empty-picker-after-clear.png"
+      ],
+      "visual_review": "not-visually-reviewed"
+    },
+    {
+      "category": "untracked",
+      "path": "docs/screenshots/proactive/E9-purchase-no-products.png",
+      "bytes": 1244107,
+      "sha256": "e0fe5e3c1c94cd13f8ec53978623ba4c71f2edd7a4aa449f0b71255479615570",
+      "preserved_path": "F:\\AIXM\\烟花爆竹-closeout-evidence-20261115\\untracked\\docs\\screenshots\\proactive\\E9-purchase-no-products.png",
+      "disposition": "应保留",
+      "reason": "候选仓库无同 SHA256 图片；图片是历史运行截图/报告证据，路径与哈希保留在外置快照。未逐张视觉检查。",
+      "candidate_path_status": "missing",
+      "referenced_by": [],
+      "exact_duplicate_preserved_paths": [],
+      "visual_review": "not-visually-reviewed"
+    },
+    {
+      "category": "untracked",
+      "path": "docs/screenshots/proactive/F1-editor-filled.png",
+      "bytes": 1677287,
+      "sha256": "3df3405e40382b45e939f9af4942aa5620c10b4f912fed173ae20ea0923d0e6c",
+      "preserved_path": "F:\\AIXM\\烟花爆竹-closeout-evidence-20261115\\untracked\\docs\\screenshots\\proactive\\F1-editor-filled.png",
+      "disposition": "应保留",
+      "reason": "候选仓库无同 SHA256 图片；图片是历史运行截图/报告证据，路径与哈希保留在外置快照。未逐张视觉检查。",
+      "candidate_path_status": "missing",
+      "referenced_by": [
+        {
+          "from": "docs/ux-proactive-20261112.md",
+          "line": 245,
+          "relation": "literal basename; resolve in context"
+        }
+      ],
+      "exact_duplicate_preserved_paths": [],
+      "visual_review": "not-visually-reviewed"
+    },
+    {
+      "category": "untracked",
+      "path": "docs/screenshots/proactive/F2-double-back.png",
+      "bytes": 1688859,
+      "sha256": "5850e64c39680b4e61ddf8fc585b6f30655207c2363d60c2910a294ffac165e5",
+      "preserved_path": "F:\\AIXM\\烟花爆竹-closeout-evidence-20261115\\untracked\\docs\\screenshots\\proactive\\F2-double-back.png",
+      "disposition": "应保留",
+      "reason": "候选仓库无同 SHA256 图片；图片是历史运行截图/报告证据，路径与哈希保留在外置快照。未逐张视觉检查。",
+      "candidate_path_status": "missing",
+      "referenced_by": [],
+      "exact_duplicate_preserved_paths": [],
+      "visual_review": "not-visually-reviewed"
+    },
+    {
+      "category": "untracked",
+      "path": "docs/screenshots/proactive/F3-draft-restored.png",
+      "bytes": 1862201,
+      "sha256": "1aca9187c8ccf4d1410f62dad5b03b9f400e2c00adb7691855ece8e6ca983d5e",
+      "preserved_path": "F:\\AIXM\\烟花爆竹-closeout-evidence-20261115\\untracked\\docs\\screenshots\\proactive\\F3-draft-restored.png",
+      "disposition": "应保留",
+      "reason": "候选仓库无同 SHA256 图片；图片是历史运行截图/报告证据，路径与哈希保留在外置快照。未逐张视觉检查。",
+      "candidate_path_status": "missing",
+      "referenced_by": [],
+      "exact_duplicate_preserved_paths": [
+        "docs/screenshots/proactive/F6-after-forward-draft.png"
+      ],
+      "visual_review": "not-visually-reviewed"
+    },
+    {
+      "category": "untracked",
+      "path": "docs/screenshots/proactive/F4-fast-tabs.png",
+      "bytes": 1525391,
+      "sha256": "65b8111291681fedda4014ad329bb7090fa580593a97978a6e8fd9a12492f85f",
+      "preserved_path": "F:\\AIXM\\烟花爆竹-closeout-evidence-20261115\\untracked\\docs\\screenshots\\proactive\\F4-fast-tabs.png",
+      "disposition": "应保留",
+      "reason": "候选仓库无同 SHA256 图片；图片是历史运行截图/报告证据，路径与哈希保留在外置快照。未逐张视觉检查。",
+      "candidate_path_status": "missing",
+      "referenced_by": [],
+      "exact_duplicate_preserved_paths": [],
+      "visual_review": "not-visually-reviewed"
+    },
+    {
+      "category": "untracked",
+      "path": "docs/screenshots/proactive/F5-after-android-back.png",
+      "bytes": 14074,
+      "sha256": "04efb0e77f29f408652c188975b7a844b786cc383d06d8b8e3942cc9e36993a5",
+      "preserved_path": "F:\\AIXM\\烟花爆竹-closeout-evidence-20261115\\untracked\\docs\\screenshots\\proactive\\F5-after-android-back.png",
+      "disposition": "应保留",
+      "reason": "候选仓库无同 SHA256 图片；图片是历史运行截图/报告证据，路径与哈希保留在外置快照。未逐张视觉检查。",
+      "candidate_path_status": "missing",
+      "referenced_by": [
+        {
+          "from": "docs/ux-proactive-20261112.md",
+          "line": 239,
+          "relation": "literal basename; resolve in context"
+        }
+      ],
+      "exact_duplicate_preserved_paths": [],
+      "visual_review": "not-visually-reviewed"
+    },
+    {
+      "category": "untracked",
+      "path": "docs/screenshots/proactive/F6-after-forward-draft.png",
+      "bytes": 1862201,
+      "sha256": "1aca9187c8ccf4d1410f62dad5b03b9f400e2c00adb7691855ece8e6ca983d5e",
+      "preserved_path": "F:\\AIXM\\烟花爆竹-closeout-evidence-20261115\\untracked\\docs\\screenshots\\proactive\\F6-after-forward-draft.png",
+      "disposition": "重复",
+      "reason": "此路径不是该 SHA256 组代表项；与 docs/screenshots/proactive/F3-draft-restored.png 逐字节相同。全组原路径仍在快照，代表项保留，不能称为候选仓库已整合。",
+      "candidate_path_status": "missing",
+      "referenced_by": [
+        {
+          "from": "docs/ux-proactive-20261112.md",
+          "line": 239,
+          "relation": "literal basename; resolve in context"
+        }
+      ],
+      "exact_duplicate_preserved_paths": [
+        "docs/screenshots/proactive/F3-draft-restored.png"
+      ],
+      "visual_review": "not-visually-reviewed"
+    },
+    {
+      "category": "untracked",
+      "path": "docs/screenshots/proactive/G1-record-home.png",
+      "bytes": 1571794,
+      "sha256": "168357b3eb7744905d985ab3f1967da1bfda912112425286956d72ea8bc5eb5a",
+      "preserved_path": "F:\\AIXM\\烟花爆竹-closeout-evidence-20261115\\untracked\\docs\\screenshots\\proactive\\G1-record-home.png",
+      "disposition": "应保留",
+      "reason": "候选仓库无同 SHA256 图片；图片是历史运行截图/报告证据，路径与哈希保留在外置快照。未逐张视觉检查。",
+      "candidate_path_status": "missing",
+      "referenced_by": [],
+      "exact_duplicate_preserved_paths": [],
+      "visual_review": "not-visually-reviewed"
+    },
+    {
+      "category": "untracked",
+      "path": "docs/screenshots/proactive/G2-purchase.png",
+      "bytes": 1315255,
+      "sha256": "684f30e358dfa719d3a6b75f1c4e3850d775797477b654d75c2e6df171891e45",
+      "preserved_path": "F:\\AIXM\\烟花爆竹-closeout-evidence-20261115\\untracked\\docs\\screenshots\\proactive\\G2-purchase.png",
+      "disposition": "应保留",
+      "reason": "候选仓库无同 SHA256 图片；图片是历史运行截图/报告证据，路径与哈希保留在外置快照。未逐张视觉检查。",
+      "candidate_path_status": "missing",
+      "referenced_by": [],
+      "exact_duplicate_preserved_paths": [],
+      "visual_review": "not-visually-reviewed"
+    },
+    {
+      "category": "untracked",
+      "path": "docs/screenshots/proactive/G3-stock.png",
+      "bytes": 1034699,
+      "sha256": "c6219a565fec18cfb954ecb6d55ae3edb143e91240211ce2af1b38bb6896a06f",
+      "preserved_path": "F:\\AIXM\\烟花爆竹-closeout-evidence-20261115\\untracked\\docs\\screenshots\\proactive\\G3-stock.png",
+      "disposition": "应保留",
+      "reason": "候选仓库无同 SHA256 图片；图片是历史运行截图/报告证据，路径与哈希保留在外置快照。未逐张视觉检查。",
+      "candidate_path_status": "missing",
+      "referenced_by": [],
+      "exact_duplicate_preserved_paths": [],
+      "visual_review": "not-visually-reviewed"
+    },
+    {
+      "category": "untracked",
+      "path": "docs/screenshots/proactive/G4-report.png",
+      "bytes": 1078694,
+      "sha256": "edb4fd9dedeb7613511ade2d03b4fc77bc367a4d0d3721c6de24c3dc906ebcb1",
+      "preserved_path": "F:\\AIXM\\烟花爆竹-closeout-evidence-20261115\\untracked\\docs\\screenshots\\proactive\\G4-report.png",
+      "disposition": "应保留",
+      "reason": "候选仓库无同 SHA256 图片；图片是历史运行截图/报告证据，路径与哈希保留在外置快照。未逐张视觉检查。",
+      "candidate_path_status": "missing",
+      "referenced_by": [],
+      "exact_duplicate_preserved_paths": [],
+      "visual_review": "not-visually-reviewed"
+    },
+    {
+      "category": "untracked",
+      "path": "docs/screenshots/proactive/G5-more.png",
+      "bytes": 1327340,
+      "sha256": "880dea9347a28e31f8a678e44da6ac83c18020ca2d9eab2ffe71f1d21ac1315c",
+      "preserved_path": "F:\\AIXM\\烟花爆竹-closeout-evidence-20261115\\untracked\\docs\\screenshots\\proactive\\G5-more.png",
+      "disposition": "应保留",
+      "reason": "候选仓库无同 SHA256 图片；图片是历史运行截图/报告证据，路径与哈希保留在外置快照。未逐张视觉检查。",
+      "candidate_path_status": "missing",
+      "referenced_by": [],
+      "exact_duplicate_preserved_paths": [],
+      "visual_review": "not-visually-reviewed"
+    },
+    {
+      "category": "untracked",
+      "path": "docs/screenshots/proactive/G6-settings.png",
+      "bytes": 999597,
+      "sha256": "910634f15dc765aa1ebccdce906dc70a49301cfbbbf8a4dfdb9ca35ca50ce639",
+      "preserved_path": "F:\\AIXM\\烟花爆竹-closeout-evidence-20261115\\untracked\\docs\\screenshots\\proactive\\G6-settings.png",
+      "disposition": "应保留",
+      "reason": "候选仓库无同 SHA256 图片；图片是历史运行截图/报告证据，路径与哈希保留在外置快照。未逐张视觉检查。",
+      "candidate_path_status": "missing",
+      "referenced_by": [],
+      "exact_duplicate_preserved_paths": [],
+      "visual_review": "not-visually-reviewed"
+    },
+    {
+      "category": "untracked",
+      "path": "docs/screenshots/proactive/H1-first-screen.png",
+      "bytes": 1525574,
+      "sha256": "2688b9d1a014781cd2e221c855e76620444a570eedb37cabd094463cedf86f3c",
+      "preserved_path": "F:\\AIXM\\烟花爆竹-closeout-evidence-20261115\\untracked\\docs\\screenshots\\proactive\\H1-first-screen.png",
+      "disposition": "重复",
+      "reason": "此路径不是该 SHA256 组代表项；与 docs/screenshots/proactive/00-record-home.png 逐字节相同。全组原路径仍在快照，代表项保留，不能称为候选仓库已整合。",
+      "candidate_path_status": "missing",
+      "referenced_by": [],
+      "exact_duplicate_preserved_paths": [
+        "docs/screenshots/proactive/00-record-home.png"
+      ],
+      "visual_review": "not-visually-reviewed"
+    },
+    {
+      "category": "untracked",
+      "path": "docs/screenshots/proactive/H2-first-order-saved.png",
+      "bytes": 711640,
+      "sha256": "f018078cb95f48c11842fff253ed93b37ea82ff20c858823d3f46a5a7563c56b",
+      "preserved_path": "F:\\AIXM\\烟花爆竹-closeout-evidence-20261115\\untracked\\docs\\screenshots\\proactive\\H2-first-order-saved.png",
+      "disposition": "重复",
+      "reason": "此路径不是该 SHA256 组代表项；与 docs/screenshots/proactive/A1-after-save1.png 逐字节相同。全组原路径仍在快照，代表项保留，不能称为候选仓库已整合。",
+      "candidate_path_status": "missing",
+      "referenced_by": [],
+      "exact_duplicate_preserved_paths": [
+        "docs/screenshots/proactive/A1-after-save1.png"
+      ],
+      "visual_review": "not-visually-reviewed"
+    },
+    {
+      "category": "untracked",
+      "path": "docs/screenshots/proactive/H3-empty-picker-after-clear.png",
+      "bytes": 621984,
+      "sha256": "9b52f0fda74628897919a5fbac294f2d5c5541a14a0d1d7f54f54a771f95d154",
+      "preserved_path": "F:\\AIXM\\烟花爆竹-closeout-evidence-20261115\\untracked\\docs\\screenshots\\proactive\\H3-empty-picker-after-clear.png",
+      "disposition": "重复",
+      "reason": "此路径不是该 SHA256 组代表项；与 docs/screenshots/proactive/E8-picker-no-products.png 逐字节相同。全组原路径仍在快照，代表项保留，不能称为候选仓库已整合。",
+      "candidate_path_status": "missing",
+      "referenced_by": [],
+      "exact_duplicate_preserved_paths": [
+        "docs/screenshots/proactive/E8-picker-no-products.png"
+      ],
+      "visual_review": "not-visually-reviewed"
+    },
+    {
+      "category": "untracked",
+      "path": "docs/screenshots/proactive/H4-products-empty.png",
+      "bytes": 1980375,
+      "sha256": "00b1ea8d10b70568530590fccd971581ce7feaa91aa19c28746f73b4ead4ced5",
+      "preserved_path": "F:\\AIXM\\烟花爆竹-closeout-evidence-20261115\\untracked\\docs\\screenshots\\proactive\\H4-products-empty.png",
+      "disposition": "应保留",
+      "reason": "候选仓库无同 SHA256 图片；图片是历史运行截图/报告证据，路径与哈希保留在外置快照。未逐张视觉检查。",
+      "candidate_path_status": "missing",
+      "referenced_by": [],
+      "exact_duplicate_preserved_paths": [],
+      "visual_review": "not-visually-reviewed"
+    },
+    {
+      "category": "untracked",
+      "path": "docs/screenshots/proactive/H5-new-product-form.png",
+      "bytes": 500075,
+      "sha256": "3a71e23af4e83854c2e18dec9e38b6463d65ea9a82c2b5e07bdedecef0480348",
+      "preserved_path": "F:\\AIXM\\烟花爆竹-closeout-evidence-20261115\\untracked\\docs\\screenshots\\proactive\\H5-new-product-form.png",
+      "disposition": "应保留",
+      "reason": "候选仓库无同 SHA256 图片；图片是历史运行截图/报告证据，路径与哈希保留在外置快照。未逐张视觉检查。",
+      "candidate_path_status": "missing",
+      "referenced_by": [],
+      "exact_duplicate_preserved_paths": [],
+      "visual_review": "not-visually-reviewed"
+    },
+    {
+      "category": "untracked",
+      "path": "docs/screenshots/proactive/H6-first-order-from-zero.png",
+      "bytes": 616795,
+      "sha256": "9424f92546bd9ef4f670c4c1e2b33a25e76dfec8a0e64f435c4497967cda4f82",
+      "preserved_path": "F:\\AIXM\\烟花爆竹-closeout-evidence-20261115\\untracked\\docs\\screenshots\\proactive\\H6-first-order-from-zero.png",
+      "disposition": "应保留",
+      "reason": "候选仓库无同 SHA256 图片；图片是历史运行截图/报告证据，路径与哈希保留在外置快照。未逐张视觉检查。",
+      "candidate_path_status": "missing",
+      "referenced_by": [],
+      "exact_duplicate_preserved_paths": [],
+      "visual_review": "not-visually-reviewed"
+    },
+    {
+      "category": "untracked",
+      "path": "docs/screenshots/proactive/X1-toast-over-picker.png",
+      "bytes": 714065,
+      "sha256": "07f72b870e64ef6a3b9e26fc8b1ae6daaa4245bf123d2170c529b6157d6c8a52",
+      "preserved_path": "F:\\AIXM\\烟花爆竹-closeout-evidence-20261115\\untracked\\docs\\screenshots\\proactive\\X1-toast-over-picker.png",
+      "disposition": "应保留",
+      "reason": "候选仓库无同 SHA256 图片；图片是历史运行截图/报告证据，路径与哈希保留在外置快照。未逐张视觉检查。",
+      "candidate_path_status": "missing",
+      "referenced_by": [
+        {
+          "from": "docs/ux-proactive-20261112.md",
+          "line": 215,
+          "relation": "literal basename; resolve in context"
+        }
+      ],
+      "exact_duplicate_preserved_paths": [],
+      "visual_review": "not-visually-reviewed"
+    },
+    {
+      "category": "untracked",
+      "path": "docs/screenshots/proactive/X2-amount-errors.png",
+      "bytes": 1679810,
+      "sha256": "acb70e6bad6dc1aef8d70e1f2c247e3fc52136939ede3b6b90f8265d8cd8aa85",
+      "preserved_path": "F:\\AIXM\\烟花爆竹-closeout-evidence-20261115\\untracked\\docs\\screenshots\\proactive\\X2-amount-errors.png",
+      "disposition": "应保留",
+      "reason": "候选仓库无同 SHA256 图片；图片是历史运行截图/报告证据，路径与哈希保留在外置快照。未逐张视觉检查。",
+      "candidate_path_status": "missing",
+      "referenced_by": [],
+      "exact_duplicate_preserved_paths": [],
+      "visual_review": "not-visually-reviewed"
+    },
+    {
+      "category": "untracked",
+      "path": "docs/screenshots/proactive/X3-after-toast-undo.png",
+      "bytes": 1873048,
+      "sha256": "7dab0ef44c722a63b21d750020468d7db4a843bf40f7ba91e76ed78b3c622581",
+      "preserved_path": "F:\\AIXM\\烟花爆竹-closeout-evidence-20261115\\untracked\\docs\\screenshots\\proactive\\X3-after-toast-undo.png",
+      "disposition": "应保留",
+      "reason": "候选仓库无同 SHA256 图片；图片是历史运行截图/报告证据，路径与哈希保留在外置快照。未逐张视觉检查。",
+      "candidate_path_status": "missing",
+      "referenced_by": [],
+      "exact_duplicate_preserved_paths": [],
+      "visual_review": "not-visually-reviewed"
+    },
+    {
+      "category": "untracked",
+      "path": "docs/screenshots/proactive/X5-report-margin.png",
+      "bytes": 1108654,
+      "sha256": "f925690a38777305f560c4b59bf927f7a8c89064e16bccd87e09b2a49e461c55",
+      "preserved_path": "F:\\AIXM\\烟花爆竹-closeout-evidence-20261115\\untracked\\docs\\screenshots\\proactive\\X5-report-margin.png",
+      "disposition": "应保留",
+      "reason": "候选仓库无同 SHA256 图片；图片是历史运行截图/报告证据，路径与哈希保留在外置快照。未逐张视觉检查。",
+      "candidate_path_status": "missing",
+      "referenced_by": [],
+      "exact_duplicate_preserved_paths": [],
+      "visual_review": "not-visually-reviewed"
+    },
+    {
+      "category": "untracked",
+      "path": "docs/screenshots/proactive/X6-purchase-zero-qty.png",
+      "bytes": 1064833,
+      "sha256": "f6f5740cba6e2d9f8d0d7523236004351f83f4fa96a97b2becc0eb3adabcb9f7",
+      "preserved_path": "F:\\AIXM\\烟花爆竹-closeout-evidence-20261115\\untracked\\docs\\screenshots\\proactive\\X6-purchase-zero-qty.png",
+      "disposition": "应保留",
+      "reason": "候选仓库无同 SHA256 图片；图片是历史运行截图/报告证据，路径与哈希保留在外置快照。未逐张视觉检查。",
+      "candidate_path_status": "missing",
+      "referenced_by": [],
+      "exact_duplicate_preserved_paths": [],
+      "visual_review": "not-visually-reviewed"
+    },
+    {
+      "category": "untracked",
+      "path": "docs/screenshots/proactive/X7-purchase-empty-cost.png",
+      "bytes": 1057386,
+      "sha256": "0d98714689bb2e6914b8ea9122b51ea5104d085242581fa74e6da944377212ca",
+      "preserved_path": "F:\\AIXM\\烟花爆竹-closeout-evidence-20261115\\untracked\\docs\\screenshots\\proactive\\X7-purchase-empty-cost.png",
+      "disposition": "应保留",
+      "reason": "候选仓库无同 SHA256 图片；图片是历史运行截图/报告证据，路径与哈希保留在外置快照。未逐张视觉检查。",
+      "candidate_path_status": "missing",
+      "referenced_by": [],
+      "exact_duplicate_preserved_paths": [],
+      "visual_review": "not-visually-reviewed"
+    },
+    {
+      "category": "untracked",
+      "path": "docs/superpowers/plans/2026-11-13-stability-backend.md",
+      "bytes": 32857,
+      "sha256": "6a7e16c65a02b0c0b3eb134742aa8f894d73d93798c2cc01668a6c4961d6a6fd",
+      "preserved_path": "F:\\AIXM\\烟花爆竹-closeout-evidence-20261115\\untracked\\docs\\superpowers\\plans\\2026-11-13-stability-backend.md",
+      "disposition": "应保留",
+      "reason": "候选存在同路径但字节不同的新版文件；这是历史版本而非完全重复，禁止覆盖候选文件，独立快照保留原始版本。",
+      "candidate_path_status": "changed",
+      "referenced_by": [
+        {
+          "from": "docs/superpowers/plans/2026-11-13-stability-frontend.md",
+          "line": 15,
+          "relation": "literal basename; resolve in context"
+        },
+        {
+          "from": "docs/superpowers/plans/2026-11-13-stability-repair.md",
+          "line": 25,
+          "relation": "literal basename; resolve in context"
+        }
+      ],
+      "exact_duplicate_preserved_paths": [],
+      "visual_review": null
+    },
+    {
+      "category": "untracked",
+      "path": "docs/superpowers/plans/2026-11-13-stability-frontend.md",
+      "bytes": 18635,
+      "sha256": "f45435085595a2239fbe0f78b8b84519fc5ff3ea0092a81da6b21ae13f9de93a",
+      "preserved_path": "F:\\AIXM\\烟花爆竹-closeout-evidence-20261115\\untracked\\docs\\superpowers\\plans\\2026-11-13-stability-frontend.md",
+      "disposition": "应保留",
+      "reason": "候选存在同路径但字节不同的新版文件；这是历史版本而非完全重复，禁止覆盖候选文件，独立快照保留原始版本。",
+      "candidate_path_status": "changed",
+      "referenced_by": [
+        {
+          "from": "docs/superpowers/plans/2026-11-13-stability-backend.md",
+          "line": 15,
+          "relation": "literal basename; resolve in context"
+        },
+        {
+          "from": "docs/superpowers/plans/2026-11-13-stability-repair.md",
+          "line": 24,
+          "relation": "literal basename; resolve in context"
+        }
+      ],
+      "exact_duplicate_preserved_paths": [],
+      "visual_review": null
+    },
+    {
+      "category": "untracked",
+      "path": "docs/superpowers/plans/2026-11-13-stability-repair.md",
+      "bytes": 16045,
+      "sha256": "5f6f77e595096e57df8afa054ebb65276ce00e0f25f6a82bf305dee4b1ef2ab4",
+      "preserved_path": "F:\\AIXM\\烟花爆竹-closeout-evidence-20261115\\untracked\\docs\\superpowers\\plans\\2026-11-13-stability-repair.md",
+      "disposition": "应保留",
+      "reason": "候选存在同路径但字节不同的新版文件；这是历史版本而非完全重复，禁止覆盖候选文件，独立快照保留原始版本。",
+      "candidate_path_status": "changed",
+      "referenced_by": [
+        {
+          "from": "AGENTS.md",
+          "line": 47,
+          "relation": "literal full path"
+        },
+        {
+          "from": "CHANGELOG.md",
+          "line": 8,
+          "relation": "literal full path"
+        },
+        {
+          "from": "README.md",
+          "line": 16,
+          "relation": "literal full path"
+        },
+        {
+          "from": "docs/03-云同步设置.md",
+          "line": 6,
+          "relation": "literal basename; resolve in context"
+        },
+        {
+          "from": "docs/04-设计系统.md",
+          "line": 8,
+          "relation": "literal basename; resolve in context"
+        },
+        {
+          "from": "docs/05-技术债登记表.md",
+          "line": 3,
+          "relation": "literal basename; resolve in context"
+        },
+        {
+          "from": "docs/06-技术债修复执行计划.md",
+          "line": 3,
+          "relation": "literal basename; resolve in context"
+        },
+        {
+          "from": "docs/06-技术债修复执行计划.md",
+          "line": 117,
+          "relation": "literal basename; resolve in context"
+        },
+        {
+          "from": "docs/07-技术债修复执行记录.md",
+          "line": 3,
+          "relation": "literal basename; resolve in context"
+        },
+        {
+          "from": "docs/08-运维手册.md",
+          "line": 259,
+          "relation": "literal basename; resolve in context"
+        },
+        {
+          "from": "docs/superpowers/plans/2026-11-13-stability-backend.md",
+          "line": 15,
+          "relation": "literal basename; resolve in context"
+        },
+        {
+          "from": "docs/superpowers/plans/2026-11-13-stability-frontend.md",
+          "line": 15,
+          "relation": "literal basename; resolve in context"
+        },
+        {
+          "from": "docs/ux-audit-report-20261112.md",
+          "line": 3,
+          "relation": "literal basename; resolve in context"
+        },
+        {
+          "from": "docs/ux-audit-sync-20261112.md",
+          "line": 3,
+          "relation": "literal basename; resolve in context"
+        },
+        {
+          "from": "docs/ux-consistency-20261112.md",
+          "line": 3,
+          "relation": "literal basename; resolve in context"
+        },
+        {
+          "from": "docs/ux-proactive-20261112.md",
+          "line": 3,
+          "relation": "literal basename; resolve in context"
+        },
+        {
+          "from": "docs/代码异味基线-20261110.md",
+          "line": 3,
+          "relation": "literal basename; resolve in context"
+        },
+        {
+          "from": "docs/代码异味基线-20261110.md",
+          "line": 199,
+          "relation": "literal basename; resolve in context"
+        },
+        {
+          "from": "docs/代码异味基线-20261110.md",
+          "line": 209,
+          "relation": "literal basename; resolve in context"
+        },
+        {
+          "from": "docs/代码异味基线-20261110.md",
+          "line": 218,
+          "relation": "literal basename; resolve in context"
+        },
+        {
+          "from": "docs/代码异味基线-20261110.md",
+          "line": 554,
+          "relation": "literal full path"
+        },
+        {
+          "from": "docs/代码异味基线-20261110.md",
+          "line": 623,
+          "relation": "literal basename; resolve in context"
+        },
+        {
+          "from": "docs/代码异味检测入口.md",
+          "line": 68,
+          "relation": "literal basename; resolve in context"
+        },
+        {
+          "from": "docs/代码异味检测入口.md",
+          "line": 74,
+          "relation": "literal basename; resolve in context"
+        },
+        {
+          "from": "docs/代码异味检测入口.md",
+          "line": 76,
+          "relation": "literal basename; resolve in context"
+        }
+      ],
+      "exact_duplicate_preserved_paths": [],
+      "visual_review": null
+    },
+    {
+      "category": "untracked",
+      "path": "scripts/action-row-20261112/measure.py",
+      "bytes": 24198,
+      "sha256": "491679946b69f671137495f1fc4c0e56712cd6b1aa779795b50233273590fae7",
+      "preserved_path": "F:\\AIXM\\烟花爆竹-closeout-evidence-20261115\\untracked\\scripts\\action-row-20261112\\measure.py",
+      "disposition": "应保留",
+      "reason": "历史审计/探针实现，仅用于理解和追溯旧观测；不适合作为现役回归直接运行，避免其硬编码原 main 写路径或启动浏览器/mock。原始字节仅外置保全。",
+      "candidate_path_status": "missing",
+      "referenced_by": [
+        {
+          "from": "docs/dock-belt-20261112.md",
+          "line": 199,
+          "relation": "literal basename; resolve in context"
+        },
+        {
+          "from": "docs/dock-belt-20261112.md",
+          "line": 210,
+          "relation": "literal basename; resolve in context"
+        },
+        {
+          "from": "docs/dock-belt-20261112.md",
+          "line": 238,
+          "relation": "literal full path"
+        },
+        {
+          "from": "docs/dock-belt-verify-20261112.md",
+          "line": 105,
+          "relation": "literal basename; resolve in context"
+        },
+        {
+          "from": "docs/dock-belt-verify-20261112.md",
+          "line": 116,
+          "relation": "literal basename; resolve in context"
+        },
+        {
+          "from": "docs/代码异味基线-20261110.md",
+          "line": 549,
+          "relation": "literal full path"
+        },
+        {
+          "from": "scripts/action-row-20261112/measure.py",
+          "line": 10,
+          "relation": "literal full path"
+        },
+        {
+          "from": "scripts/action-row-20261112/measure.py",
+          "line": 12,
+          "relation": "literal basename; resolve in context"
+        },
+        {
+          "from": "scripts/dock-belt-20261112/measure.py",
+          "line": 7,
+          "relation": "literal basename; resolve in context"
+        },
+        {
+          "from": "scripts/dock-belt-20261112/measure.py",
+          "line": 8,
+          "relation": "literal basename; resolve in context"
+        }
+      ],
+      "exact_duplicate_preserved_paths": [],
+      "visual_review": null
+    },
+    {
+      "category": "untracked",
+      "path": "scripts/action-row-20261112/result.json",
+      "bytes": 84186,
+      "sha256": "530e22ff1bbdac77c08fccfa500d3937f08ea260d7159a6bb34270dc47891b2f",
+      "preserved_path": "F:\\AIXM\\烟花爆竹-closeout-evidence-20261115\\untracked\\scripts\\action-row-20261112\\result.json",
+      "disposition": "应保留",
+      "reason": "候选仓库无同 SHA256 数据；该 JSON 是运行时测量/回归原始结构化结果，摘要见 JSON 摘要表；原始完整数据仅外置保全。",
+      "candidate_path_status": "missing",
+      "referenced_by": [
+        {
+          "from": "scripts/action-row-20261112/measure.py",
+          "line": 34,
+          "relation": "writes result output"
+        },
+        {
+          "from": "scripts/action-row-20261112/show.py",
+          "line": 7,
+          "relation": "reads result output"
+        },
+        {
+          "from": "docs/dock-belt-20261112.md",
+          "line": 238,
+          "relation": "historic repro command family"
+        }
+      ],
+      "exact_duplicate_preserved_paths": [],
+      "visual_review": null
+    },
+    {
+      "category": "untracked",
+      "path": "scripts/action-row-20261112/show.py",
+      "bytes": 790,
+      "sha256": "a9447a7a9b01b41ee577ea5f4cd57d9d5507327e16f567c843ec0d7e5f07230b",
+      "preserved_path": "F:\\AIXM\\烟花爆竹-closeout-evidence-20261115\\untracked\\scripts\\action-row-20261112\\show.py",
+      "disposition": "应保留",
+      "reason": "历史审计/探针实现，仅用于理解和追溯旧观测；不适合作为现役回归直接运行，避免其硬编码原 main 写路径或启动浏览器/mock。原始字节仅外置保全。",
+      "candidate_path_status": "missing",
+      "referenced_by": [],
+      "exact_duplicate_preserved_paths": [],
+      "visual_review": null
+    },
+    {
+      "category": "untracked",
+      "path": "scripts/report-fix-b-20261112/probe_fix_b.py",
+      "bytes": 11369,
+      "sha256": "6f184470aec5c1250a94fdda708dd2e4f21ef230b4ca8146203b110fd764f6bb",
+      "preserved_path": "F:\\AIXM\\烟花爆竹-closeout-evidence-20261115\\untracked\\scripts\\report-fix-b-20261112\\probe_fix_b.py",
+      "disposition": "应保留",
+      "reason": "历史审计/探针实现，仅用于理解和追溯旧观测；不适合作为现役回归直接运行，避免其硬编码原 main 写路径或启动浏览器/mock。原始字节仅外置保全。",
+      "candidate_path_status": "missing",
+      "referenced_by": [
+        {
+          "from": "scripts/report-fix-b-20261112/verify.md",
+          "line": 5,
+          "relation": "literal full path"
+        },
+        {
+          "from": "scripts/report-fix-b-20261112/verify.md",
+          "line": 73,
+          "relation": "literal full path"
+        }
+      ],
+      "exact_duplicate_preserved_paths": [],
+      "visual_review": null
+    },
+    {
+      "category": "untracked",
+      "path": "scripts/report-fix-b-20261112/result.json",
+      "bytes": 60043,
+      "sha256": "40781f8fc853efdbca60e8232a6a8c2d53d24fe6d55faa799f617d4f64913f15",
+      "preserved_path": "F:\\AIXM\\烟花爆竹-closeout-evidence-20261115\\untracked\\scripts\\report-fix-b-20261112\\result.json",
+      "disposition": "应保留",
+      "reason": "候选仓库无同 SHA256 数据；该 JSON 是运行时测量/回归原始结构化结果，摘要见 JSON 摘要表；原始完整数据仅外置保全。",
+      "candidate_path_status": "missing",
+      "referenced_by": [
+        {
+          "from": "scripts/report-fix-b-20261112/probe_fix_b.py",
+          "line": 11,
+          "relation": "literal full path"
+        },
+        {
+          "from": "scripts/report-fix-b-20261112/probe_fix_b.py",
+          "line": 31,
+          "relation": "writes output"
+        },
+        {
+          "from": "scripts/report-fix-b-20261112/verify.md",
+          "line": 5,
+          "relation": "verification input"
+        },
+        {
+          "from": "scripts/report-fix-b-20261112/probe_fix_b.py",
+          "line": 11,
+          "relation": "literal full path"
+        }
+      ],
+      "exact_duplicate_preserved_paths": [],
+      "visual_review": null
+    },
+    {
+      "category": "untracked",
+      "path": "scripts/report-fix-b-20261112/verify.md",
+      "bytes": 4231,
+      "sha256": "564ef59a35d6c0174d8e07af592844653fa6ab0408954c97aa7035e49a3fd2e6",
+      "preserved_path": "F:\\AIXM\\烟花爆竹-closeout-evidence-20261115\\untracked\\scripts\\report-fix-b-20261112\\verify.md",
+      "disposition": "应保留",
+      "reason": "历史验证说明包含当时环境、判定和测试凭证，不是现役验收；原文仅外置保留，避免与现役总方案并列误导。",
+      "candidate_path_status": "missing",
+      "referenced_by": [],
+      "exact_duplicate_preserved_paths": [],
+      "visual_review": null
+    },
+    {
+      "category": "untracked",
+      "path": "scripts/ux-audit-20261112/audit_report.py",
+      "bytes": 21516,
+      "sha256": "e1f817ad779ad9e03c70781a05e20c42cad2ee92a61d0b450869b62d17a2ad0d",
+      "preserved_path": "F:\\AIXM\\烟花爆竹-closeout-evidence-20261115\\untracked\\scripts\\ux-audit-20261112\\audit_report.py",
+      "disposition": "应保留",
+      "reason": "历史审计/探针实现，仅用于理解和追溯旧观测；不适合作为现役回归直接运行，避免其硬编码原 main 写路径或启动浏览器/mock。原始字节仅外置保全。",
+      "candidate_path_status": "missing",
+      "referenced_by": [
+        {
+          "from": "docs/ux-audit-report-20261112.md",
+          "line": 239,
+          "relation": "literal full path"
+        },
+        {
+          "from": "scripts/ux-audit-20261112/extra_report.py",
+          "line": 3,
+          "relation": "literal basename; resolve in context"
+        },
+        {
+          "from": "scripts/ux-audit-20261112/extra_report.py",
+          "line": 22,
+          "relation": "literal basename; resolve in context"
+        },
+        {
+          "from": "scripts/ux-audit-20261112/extra_shots.py",
+          "line": 8,
+          "relation": "literal basename; resolve in context"
+        },
+        {
+          "from": "scripts/ux-audit-20261112/sticky_controls.py",
+          "line": 17,
+          "relation": "literal basename; resolve in context"
+        },
+        {
+          "from": "scripts/ux-probe-20261112/debug_sticky.py",
+          "line": 14,
+          "relation": "literal basename; resolve in context"
+        },
+        {
+          "from": "scripts/ux-probe-20261112/final_ui_regress.py",
+          "line": 30,
+          "relation": "literal basename; resolve in context"
+        }
+      ],
+      "exact_duplicate_preserved_paths": [],
+      "visual_review": null
+    },
+    {
+      "category": "untracked",
+      "path": "scripts/ux-audit-20261112/extra.json",
+      "bytes": 4694,
+      "sha256": "562c783721ffdb4662156f44c4498da9678fda13448bb7ac6a69531d22f34b50",
+      "preserved_path": "F:\\AIXM\\烟花爆竹-closeout-evidence-20261115\\untracked\\scripts\\ux-audit-20261112\\extra.json",
+      "disposition": "应保留",
+      "reason": "候选仓库无同 SHA256 数据；该 JSON 是运行时测量/回归原始结构化结果，摘要见 JSON 摘要表；原始完整数据仅外置保全。",
+      "candidate_path_status": "missing",
+      "referenced_by": [
+        {
+          "from": "scripts/ux-audit-20261112/extra_report.py",
+          "line": 18,
+          "relation": "writes output"
+        },
+        {
+          "from": "docs/ux-audit-report-20261112.md",
+          "line": 238,
+          "relation": "command/output reference"
+        }
+      ],
+      "exact_duplicate_preserved_paths": [],
+      "visual_review": null
+    },
+    {
+      "category": "untracked",
+      "path": "scripts/ux-audit-20261112/extra_report.py",
+      "bytes": 12024,
+      "sha256": "c7c0b57f95ebf852e7f37d63563fc455c745dd5fccbfbcbb3b3df34b83ebcf31",
+      "preserved_path": "F:\\AIXM\\烟花爆竹-closeout-evidence-20261115\\untracked\\scripts\\ux-audit-20261112\\extra_report.py",
+      "disposition": "应保留",
+      "reason": "历史审计/探针实现，仅用于理解和追溯旧观测；不适合作为现役回归直接运行，避免其硬编码原 main 写路径或启动浏览器/mock。原始字节仅外置保全。",
+      "candidate_path_status": "missing",
+      "referenced_by": [
+        {
+          "from": "docs/ux-audit-report-20261112.md",
+          "line": 240,
+          "relation": "literal full path"
+        }
+      ],
+      "exact_duplicate_preserved_paths": [],
+      "visual_review": null
+    },
+    {
+      "category": "untracked",
+      "path": "scripts/ux-audit-20261112/extra_shots.py",
+      "bytes": 2204,
+      "sha256": "bfdec960b447535eb4e08066255568468a3ea878fa84e9b2b7727eef41edc732",
+      "preserved_path": "F:\\AIXM\\烟花爆竹-closeout-evidence-20261115\\untracked\\scripts\\ux-audit-20261112\\extra_shots.py",
+      "disposition": "应保留",
+      "reason": "历史审计/探针实现，仅用于理解和追溯旧观测；不适合作为现役回归直接运行，避免其硬编码原 main 写路径或启动浏览器/mock。原始字节仅外置保全。",
+      "candidate_path_status": "missing",
+      "referenced_by": [],
+      "exact_duplicate_preserved_paths": [],
+      "visual_review": null
+    },
+    {
+      "category": "untracked",
+      "path": "scripts/ux-audit-20261112/plan.py",
+      "bytes": 9604,
+      "sha256": "64498662f2878eb8a8109146faaa9d81cdd9bd8a90c70dbe1b9bdd0863946a6e",
+      "preserved_path": "F:\\AIXM\\烟花爆竹-closeout-evidence-20261115\\untracked\\scripts\\ux-audit-20261112\\plan.py",
+      "disposition": "应保留",
+      "reason": "历史审计/探针实现，仅用于理解和追溯旧观测；不适合作为现役回归直接运行，避免其硬编码原 main 写路径或启动浏览器/mock。原始字节仅外置保全。",
+      "candidate_path_status": "missing",
+      "referenced_by": [
+        {
+          "from": "docs/ux-audit-report-20261112.md",
+          "line": 7,
+          "relation": "literal full path"
+        },
+        {
+          "from": "docs/ux-audit-report-20261112.md",
+          "line": 242,
+          "relation": "literal full path"
+        },
+        {
+          "from": "scripts/report-fix-a-20261112/probe_fix.py",
+          "line": 4,
+          "relation": "literal full path"
+        },
+        {
+          "from": "scripts/report-fix-a-20261112/verify.md",
+          "line": 4,
+          "relation": "literal full path"
+        },
+        {
+          "from": "scripts/report-fix-b-20261112/verify.md",
+          "line": 4,
+          "relation": "literal full path"
+        }
+      ],
+      "exact_duplicate_preserved_paths": [],
+      "visual_review": null
+    },
+    {
+      "category": "untracked",
+      "path": "scripts/ux-audit-20261112/result.json",
+      "bytes": 13082,
+      "sha256": "61255d552e57b8d20f39326ba9b5edce76f7e786b2ce4efce09fcdee2a0813f7",
+      "preserved_path": "F:\\AIXM\\烟花爆竹-closeout-evidence-20261115\\untracked\\scripts\\ux-audit-20261112\\result.json",
+      "disposition": "应保留",
+      "reason": "候选仓库无同 SHA256 数据；该 JSON 是运行时测量/回归原始结构化结果，摘要见 JSON 摘要表；原始完整数据仅外置保全。",
+      "candidate_path_status": "missing",
+      "referenced_by": [
+        {
+          "from": "scripts/ux-audit-20261112/audit_report.py",
+          "line": 4,
+          "relation": "literal full path"
+        },
+        {
+          "from": "scripts/ux-audit-20261112/audit_report.py",
+          "line": 24,
+          "relation": "writes output"
+        },
+        {
+          "from": "docs/ux-audit-report-20261112.md",
+          "line": 237,
+          "relation": "command/output reference"
+        },
+        {
+          "from": "scripts/ux-audit-20261112/audit_report.py",
+          "line": 4,
+          "relation": "literal full path"
+        }
+      ],
+      "exact_duplicate_preserved_paths": [],
+      "visual_review": null
+    },
+    {
+      "category": "untracked",
+      "path": "scripts/ux-audit-20261112/sticky.json",
+      "bytes": 1408,
+      "sha256": "205baff68aaa9b802d126135bba3ef1f9d19a845b4bdc104e25d30b80fc77115",
+      "preserved_path": "F:\\AIXM\\烟花爆竹-closeout-evidence-20261115\\untracked\\scripts\\ux-audit-20261112\\sticky.json",
+      "disposition": "应保留",
+      "reason": "候选仓库无同 SHA256 数据；该 JSON 是运行时测量/回归原始结构化结果，摘要见 JSON 摘要表；原始完整数据仅外置保全。",
+      "candidate_path_status": "missing",
+      "referenced_by": [
+        {
+          "from": "docs/ux-audit-report-20261112.md",
+          "line": 197,
+          "relation": "literal basename; resolve in context"
+        },
+        {
+          "from": "docs/ux-audit-report-20261112.md",
+          "line": 203,
+          "relation": "literal basename; resolve in context"
+        },
+        {
+          "from": "docs/ux-audit-report-20261112.md",
+          "line": 241,
+          "relation": "literal basename; resolve in context"
+        },
+        {
+          "from": "scripts/ux-audit-20261112/sticky_controls.py",
+          "line": 121,
+          "relation": "literal basename; resolve in context"
+        },
+        {
+          "from": "scripts/ux-audit-20261112/sticky_controls.py",
+          "line": 13,
+          "relation": "writes output"
+        },
+        {
+          "from": "docs/ux-audit-report-20261112.md",
+          "line": 239,
+          "relation": "command/output reference"
+        },
+        {
+          "from": "docs/ux-audit-report-20261112.md",
+          "line": 197,
+          "relation": "literal basename; resolve in context"
+        },
+        {
+          "from": "docs/ux-audit-report-20261112.md",
+          "line": 203,
+          "relation": "literal basename; resolve in context"
+        },
+        {
+          "from": "docs/ux-audit-report-20261112.md",
+          "line": 241,
+          "relation": "literal basename; resolve in context"
+        },
+        {
+          "from": "scripts/ux-audit-20261112/sticky_controls.py",
+          "line": 121,
+          "relation": "literal basename; resolve in context"
+        }
+      ],
+      "exact_duplicate_preserved_paths": [],
+      "visual_review": null
+    },
+    {
+      "category": "untracked",
+      "path": "scripts/ux-audit-20261112/sticky_controls.py",
+      "bytes": 5667,
+      "sha256": "5eeefbed0e47466a92671bd2af73d1692e384ac1f7ccc87771e3aadc81bf9c97",
+      "preserved_path": "F:\\AIXM\\烟花爆竹-closeout-evidence-20261115\\untracked\\scripts\\ux-audit-20261112\\sticky_controls.py",
+      "disposition": "应保留",
+      "reason": "历史审计/探针实现，仅用于理解和追溯旧观测；不适合作为现役回归直接运行，避免其硬编码原 main 写路径或启动浏览器/mock。原始字节仅外置保全。",
+      "candidate_path_status": "missing",
+      "referenced_by": [
+        {
+          "from": "docs/ux-audit-report-20261112.md",
+          "line": 241,
+          "relation": "literal full path"
+        }
+      ],
+      "exact_duplicate_preserved_paths": [],
+      "visual_review": null
+    },
+    {
+      "category": "untracked",
+      "path": "scripts/ux-audit-consistency-20261112/count_inline.py",
+      "bytes": 1024,
+      "sha256": "8bbd50862c1299c0fe23308b995ce5aac4eabc1244d26b354ad309aa05b1c59f",
+      "preserved_path": "F:\\AIXM\\烟花爆竹-closeout-evidence-20261115\\untracked\\scripts\\ux-audit-consistency-20261112\\count_inline.py",
+      "disposition": "应保留",
+      "reason": "历史审计/探针实现，仅用于理解和追溯旧观测；不适合作为现役回归直接运行，避免其硬编码原 main 写路径或启动浏览器/mock。原始字节仅外置保全。",
+      "candidate_path_status": "missing",
+      "referenced_by": [
+        {
+          "from": "docs/ux-consistency-20261112.md",
+          "line": 272,
+          "relation": "literal basename; resolve in context"
+        }
+      ],
+      "exact_duplicate_preserved_paths": [],
+      "visual_review": null
+    },
+    {
+      "category": "untracked",
+      "path": "scripts/ux-audit-consistency-20261112/fix_report.py",
+      "bytes": 833,
+      "sha256": "01e439c137bb1bc5e10e4b4f2bd09636e8ddf722a7469d2da657692f12739c37",
+      "preserved_path": "F:\\AIXM\\烟花爆竹-closeout-evidence-20261115\\untracked\\scripts\\ux-audit-consistency-20261112\\fix_report.py",
+      "disposition": "应保留",
+      "reason": "历史审计/探针实现，仅用于理解和追溯旧观测；不适合作为现役回归直接运行，避免其硬编码原 main 写路径或启动浏览器/mock。原始字节仅外置保全。",
+      "candidate_path_status": "missing",
+      "referenced_by": [],
+      "exact_duplicate_preserved_paths": [],
+      "visual_review": null
+    },
+    {
+      "category": "untracked",
+      "path": "scripts/ux-audit-consistency-20261112/fix_report2.py",
+      "bytes": 1907,
+      "sha256": "d5678d396ed3b131eec358fca136f2f46bc296167fd58cf2a4e02e175aaaa746",
+      "preserved_path": "F:\\AIXM\\烟花爆竹-closeout-evidence-20261115\\untracked\\scripts\\ux-audit-consistency-20261112\\fix_report2.py",
+      "disposition": "应保留",
+      "reason": "历史审计/探针实现，仅用于理解和追溯旧观测；不适合作为现役回归直接运行，避免其硬编码原 main 写路径或启动浏览器/mock。原始字节仅外置保全。",
+      "candidate_path_status": "missing",
+      "referenced_by": [],
+      "exact_duplicate_preserved_paths": [],
+      "visual_review": null
+    },
+    {
+      "category": "untracked",
+      "path": "scripts/ux-audit-consistency-20261112/probe.py",
+      "bytes": 13718,
+      "sha256": "ff7a0e19ba032185900e790f1b6deca80b4fc65d908dcaa83e1e00b90178b27b",
+      "preserved_path": "F:\\AIXM\\烟花爆竹-closeout-evidence-20261115\\untracked\\scripts\\ux-audit-consistency-20261112\\probe.py",
+      "disposition": "应保留",
+      "reason": "历史审计/探针实现，仅用于理解和追溯旧观测；不适合作为现役回归直接运行，避免其硬编码原 main 写路径或启动浏览器/mock。原始字节仅外置保全。",
+      "candidate_path_status": "missing",
+      "referenced_by": [
+        {
+          "from": "docs/ux-consistency-20261112.md",
+          "line": 6,
+          "relation": "literal full path"
+        },
+        {
+          "from": "docs/ux-consistency-20261112.md",
+          "line": 272,
+          "relation": "literal full path"
+        },
+        {
+          "from": "scripts/ux-audit-consistency-20261112/probe.py",
+          "line": 5,
+          "relation": "literal full path"
+        }
+      ],
+      "exact_duplicate_preserved_paths": [],
+      "visual_review": null
+    },
+    {
+      "category": "untracked",
+      "path": "scripts/ux-audit-consistency-20261112/probe2.py",
+      "bytes": 6256,
+      "sha256": "6e688d47cdac6ee7395ebe1bc7ffd701c12e1ce8a8a231a63321b3f0b45c75ee",
+      "preserved_path": "F:\\AIXM\\烟花爆竹-closeout-evidence-20261115\\untracked\\scripts\\ux-audit-consistency-20261112\\probe2.py",
+      "disposition": "应保留",
+      "reason": "历史审计/探针实现，仅用于理解和追溯旧观测；不适合作为现役回归直接运行，避免其硬编码原 main 写路径或启动浏览器/mock。原始字节仅外置保全。",
+      "candidate_path_status": "missing",
+      "referenced_by": [
+        {
+          "from": "scripts/ux-audit-consistency-20261112/probe2.py",
+          "line": 5,
+          "relation": "literal full path"
+        }
+      ],
+      "exact_duplicate_preserved_paths": [],
+      "visual_review": null
+    },
+    {
+      "category": "untracked",
+      "path": "scripts/ux-audit-consistency-20261112/runtime.json",
+      "bytes": 8206,
+      "sha256": "c87b24adda76e9456a89b9e18d07c31dfad115edbc76cd88f488ab65557530c9",
+      "preserved_path": "F:\\AIXM\\烟花爆竹-closeout-evidence-20261115\\untracked\\scripts\\ux-audit-consistency-20261112\\runtime.json",
+      "disposition": "应保留",
+      "reason": "候选仓库无同 SHA256 数据；该 JSON 是运行时测量/回归原始结构化结果，摘要见 JSON 摘要表；原始完整数据仅外置保全。",
+      "candidate_path_status": "missing",
+      "referenced_by": [
+        {
+          "from": "docs/ux-consistency-20261112.md",
+          "line": 271,
+          "relation": "literal full path"
+        },
+        {
+          "from": "scripts/ux-audit-consistency-20261112/probe.py",
+          "line": 22,
+          "relation": "writes output"
+        },
+        {
+          "from": "docs/ux-consistency-20261112.md",
+          "line": 4,
+          "relation": "cited measured data"
+        },
+        {
+          "from": "docs/ux-consistency-20261112.md",
+          "line": 271,
+          "relation": "literal full path"
+        }
+      ],
+      "exact_duplicate_preserved_paths": [],
+      "visual_review": null
+    },
+    {
+      "category": "untracked",
+      "path": "scripts/ux-audit-consistency-20261112/runtime2.json",
+      "bytes": 4396,
+      "sha256": "1d61b543252eb205bb98bc9e786620641b51072643a1086ed215607c8dbad42c",
+      "preserved_path": "F:\\AIXM\\烟花爆竹-closeout-evidence-20261115\\untracked\\scripts\\ux-audit-consistency-20261112\\runtime2.json",
+      "disposition": "应保留",
+      "reason": "候选仓库无同 SHA256 数据；该 JSON 是运行时测量/回归原始结构化结果，摘要见 JSON 摘要表；原始完整数据仅外置保全。",
+      "candidate_path_status": "missing",
+      "referenced_by": [
+        {
+          "from": "scripts/ux-audit-consistency-20261112/probe2.py",
+          "line": 16,
+          "relation": "writes output"
+        },
+        {
+          "from": "docs/ux-consistency-20261112.md",
+          "line": 4,
+          "relation": "cited measured data"
+        }
+      ],
+      "exact_duplicate_preserved_paths": [],
+      "visual_review": null
+    },
+    {
+      "category": "untracked",
+      "path": "scripts/ux-audit-sync-20261112/audit_lib.py",
+      "bytes": 14622,
+      "sha256": "50308dbd7b9dd91e9197ebae9f6bcbf3c29c6bb36a94f8f61da47c562a32c211",
+      "preserved_path": "F:\\AIXM\\烟花爆竹-closeout-evidence-20261115\\untracked\\scripts\\ux-audit-sync-20261112\\audit_lib.py",
+      "disposition": "应保留",
+      "reason": "历史审计/探针实现，仅用于理解和追溯旧观测；不适合作为现役回归直接运行，避免其硬编码原 main 写路径或启动浏览器/mock。原始字节仅外置保全。",
+      "candidate_path_status": "missing",
+      "referenced_by": [
+        {
+          "from": "docs/ux-audit-sync-20261112.md",
+          "line": 375,
+          "relation": "literal basename; resolve in context"
+        }
+      ],
+      "exact_duplicate_preserved_paths": [],
+      "visual_review": null
+    },
+    {
+      "category": "untracked",
+      "path": "scripts/ux-audit-sync-20261112/audit_sync.py",
+      "bytes": 27201,
+      "sha256": "0a641f33773197e372fe2a51c956025c0794847a101b4d30220a217862ed8155",
+      "preserved_path": "F:\\AIXM\\烟花爆竹-closeout-evidence-20261115\\untracked\\scripts\\ux-audit-sync-20261112\\audit_sync.py",
+      "disposition": "应保留",
+      "reason": "历史审计/探针实现，仅用于理解和追溯旧观测；不适合作为现役回归直接运行，避免其硬编码原 main 写路径或启动浏览器/mock。原始字节仅外置保全。",
+      "candidate_path_status": "missing",
+      "referenced_by": [
+        {
+          "from": "docs/ux-audit-sync-20261112.md",
+          "line": 13,
+          "relation": "literal full path"
+        },
+        {
+          "from": "docs/ux-audit-sync-20261112.md",
+          "line": 14,
+          "relation": "literal full path"
+        },
+        {
+          "from": "docs/ux-audit-sync-20261112.md",
+          "line": 375,
+          "relation": "literal full path"
+        },
+        {
+          "from": "scripts/ux-audit-sync-20261112/audit_sync.py",
+          "line": 4,
+          "relation": "literal full path"
+        },
+        {
+          "from": "scripts/ux-audit-sync-20261112/audit_sync.py",
+          "line": 5,
+          "relation": "literal full path"
+        }
+      ],
+      "exact_duplicate_preserved_paths": [],
+      "visual_review": null
+    },
+    {
+      "category": "untracked",
+      "path": "scripts/ux-audit-sync-20261112/evidence.json",
+      "bytes": 8877,
+      "sha256": "da6205c2894f688adb2da1f3a387136a09b1d45854638468dc5e21ed2b820024",
+      "preserved_path": "F:\\AIXM\\烟花爆竹-closeout-evidence-20261115\\untracked\\scripts\\ux-audit-sync-20261112\\evidence.json",
+      "disposition": "应保留",
+      "reason": "候选仓库无同 SHA256 数据；该 JSON 是运行时测量/回归原始结构化结果，摘要见 JSON 摘要表；原始完整数据仅外置保全。",
+      "candidate_path_status": "missing",
+      "referenced_by": [
+        {
+          "from": "docs/ux-audit-sync-20261112.md",
+          "line": 17,
+          "relation": "literal full path"
+        },
+        {
+          "from": "docs/ux-audit-sync-20261112.md",
+          "line": 288,
+          "relation": "literal basename; resolve in context"
+        },
+        {
+          "from": "docs/ux-audit-sync-20261112.md",
+          "line": 374,
+          "relation": "literal full path"
+        },
+        {
+          "from": "scripts/ux-audit-sync-20261112/audit_sync.py",
+          "line": 9,
+          "relation": "literal full path"
+        },
+        {
+          "from": "scripts/ux-audit-sync-20261112/audit_sync.py",
+          "line": 29,
+          "relation": "literal basename; resolve in context"
+        },
+        {
+          "from": "scripts/ux-audit-sync-20261112/audit_sync.py",
+          "line": 678,
+          "relation": "literal basename; resolve in context"
+        },
+        {
+          "from": "scripts/ux-audit-sync-20261112/verify_h3.py",
+          "line": 8,
+          "relation": "literal basename; resolve in context"
+        },
+        {
+          "from": "scripts/ux-audit-sync-20261112/verify_h3.py",
+          "line": 40,
+          "relation": "literal basename; resolve in context"
+        },
+        {
+          "from": "scripts/ux-audit-sync-20261112/audit_sync.py",
+          "line": 31,
+          "relation": "writes output"
+        },
+        {
+          "from": "docs/ux-audit-sync-20261112.md",
+          "line": 17,
+          "relation": "historical evidence reference"
+        },
+        {
+          "from": "docs/ux-audit-sync-20261112.md",
+          "line": 17,
+          "relation": "literal full path"
+        },
+        {
+          "from": "docs/ux-audit-sync-20261112.md",
+          "line": 288,
+          "relation": "literal basename; resolve in context"
+        },
+        {
+          "from": "docs/ux-audit-sync-20261112.md",
+          "line": 374,
+          "relation": "literal full path"
+        },
+        {
+          "from": "scripts/ux-audit-sync-20261112/audit_sync.py",
+          "line": 9,
+          "relation": "literal full path"
+        },
+        {
+          "from": "scripts/ux-audit-sync-20261112/audit_sync.py",
+          "line": 29,
+          "relation": "literal basename; resolve in context"
+        },
+        {
+          "from": "scripts/ux-audit-sync-20261112/audit_sync.py",
+          "line": 678,
+          "relation": "literal basename; resolve in context"
+        },
+        {
+          "from": "scripts/ux-audit-sync-20261112/verify_h3.py",
+          "line": 8,
+          "relation": "literal basename; resolve in context"
+        },
+        {
+          "from": "scripts/ux-audit-sync-20261112/verify_h3.py",
+          "line": 40,
+          "relation": "literal basename; resolve in context"
+        }
+      ],
+      "exact_duplicate_preserved_paths": [],
+      "visual_review": null
+    },
+    {
+      "category": "untracked",
+      "path": "scripts/ux-audit-sync-20261112/mock-supabase.mjs",
+      "bytes": 6605,
+      "sha256": "4c611d4c3912297144e5e0478677d19c0216e2f8aaa011011fd5e0c7f280b0e3",
+      "preserved_path": "F:\\AIXM\\烟花爆竹-closeout-evidence-20261115\\untracked\\scripts\\ux-audit-sync-20261112\\mock-supabase.mjs",
+      "disposition": "应保留",
+      "reason": "历史审计/探针实现，仅用于理解和追溯旧观测；不适合作为现役回归直接运行，避免其硬编码原 main 写路径或启动浏览器/mock。原始字节仅外置保全。",
+      "candidate_path_status": "missing",
+      "referenced_by": [
+        {
+          "from": "docs/superpowers/plans/2026-11-13-stability-backend.md",
+          "line": 27,
+          "relation": "literal basename; resolve in context"
+        },
+        {
+          "from": "docs/superpowers/plans/2026-11-13-stability-backend.md",
+          "line": 38,
+          "relation": "literal basename; resolve in context"
+        },
+        {
+          "from": "docs/ux-audit-sync-20261112.md",
+          "line": 7,
+          "relation": "literal full path"
+        },
+        {
+          "from": "docs/ux-audit-sync-20261112.md",
+          "line": 375,
+          "relation": "literal basename; resolve in context"
+        },
+        {
+          "from": "docs/代码异味基线-20261110.md",
+          "line": 285,
+          "relation": "literal basename; resolve in context"
+        },
+        {
+          "from": "docs/代码异味基线-20261110.md",
+          "line": 331,
+          "relation": "literal basename; resolve in context"
+        },
+        {
+          "from": "docs/代码异味基线-20261110.md",
+          "line": 558,
+          "relation": "literal basename; resolve in context"
+        },
+        {
+          "from": "scripts/e2e-sync.py",
+          "line": 9,
+          "relation": "literal basename; resolve in context"
+        },
+        {
+          "from": "scripts/e2e-sync.py",
+          "line": 31,
+          "relation": "literal basename; resolve in context"
+        },
+        {
+          "from": "scripts/mock-supabase.mjs",
+          "line": 2,
+          "relation": "literal basename; resolve in context"
+        },
+        {
+          "from": "scripts/perf-sync.py",
+          "line": 3,
+          "relation": "literal basename; resolve in context"
+        },
+        {
+          "from": "scripts/ux-audit-sync-20261112/audit_sync.py",
+          "line": 642,
+          "relation": "literal full path"
+        },
+        {
+          "from": "scripts/ux-audit-sync-20261112/mock-supabase.mjs",
+          "line": 3,
+          "relation": "literal basename; resolve in context"
+        },
+        {
+          "from": "scripts/ux-audit-sync-20261112/mock-supabase.mjs",
+          "line": 10,
+          "relation": "literal full path"
+        },
+        {
+          "from": "scripts/ux-audit-sync-20261112/verify_h3.py",
+          "line": 371,
+          "relation": "literal full path"
+        },
+        {
+          "from": "scripts/ux-probe-20261112/debug_download.py",
+          "line": 18,
+          "relation": "literal full path"
+        },
+        {
+          "from": "scripts/ux-probe-20261112/final_sync_regress.py",
+          "line": 304,
+          "relation": "literal full path"
+        },
+        {
+          "from": "tests/mock-in-filter.test.ts",
+          "line": 2,
+          "relation": "literal basename; resolve in context"
+        },
+        {
+          "from": "tests/mock-rpc.test.ts",
+          "line": 2,
+          "relation": "literal basename; resolve in context"
+        },
+        {
+          "from": "tests/mock-rpc.test.ts",
+          "line": 324,
+          "relation": "literal basename; resolve in context"
+        },
+        {
+          "from": "tests/mock-supabase.test.ts",
+          "line": 2,
+          "relation": "literal basename; resolve in context"
+        }
+      ],
+      "exact_duplicate_preserved_paths": [],
+      "visual_review": null
+    },
+    {
+      "category": "untracked",
+      "path": "scripts/ux-audit-sync-20261112/verify_h3.py",
+      "bytes": 15175,
+      "sha256": "8fe585dd464716d724deeab5d8c9ad85136d32d92061e33caaadccfd51082889",
+      "preserved_path": "F:\\AIXM\\烟花爆竹-closeout-evidence-20261115\\untracked\\scripts\\ux-audit-sync-20261112\\verify_h3.py",
+      "disposition": "应保留",
+      "reason": "历史审计/探针实现，仅用于理解和追溯旧观测；不适合作为现役回归直接运行，避免其硬编码原 main 写路径或启动浏览器/mock。原始字节仅外置保全。",
+      "candidate_path_status": "missing",
+      "referenced_by": [
+        {
+          "from": "scripts/ux-audit-sync-20261112/verify_h3.py",
+          "line": 4,
+          "relation": "literal full path"
+        }
+      ],
+      "exact_duplicate_preserved_paths": [],
+      "visual_review": null
+    },
+    {
+      "category": "untracked",
+      "path": "scripts/ux-probe-20261112/A.json",
+      "bytes": 5060,
+      "sha256": "6b0792e2db9a72e12cee735ea5c2517824bf346a3ca49ac09956249b7618c14f",
+      "preserved_path": "F:\\AIXM\\烟花爆竹-closeout-evidence-20261115\\untracked\\scripts\\ux-probe-20261112\\A.json",
+      "disposition": "应保留",
+      "reason": "候选仓库无同 SHA256 数据；该 JSON 是运行时测量/回归原始结构化结果，摘要见 JSON 摘要表；原始完整数据仅外置保全。",
+      "candidate_path_status": "missing",
+      "referenced_by": [
+        {
+          "from": "docs/ux-proactive-20261112.md",
+          "line": 34,
+          "relation": "literal basename; resolve in context"
+        },
+        {
+          "from": "scripts/ux-probe-20261112/a_orders.py",
+          "line": 152,
+          "relation": "literal basename; resolve in context"
+        },
+        {
+          "from": "docs/ux-proactive-20261112.md",
+          "line": 34,
+          "relation": "literal basename; resolve in context"
+        },
+        {
+          "from": "scripts/ux-probe-20261112/a_orders.py",
+          "line": 152,
+          "relation": "literal basename; resolve in context"
+        }
+      ],
+      "exact_duplicate_preserved_paths": [],
+      "visual_review": null
+    },
+    {
+      "category": "untracked",
+      "path": "scripts/ux-probe-20261112/B1.json",
+      "bytes": 5718,
+      "sha256": "cdf5746bdc27b8ef4a8987686440f3688569baf5656f905734e0d10b00a3fb5b",
+      "preserved_path": "F:\\AIXM\\烟花爆竹-closeout-evidence-20261115\\untracked\\scripts\\ux-probe-20261112\\B1.json",
+      "disposition": "应保留",
+      "reason": "候选仓库无同 SHA256 数据；该 JSON 是运行时测量/回归原始结构化结果，摘要见 JSON 摘要表；原始完整数据仅外置保全。",
+      "candidate_path_status": "missing",
+      "referenced_by": [
+        {
+          "from": "docs/ux-proactive-20261112.md",
+          "line": 209,
+          "relation": "literal basename; resolve in context"
+        },
+        {
+          "from": "scripts/ux-probe-20261112/b_numeric.py",
+          "line": 96,
+          "relation": "literal basename; resolve in context"
+        },
+        {
+          "from": "docs/ux-proactive-20261112.md",
+          "line": 209,
+          "relation": "literal basename; resolve in context"
+        },
+        {
+          "from": "scripts/ux-probe-20261112/b_numeric.py",
+          "line": 96,
+          "relation": "literal basename; resolve in context"
+        }
+      ],
+      "exact_duplicate_preserved_paths": [],
+      "visual_review": null
+    },
+    {
+      "category": "untracked",
+      "path": "scripts/ux-probe-20261112/B2.json",
+      "bytes": 2840,
+      "sha256": "2dc0ee786b81213bb1640528e8c0b6a52127e0b7db90ae90ebe17e7cf0868054",
+      "preserved_path": "F:\\AIXM\\烟花爆竹-closeout-evidence-20261115\\untracked\\scripts\\ux-probe-20261112\\B2.json",
+      "disposition": "应保留",
+      "reason": "候选仓库无同 SHA256 数据；该 JSON 是运行时测量/回归原始结构化结果，摘要见 JSON 摘要表；原始完整数据仅外置保全。",
+      "candidate_path_status": "missing",
+      "referenced_by": [
+        {
+          "from": "docs/ux-proactive-20261112.md",
+          "line": 209,
+          "relation": "literal basename; resolve in context"
+        },
+        {
+          "from": "docs/ux-proactive-20261112.md",
+          "line": 233,
+          "relation": "literal basename; resolve in context"
+        },
+        {
+          "from": "scripts/ux-probe-20261112/b2_purchase_stock.py",
+          "line": 98,
+          "relation": "literal basename; resolve in context"
+        },
+        {
+          "from": "docs/ux-proactive-20261112.md",
+          "line": 209,
+          "relation": "literal basename; resolve in context"
+        },
+        {
+          "from": "docs/ux-proactive-20261112.md",
+          "line": 233,
+          "relation": "literal basename; resolve in context"
+        },
+        {
+          "from": "scripts/ux-probe-20261112/b2_purchase_stock.py",
+          "line": 98,
+          "relation": "literal basename; resolve in context"
+        }
+      ],
+      "exact_duplicate_preserved_paths": [],
+      "visual_review": null
+    },
+    {
+      "category": "untracked",
+      "path": "scripts/ux-probe-20261112/C1.json",
+      "bytes": 2094,
+      "sha256": "3d57a6b29aa6c86c1386ecf14f7b37ddc65b494ffe0b792852a56098cc498b59",
+      "preserved_path": "F:\\AIXM\\烟花爆竹-closeout-evidence-20261115\\untracked\\scripts\\ux-probe-20261112\\C1.json",
+      "disposition": "应保留",
+      "reason": "候选仓库无同 SHA256 数据；该 JSON 是运行时测量/回归原始结构化结果，摘要见 JSON 摘要表；原始完整数据仅外置保全。",
+      "candidate_path_status": "missing",
+      "referenced_by": [
+        {
+          "from": "docs/ux-proactive-20261112.md",
+          "line": 203,
+          "relation": "literal basename; resolve in context"
+        },
+        {
+          "from": "docs/ux-proactive-20261112.md",
+          "line": 277,
+          "relation": "literal basename; resolve in context"
+        },
+        {
+          "from": "scripts/ux-probe-20261112/c1_mistouch.py",
+          "line": 128,
+          "relation": "literal basename; resolve in context"
+        },
+        {
+          "from": "docs/ux-proactive-20261112.md",
+          "line": 203,
+          "relation": "literal basename; resolve in context"
+        },
+        {
+          "from": "docs/ux-proactive-20261112.md",
+          "line": 277,
+          "relation": "literal basename; resolve in context"
+        },
+        {
+          "from": "scripts/ux-probe-20261112/c1_mistouch.py",
+          "line": 128,
+          "relation": "literal basename; resolve in context"
+        }
+      ],
+      "exact_duplicate_preserved_paths": [],
+      "visual_review": null
+    },
+    {
+      "category": "untracked",
+      "path": "scripts/ux-probe-20261112/C2.json",
+      "bytes": 2945,
+      "sha256": "4359553209551b1242a5531fc9f00b4e0482dc50e224938aa76bedcd758d8e06",
+      "preserved_path": "F:\\AIXM\\烟花爆竹-closeout-evidence-20261115\\untracked\\scripts\\ux-probe-20261112\\C2.json",
+      "disposition": "应保留",
+      "reason": "候选仓库无同 SHA256 数据；该 JSON 是运行时测量/回归原始结构化结果，摘要见 JSON 摘要表；原始完整数据仅外置保全。",
+      "candidate_path_status": "missing",
+      "referenced_by": [
+        {
+          "from": "docs/ux-proactive-20261112.md",
+          "line": 227,
+          "relation": "literal basename; resolve in context"
+        },
+        {
+          "from": "scripts/ux-probe-20261112/c2_delete_close.py",
+          "line": 83,
+          "relation": "literal basename; resolve in context"
+        },
+        {
+          "from": "docs/ux-proactive-20261112.md",
+          "line": 227,
+          "relation": "literal basename; resolve in context"
+        },
+        {
+          "from": "scripts/ux-probe-20261112/c2_delete_close.py",
+          "line": 83,
+          "relation": "literal basename; resolve in context"
+        }
+      ],
+      "exact_duplicate_preserved_paths": [],
+      "visual_review": null
+    },
+    {
+      "category": "untracked",
+      "path": "scripts/ux-probe-20261112/C4.json",
+      "bytes": 3152,
+      "sha256": "f0bd14cfc24ccaa91de090f3a490f7caee20a8a0cefb4aa8c5755a33d5701268",
+      "preserved_path": "F:\\AIXM\\烟花爆竹-closeout-evidence-20261115\\untracked\\scripts\\ux-probe-20261112\\C4.json",
+      "disposition": "应保留",
+      "reason": "候选仓库无同 SHA256 数据；该 JSON 是运行时测量/回归原始结构化结果，摘要见 JSON 摘要表；原始完整数据仅外置保全。",
+      "candidate_path_status": "missing",
+      "referenced_by": [
+        {
+          "from": "docs/ux-proactive-20261112.md",
+          "line": 284,
+          "relation": "literal basename; resolve in context"
+        },
+        {
+          "from": "scripts/ux-probe-20261112/c4_clear.py",
+          "line": 122,
+          "relation": "literal basename; resolve in context"
+        },
+        {
+          "from": "docs/ux-proactive-20261112.md",
+          "line": 284,
+          "relation": "literal basename; resolve in context"
+        },
+        {
+          "from": "scripts/ux-probe-20261112/c4_clear.py",
+          "line": 122,
+          "relation": "literal basename; resolve in context"
+        }
+      ],
+      "exact_duplicate_preserved_paths": [],
+      "visual_review": null
+    },
+    {
+      "category": "untracked",
+      "path": "scripts/ux-probe-20261112/D.json",
+      "bytes": 2302,
+      "sha256": "8736198bd1ec2d027aba1ab5eef33af965db73baabd1409f2006e5671977a739",
+      "preserved_path": "F:\\AIXM\\烟花爆竹-closeout-evidence-20261115\\untracked\\scripts\\ux-probe-20261112\\D.json",
+      "disposition": "应保留",
+      "reason": "候选仓库无同 SHA256 数据；该 JSON 是运行时测量/回归原始结构化结果，摘要见 JSON 摘要表；原始完整数据仅外置保全。",
+      "candidate_path_status": "missing",
+      "referenced_by": [
+        {
+          "from": "docs/ux-proactive-20261112.md",
+          "line": 257,
+          "relation": "literal basename; resolve in context"
+        },
+        {
+          "from": "scripts/ux-probe-20261112/d_visibility.py",
+          "line": 127,
+          "relation": "literal basename; resolve in context"
+        },
+        {
+          "from": "docs/ux-proactive-20261112.md",
+          "line": 257,
+          "relation": "literal basename; resolve in context"
+        },
+        {
+          "from": "scripts/ux-probe-20261112/d_visibility.py",
+          "line": 127,
+          "relation": "literal basename; resolve in context"
+        }
+      ],
+      "exact_duplicate_preserved_paths": [],
+      "visual_review": null
+    },
+    {
+      "category": "untracked",
+      "path": "scripts/ux-probe-20261112/E1.json",
+      "bytes": 1899,
+      "sha256": "9578e506938e25b7d47c5d24a092f877a0eb18f376a51197e5f24711f00e20e0",
+      "preserved_path": "F:\\AIXM\\烟花爆竹-closeout-evidence-20261115\\untracked\\scripts\\ux-probe-20261112\\E1.json",
+      "disposition": "应保留",
+      "reason": "候选仓库无同 SHA256 数据；该 JSON 是运行时测量/回归原始结构化结果，摘要见 JSON 摘要表；原始完整数据仅外置保全。",
+      "candidate_path_status": "missing",
+      "referenced_by": [
+        {
+          "from": "docs/ux-proactive-20261112.md",
+          "line": 221,
+          "relation": "literal basename; resolve in context"
+        },
+        {
+          "from": "scripts/ux-probe-20261112/e1_offline.py",
+          "line": 94,
+          "relation": "literal basename; resolve in context"
+        },
+        {
+          "from": "docs/ux-proactive-20261112.md",
+          "line": 221,
+          "relation": "literal basename; resolve in context"
+        },
+        {
+          "from": "scripts/ux-probe-20261112/e1_offline.py",
+          "line": 94,
+          "relation": "literal basename; resolve in context"
+        }
+      ],
+      "exact_duplicate_preserved_paths": [],
+      "visual_review": null
+    },
+    {
+      "category": "untracked",
+      "path": "scripts/ux-probe-20261112/E2.json",
+      "bytes": 2642,
+      "sha256": "21060dcb4443581dd3192ea28e3af9487206cdbfb0046f6cf93dd50b541274d5",
+      "preserved_path": "F:\\AIXM\\烟花爆竹-closeout-evidence-20261115\\untracked\\scripts\\ux-probe-20261112\\E2.json",
+      "disposition": "应保留",
+      "reason": "候选仓库无同 SHA256 数据；该 JSON 是运行时测量/回归原始结构化结果，摘要见 JSON 摘要表；原始完整数据仅外置保全。",
+      "candidate_path_status": "missing",
+      "referenced_by": [
+        {
+          "from": "scripts/ux-probe-20261112/e2_empty.py",
+          "line": 79,
+          "relation": "literal basename; resolve in context"
+        },
+        {
+          "from": "scripts/ux-probe-20261112/e2_empty.py",
+          "line": 79,
+          "relation": "literal basename; resolve in context"
+        }
+      ],
+      "exact_duplicate_preserved_paths": [],
+      "visual_review": null
+    },
+    {
+      "category": "untracked",
+      "path": "scripts/ux-probe-20261112/F.json",
+      "bytes": 3935,
+      "sha256": "f2ac6401a6775f45e9126f99e2dbcbf84b3c17130ec5a8b24e182240efebe358",
+      "preserved_path": "F:\\AIXM\\烟花爆竹-closeout-evidence-20261115\\untracked\\scripts\\ux-probe-20261112\\F.json",
+      "disposition": "应保留",
+      "reason": "候选仓库无同 SHA256 数据；该 JSON 是运行时测量/回归原始结构化结果，摘要见 JSON 摘要表；原始完整数据仅外置保全。",
+      "candidate_path_status": "missing",
+      "referenced_by": [
+        {
+          "from": "docs/ux-proactive-20261112.md",
+          "line": 239,
+          "relation": "literal basename; resolve in context"
+        },
+        {
+          "from": "scripts/ux-probe-20261112/f_g_repeat.py",
+          "line": 164,
+          "relation": "literal basename; resolve in context"
+        },
+        {
+          "from": "docs/ux-proactive-20261112.md",
+          "line": 239,
+          "relation": "literal basename; resolve in context"
+        },
+        {
+          "from": "scripts/ux-probe-20261112/f_g_repeat.py",
+          "line": 164,
+          "relation": "literal basename; resolve in context"
+        }
+      ],
+      "exact_duplicate_preserved_paths": [],
+      "visual_review": null
+    },
+    {
+      "category": "untracked",
+      "path": "scripts/ux-probe-20261112/G.json",
+      "bytes": 2830,
+      "sha256": "914c4cc032896fecb05e9b112143556edb05f1d37437e5490124cb8b182eac7f",
+      "preserved_path": "F:\\AIXM\\烟花爆竹-closeout-evidence-20261115\\untracked\\scripts\\ux-probe-20261112\\G.json",
+      "disposition": "应保留",
+      "reason": "候选仓库无同 SHA256 数据；该 JSON 是运行时测量/回归原始结构化结果，摘要见 JSON 摘要表；原始完整数据仅外置保全。",
+      "candidate_path_status": "missing",
+      "referenced_by": [
+        {
+          "from": "docs/ux-proactive-20261112.md",
+          "line": 245,
+          "relation": "literal basename; resolve in context"
+        },
+        {
+          "from": "scripts/ux-probe-20261112/g_reach.py",
+          "line": 96,
+          "relation": "literal basename; resolve in context"
+        },
+        {
+          "from": "docs/ux-proactive-20261112.md",
+          "line": 245,
+          "relation": "literal basename; resolve in context"
+        },
+        {
+          "from": "scripts/ux-probe-20261112/g_reach.py",
+          "line": 96,
+          "relation": "literal basename; resolve in context"
+        }
+      ],
+      "exact_duplicate_preserved_paths": [],
+      "visual_review": null
+    },
+    {
+      "category": "untracked",
+      "path": "scripts/ux-probe-20261112/H.json",
+      "bytes": 1794,
+      "sha256": "cbc578292133606ca4fab04f4befa2a2a557d0beb6af701cb100cf93ae7b880d",
+      "preserved_path": "F:\\AIXM\\烟花爆竹-closeout-evidence-20261115\\untracked\\scripts\\ux-probe-20261112\\H.json",
+      "disposition": "应保留",
+      "reason": "候选仓库无同 SHA256 数据；该 JSON 是运行时测量/回归原始结构化结果，摘要见 JSON 摘要表；原始完整数据仅外置保全。",
+      "candidate_path_status": "missing",
+      "referenced_by": [
+        {
+          "from": "docs/ux-proactive-20261112.md",
+          "line": 251,
+          "relation": "literal basename; resolve in context"
+        },
+        {
+          "from": "scripts/ux-probe-20261112/h_firstuse.py",
+          "line": 140,
+          "relation": "literal basename; resolve in context"
+        },
+        {
+          "from": "docs/ux-proactive-20261112.md",
+          "line": 251,
+          "relation": "literal basename; resolve in context"
+        },
+        {
+          "from": "scripts/ux-probe-20261112/h_firstuse.py",
+          "line": 140,
+          "relation": "literal basename; resolve in context"
+        }
+      ],
+      "exact_duplicate_preserved_paths": [],
+      "visual_review": null
+    },
+    {
+      "category": "untracked",
+      "path": "scripts/ux-probe-20261112/X.json",
+      "bytes": 981,
+      "sha256": "c0800925bb715d1910594a5efe9607b76ff3d97935faba1535a6dd0d1a6296d7",
+      "preserved_path": "F:\\AIXM\\烟花爆竹-closeout-evidence-20261115\\untracked\\scripts\\ux-probe-20261112\\X.json",
+      "disposition": "应保留",
+      "reason": "候选仓库无同 SHA256 数据；该 JSON 是运行时测量/回归原始结构化结果，摘要见 JSON 摘要表；原始完整数据仅外置保全。",
+      "candidate_path_status": "missing",
+      "referenced_by": [
+        {
+          "from": "docs/ux-proactive-20261112.md",
+          "line": 215,
+          "relation": "literal basename; resolve in context"
+        },
+        {
+          "from": "scripts/ux-probe-20261112/x_verify.py",
+          "line": 94,
+          "relation": "literal basename; resolve in context"
+        },
+        {
+          "from": "docs/ux-proactive-20261112.md",
+          "line": 215,
+          "relation": "literal basename; resolve in context"
+        },
+        {
+          "from": "scripts/ux-probe-20261112/x_verify.py",
+          "line": 94,
+          "relation": "literal basename; resolve in context"
+        }
+      ],
+      "exact_duplicate_preserved_paths": [],
+      "visual_review": null
+    },
+    {
+      "category": "untracked",
+      "path": "scripts/ux-probe-20261112/X2.json",
+      "bytes": 1539,
+      "sha256": "b27f0d0f836494f1554e25b1e19e4ca39d694ccb769baac060c47e98c05eb291",
+      "preserved_path": "F:\\AIXM\\烟花爆竹-closeout-evidence-20261115\\untracked\\scripts\\ux-probe-20261112\\X2.json",
+      "disposition": "应保留",
+      "reason": "候选仓库无同 SHA256 数据；该 JSON 是运行时测量/回归原始结构化结果，摘要见 JSON 摘要表；原始完整数据仅外置保全。",
+      "candidate_path_status": "missing",
+      "referenced_by": [
+        {
+          "from": "scripts/ux-probe-20261112/x2_amount.py",
+          "line": 69,
+          "relation": "literal basename; resolve in context"
+        },
+        {
+          "from": "scripts/ux-probe-20261112/x2_amount.py",
+          "line": 69,
+          "relation": "literal basename; resolve in context"
+        }
+      ],
+      "exact_duplicate_preserved_paths": [],
+      "visual_review": null
+    },
+    {
+      "category": "untracked",
+      "path": "scripts/ux-probe-20261112/a_orders.py",
+      "bytes": 6593,
+      "sha256": "30eda9aa7b93a551570eea633b9bc5dca03c78b3eda793650d90229553989e1b",
+      "preserved_path": "F:\\AIXM\\烟花爆竹-closeout-evidence-20261115\\untracked\\scripts\\ux-probe-20261112\\a_orders.py",
+      "disposition": "应保留",
+      "reason": "历史审计/探针实现，仅用于理解和追溯旧观测；不适合作为现役回归直接运行，避免其硬编码原 main 写路径或启动浏览器/mock。原始字节仅外置保全。",
+      "candidate_path_status": "missing",
+      "referenced_by": [],
+      "exact_duplicate_preserved_paths": [],
+      "visual_review": null
+    },
+    {
+      "category": "untracked",
+      "path": "scripts/ux-probe-20261112/b2_purchase_stock.py",
+      "bytes": 3930,
+      "sha256": "107f1cfd4659fc546daf56e3a29680c6956d7b9b430471046f6cc36d0435727f",
+      "preserved_path": "F:\\AIXM\\烟花爆竹-closeout-evidence-20261115\\untracked\\scripts\\ux-probe-20261112\\b2_purchase_stock.py",
+      "disposition": "应保留",
+      "reason": "历史审计/探针实现，仅用于理解和追溯旧观测；不适合作为现役回归直接运行，避免其硬编码原 main 写路径或启动浏览器/mock。原始字节仅外置保全。",
+      "candidate_path_status": "missing",
+      "referenced_by": [],
+      "exact_duplicate_preserved_paths": [],
+      "visual_review": null
+    },
+    {
+      "category": "untracked",
+      "path": "scripts/ux-probe-20261112/b_numeric.py",
+      "bytes": 3329,
+      "sha256": "aac4989fd5d32c25ef653ab7e818cd5678da23109258fbe1d8d8cb76b6f86565",
+      "preserved_path": "F:\\AIXM\\烟花爆竹-closeout-evidence-20261115\\untracked\\scripts\\ux-probe-20261112\\b_numeric.py",
+      "disposition": "应保留",
+      "reason": "历史审计/探针实现，仅用于理解和追溯旧观测；不适合作为现役回归直接运行，避免其硬编码原 main 写路径或启动浏览器/mock。原始字节仅外置保全。",
+      "candidate_path_status": "missing",
+      "referenced_by": [],
+      "exact_duplicate_preserved_paths": [],
+      "visual_review": null
+    },
+    {
+      "category": "untracked",
+      "path": "scripts/ux-probe-20261112/c1_mistouch.py",
+      "bytes": 5127,
+      "sha256": "49c2ced462513e528fa9f4e2482a6717231e5fd7c226e326a660c4deee316bc4",
+      "preserved_path": "F:\\AIXM\\烟花爆竹-closeout-evidence-20261115\\untracked\\scripts\\ux-probe-20261112\\c1_mistouch.py",
+      "disposition": "应保留",
+      "reason": "历史审计/探针实现，仅用于理解和追溯旧观测；不适合作为现役回归直接运行，避免其硬编码原 main 写路径或启动浏览器/mock。原始字节仅外置保全。",
+      "candidate_path_status": "missing",
+      "referenced_by": [],
+      "exact_duplicate_preserved_paths": [],
+      "visual_review": null
+    },
+    {
+      "category": "untracked",
+      "path": "scripts/ux-probe-20261112/c2_delete_close.py",
+      "bytes": 4213,
+      "sha256": "1f07fb4146ea2356aaf26dd0443fba67eb7364e34663b6f17d07b0fdcdcd2d70",
+      "preserved_path": "F:\\AIXM\\烟花爆竹-closeout-evidence-20261115\\untracked\\scripts\\ux-probe-20261112\\c2_delete_close.py",
+      "disposition": "应保留",
+      "reason": "历史审计/探针实现，仅用于理解和追溯旧观测；不适合作为现役回归直接运行，避免其硬编码原 main 写路径或启动浏览器/mock。原始字节仅外置保全。",
+      "candidate_path_status": "missing",
+      "referenced_by": [],
+      "exact_duplicate_preserved_paths": [],
+      "visual_review": null
+    },
+    {
+      "category": "untracked",
+      "path": "scripts/ux-probe-20261112/c3_clear_undo.py",
+      "bytes": 4187,
+      "sha256": "2cd76cc33ba74b33c5236a4233329b977cebe3f49a923b78d323736e1618ad4d",
+      "preserved_path": "F:\\AIXM\\烟花爆竹-closeout-evidence-20261115\\untracked\\scripts\\ux-probe-20261112\\c3_clear_undo.py",
+      "disposition": "应保留",
+      "reason": "历史审计/探针实现，仅用于理解和追溯旧观测；不适合作为现役回归直接运行，避免其硬编码原 main 写路径或启动浏览器/mock。原始字节仅外置保全。",
+      "candidate_path_status": "missing",
+      "referenced_by": [],
+      "exact_duplicate_preserved_paths": [],
+      "visual_review": null
+    },
+    {
+      "category": "untracked",
+      "path": "scripts/ux-probe-20261112/c4_clear.py",
+      "bytes": 4901,
+      "sha256": "c22f6c67c6b3269375980d5683007804b0f47b64b9eb712a1dda264d0341c11b",
+      "preserved_path": "F:\\AIXM\\烟花爆竹-closeout-evidence-20261115\\untracked\\scripts\\ux-probe-20261112\\c4_clear.py",
+      "disposition": "应保留",
+      "reason": "历史审计/探针实现，仅用于理解和追溯旧观测；不适合作为现役回归直接运行，避免其硬编码原 main 写路径或启动浏览器/mock。原始字节仅外置保全。",
+      "candidate_path_status": "missing",
+      "referenced_by": [],
+      "exact_duplicate_preserved_paths": [],
+      "visual_review": null
+    },
+    {
+      "category": "untracked",
+      "path": "scripts/ux-probe-20261112/d_visibility.py",
+      "bytes": 5600,
+      "sha256": "80b45b5df74f5e3527cdab1e8834c1df663e828e6272774c2728bbf9d93a8e1c",
+      "preserved_path": "F:\\AIXM\\烟花爆竹-closeout-evidence-20261115\\untracked\\scripts\\ux-probe-20261112\\d_visibility.py",
+      "disposition": "应保留",
+      "reason": "历史审计/探针实现，仅用于理解和追溯旧观测；不适合作为现役回归直接运行，避免其硬编码原 main 写路径或启动浏览器/mock。原始字节仅外置保全。",
+      "candidate_path_status": "missing",
+      "referenced_by": [],
+      "exact_duplicate_preserved_paths": [],
+      "visual_review": null
+    },
+    {
+      "category": "untracked",
+      "path": "scripts/ux-probe-20261112/debug_back.py",
+      "bytes": 3548,
+      "sha256": "c94865651bbbaf354b48a553f6130fccfa1e6512b9bd7dc1dd47ac7a3698ae4f",
+      "preserved_path": "F:\\AIXM\\烟花爆竹-closeout-evidence-20261115\\untracked\\scripts\\ux-probe-20261112\\debug_back.py",
+      "disposition": "应保留",
+      "reason": "历史审计/探针实现，仅用于理解和追溯旧观测；不适合作为现役回归直接运行，避免其硬编码原 main 写路径或启动浏览器/mock。原始字节仅外置保全。",
+      "candidate_path_status": "missing",
+      "referenced_by": [],
+      "exact_duplicate_preserved_paths": [],
+      "visual_review": null
+    },
+    {
+      "category": "untracked",
+      "path": "scripts/ux-probe-20261112/debug_close.py",
+      "bytes": 2735,
+      "sha256": "224df16420c8cf57f828ba2e3902dc55ead793b31c8c129c891a1220b139d324",
+      "preserved_path": "F:\\AIXM\\烟花爆竹-closeout-evidence-20261115\\untracked\\scripts\\ux-probe-20261112\\debug_close.py",
+      "disposition": "应保留",
+      "reason": "历史审计/探针实现，仅用于理解和追溯旧观测；不适合作为现役回归直接运行，避免其硬编码原 main 写路径或启动浏览器/mock。原始字节仅外置保全。",
+      "candidate_path_status": "missing",
+      "referenced_by": [],
+      "exact_duplicate_preserved_paths": [],
+      "visual_review": null
+    },
+    {
+      "category": "untracked",
+      "path": "scripts/ux-probe-20261112/debug_download.py",
+      "bytes": 3211,
+      "sha256": "c24efe614cc1949eb1f2af871e73db6e6d174ae825f083854c329dc7fdd32e6b",
+      "preserved_path": "F:\\AIXM\\烟花爆竹-closeout-evidence-20261115\\untracked\\scripts\\ux-probe-20261112\\debug_download.py",
+      "disposition": "应保留",
+      "reason": "历史审计/探针实现，仅用于理解和追溯旧观测；不适合作为现役回归直接运行，避免其硬编码原 main 写路径或启动浏览器/mock。原始字节仅外置保全。",
+      "candidate_path_status": "missing",
+      "referenced_by": [],
+      "exact_duplicate_preserved_paths": [],
+      "visual_review": null
+    },
+    {
+      "category": "untracked",
+      "path": "scripts/ux-probe-20261112/debug_sticky.py",
+      "bytes": 2199,
+      "sha256": "28a9d4672ac56b45bb5092ac87c97e43db7dc2cdeb8a5fcbdb3ce58a5c6b76cb",
+      "preserved_path": "F:\\AIXM\\烟花爆竹-closeout-evidence-20261115\\untracked\\scripts\\ux-probe-20261112\\debug_sticky.py",
+      "disposition": "应保留",
+      "reason": "历史审计/探针实现，仅用于理解和追溯旧观测；不适合作为现役回归直接运行，避免其硬编码原 main 写路径或启动浏览器/mock。原始字节仅外置保全。",
+      "candidate_path_status": "missing",
+      "referenced_by": [],
+      "exact_duplicate_preserved_paths": [],
+      "visual_review": null
+    },
+    {
+      "category": "untracked",
+      "path": "scripts/ux-probe-20261112/e1_offline.py",
+      "bytes": 3426,
+      "sha256": "aab1ced663734010342de55b904f3ef719c446ffa612e07c71738d0f070d1cf3",
+      "preserved_path": "F:\\AIXM\\烟花爆竹-closeout-evidence-20261115\\untracked\\scripts\\ux-probe-20261112\\e1_offline.py",
+      "disposition": "应保留",
+      "reason": "历史审计/探针实现，仅用于理解和追溯旧观测；不适合作为现役回归直接运行，避免其硬编码原 main 写路径或启动浏览器/mock。原始字节仅外置保全。",
+      "candidate_path_status": "missing",
+      "referenced_by": [],
+      "exact_duplicate_preserved_paths": [],
+      "visual_review": null
+    },
+    {
+      "category": "untracked",
+      "path": "scripts/ux-probe-20261112/e2_empty.py",
+      "bytes": 3538,
+      "sha256": "b397c5ab9366170d94538ef9c11900831ec9bcf86521d50de4fa75bb8671872a",
+      "preserved_path": "F:\\AIXM\\烟花爆竹-closeout-evidence-20261115\\untracked\\scripts\\ux-probe-20261112\\e2_empty.py",
+      "disposition": "应保留",
+      "reason": "历史审计/探针实现，仅用于理解和追溯旧观测；不适合作为现役回归直接运行，避免其硬编码原 main 写路径或启动浏览器/mock。原始字节仅外置保全。",
+      "candidate_path_status": "missing",
+      "referenced_by": [],
+      "exact_duplicate_preserved_paths": [],
+      "visual_review": null
+    },
+    {
+      "category": "untracked",
+      "path": "scripts/ux-probe-20261112/f_g_repeat.py",
+      "bytes": 6824,
+      "sha256": "81f05b8ec6f16ef833097d074410304493bccd05403fc95a9740f2c2e4490018",
+      "preserved_path": "F:\\AIXM\\烟花爆竹-closeout-evidence-20261115\\untracked\\scripts\\ux-probe-20261112\\f_g_repeat.py",
+      "disposition": "应保留",
+      "reason": "历史审计/探针实现，仅用于理解和追溯旧观测；不适合作为现役回归直接运行，避免其硬编码原 main 写路径或启动浏览器/mock。原始字节仅外置保全。",
+      "candidate_path_status": "missing",
+      "referenced_by": [],
+      "exact_duplicate_preserved_paths": [],
+      "visual_review": null
+    },
+    {
+      "category": "untracked",
+      "path": "scripts/ux-probe-20261112/final_sync.json",
+      "bytes": 1365,
+      "sha256": "6fd29bd82bc2ae3c6604f38224f44feea6d65f64ea10cfd0739149a8a52678f2",
+      "preserved_path": "F:\\AIXM\\烟花爆竹-closeout-evidence-20261115\\untracked\\scripts\\ux-probe-20261112\\final_sync.json",
+      "disposition": "应保留",
+      "reason": "候选仓库无同 SHA256 数据；该 JSON 是运行时测量/回归原始结构化结果，摘要见 JSON 摘要表；原始完整数据仅外置保全。",
+      "candidate_path_status": "missing",
+      "referenced_by": [
+        {
+          "from": "scripts/ux-probe-20261112/final_sync_regress.py",
+          "line": 338,
+          "relation": "literal basename; resolve in context"
+        },
+        {
+          "from": "scripts/ux-probe-20261112/final_sync_regress.py",
+          "line": 338,
+          "relation": "literal basename; resolve in context"
+        }
+      ],
+      "exact_duplicate_preserved_paths": [],
+      "visual_review": null
+    },
+    {
+      "category": "untracked",
+      "path": "scripts/ux-probe-20261112/final_sync_regress.py",
+      "bytes": 12817,
+      "sha256": "d68aa6a06dd5a1de4f5ed860098611bcc6eaab7aade67ffa38dab5023da638f5",
+      "preserved_path": "F:\\AIXM\\烟花爆竹-closeout-evidence-20261115\\untracked\\scripts\\ux-probe-20261112\\final_sync_regress.py",
+      "disposition": "应保留",
+      "reason": "历史审计/探针实现，仅用于理解和追溯旧观测；不适合作为现役回归直接运行，避免其硬编码原 main 写路径或启动浏览器/mock。原始字节仅外置保全。",
+      "candidate_path_status": "missing",
+      "referenced_by": [
+        {
+          "from": "scripts/ux-probe-20261112/final_sync_regress.py",
+          "line": 4,
+          "relation": "literal full path"
+        }
+      ],
+      "exact_duplicate_preserved_paths": [],
+      "visual_review": null
+    },
+    {
+      "category": "untracked",
+      "path": "scripts/ux-probe-20261112/final_ui.json",
+      "bytes": 3221,
+      "sha256": "76009bf15357faa9b83dbddc37179ba1bf0e145c77f8b4be49e8fe56b475d5cd",
+      "preserved_path": "F:\\AIXM\\烟花爆竹-closeout-evidence-20261115\\untracked\\scripts\\ux-probe-20261112\\final_ui.json",
+      "disposition": "应保留",
+      "reason": "候选仓库无同 SHA256 数据；该 JSON 是运行时测量/回归原始结构化结果，摘要见 JSON 摘要表；原始完整数据仅外置保全。",
+      "candidate_path_status": "missing",
+      "referenced_by": [
+        {
+          "from": "scripts/ux-probe-20261112/final_ui_regress.py",
+          "line": 6,
+          "relation": "literal full path"
+        },
+        {
+          "from": "scripts/ux-probe-20261112/final_ui_regress.py",
+          "line": 448,
+          "relation": "literal basename; resolve in context"
+        },
+        {
+          "from": "scripts/ux-probe-20261112/final_ui_regress.py",
+          "line": 6,
+          "relation": "literal full path"
+        },
+        {
+          "from": "scripts/ux-probe-20261112/final_ui_regress.py",
+          "line": 448,
+          "relation": "literal basename; resolve in context"
+        }
+      ],
+      "exact_duplicate_preserved_paths": [],
+      "visual_review": null
+    },
+    {
+      "category": "untracked",
+      "path": "scripts/ux-probe-20261112/final_ui_regress.py",
+      "bytes": 19390,
+      "sha256": "bf25b72d88d20aca510baae20197853913f9a53a92f3843ecb4f4db2a7360463",
+      "preserved_path": "F:\\AIXM\\烟花爆竹-closeout-evidence-20261115\\untracked\\scripts\\ux-probe-20261112\\final_ui_regress.py",
+      "disposition": "应保留",
+      "reason": "历史审计/探针实现，仅用于理解和追溯旧观测；不适合作为现役回归直接运行，避免其硬编码原 main 写路径或启动浏览器/mock。原始字节仅外置保全。",
+      "candidate_path_status": "missing",
+      "referenced_by": [
+        {
+          "from": "scripts/ux-probe-20261112/final_ui_regress.py",
+          "line": 4,
+          "relation": "literal full path"
+        }
+      ],
+      "exact_duplicate_preserved_paths": [],
+      "visual_review": null
+    },
+    {
+      "category": "untracked",
+      "path": "scripts/ux-probe-20261112/g_reach.py",
+      "bytes": 3314,
+      "sha256": "a80ec1fb3e2337c76af2ac7908d853c8c8f146db281f927deafe98695f9ea791",
+      "preserved_path": "F:\\AIXM\\烟花爆竹-closeout-evidence-20261115\\untracked\\scripts\\ux-probe-20261112\\g_reach.py",
+      "disposition": "应保留",
+      "reason": "历史审计/探针实现，仅用于理解和追溯旧观测；不适合作为现役回归直接运行，避免其硬编码原 main 写路径或启动浏览器/mock。原始字节仅外置保全。",
+      "candidate_path_status": "missing",
+      "referenced_by": [],
+      "exact_duplicate_preserved_paths": [],
+      "visual_review": null
+    },
+    {
+      "category": "untracked",
+      "path": "scripts/ux-probe-20261112/h_firstuse.py",
+      "bytes": 5932,
+      "sha256": "f291e6bb7faff7b59eb662a4d8a34d255f00a6eefde9aa3d3c344e056e1a67a8",
+      "preserved_path": "F:\\AIXM\\烟花爆竹-closeout-evidence-20261115\\untracked\\scripts\\ux-probe-20261112\\h_firstuse.py",
+      "disposition": "应保留",
+      "reason": "历史审计/探针实现，仅用于理解和追溯旧观测；不适合作为现役回归直接运行，避免其硬编码原 main 写路径或启动浏览器/mock。原始字节仅外置保全。",
+      "candidate_path_status": "missing",
+      "referenced_by": [],
+      "exact_duplicate_preserved_paths": [],
+      "visual_review": null
+    },
+    {
+      "category": "untracked",
+      "path": "scripts/ux-probe-20261112/p9_intent_verify.py",
+      "bytes": 12361,
+      "sha256": "ab1ee27b779f61b933cb9cfb0e2cc58e094ed9664f059e8d13a25439fa23a475",
+      "preserved_path": "F:\\AIXM\\烟花爆竹-closeout-evidence-20261115\\untracked\\scripts\\ux-probe-20261112\\p9_intent_verify.py",
+      "disposition": "应保留",
+      "reason": "历史审计/探针实现，仅用于理解和追溯旧观测；不适合作为现役回归直接运行，避免其硬编码原 main 写路径或启动浏览器/mock。原始字节仅外置保全。",
+      "candidate_path_status": "missing",
+      "referenced_by": [
+        {
+          "from": "scripts/ux-probe-20261112/p9_intent_verify.py",
+          "line": 4,
+          "relation": "literal full path"
+        }
+      ],
+      "exact_duplicate_preserved_paths": [],
+      "visual_review": null
+    },
+    {
+      "category": "untracked",
+      "path": "scripts/ux-probe-20261112/probe0.json",
+      "bytes": 1540,
+      "sha256": "0d09e4b8db9d5d0db9bfee07ed4bfa1c2480b9b1c060ee9aed4b6c8e59d99693",
+      "preserved_path": "F:\\AIXM\\烟花爆竹-closeout-evidence-20261115\\untracked\\scripts\\ux-probe-20261112\\probe0.json",
+      "disposition": "应保留",
+      "reason": "候选仓库无同 SHA256 数据；该 JSON 是运行时测量/回归原始结构化结果，摘要见 JSON 摘要表；原始完整数据仅外置保全。",
+      "candidate_path_status": "missing",
+      "referenced_by": [],
+      "exact_duplicate_preserved_paths": [],
+      "visual_review": null
+    },
+    {
+      "category": "untracked",
+      "path": "scripts/ux-probe-20261112/util.py",
+      "bytes": 3225,
+      "sha256": "41e2009a3be5b625a07bc80510b21dc21954d20510f800c020123a4abaa49b60",
+      "preserved_path": "F:\\AIXM\\烟花爆竹-closeout-evidence-20261115\\untracked\\scripts\\ux-probe-20261112\\util.py",
+      "disposition": "应保留",
+      "reason": "历史审计/探针实现，仅用于理解和追溯旧观测；不适合作为现役回归直接运行，避免其硬编码原 main 写路径或启动浏览器/mock。原始字节仅外置保全。",
+      "candidate_path_status": "missing",
+      "referenced_by": [],
+      "exact_duplicate_preserved_paths": [],
+      "visual_review": null
+    },
+    {
+      "category": "untracked",
+      "path": "scripts/ux-probe-20261112/x2_amount.py",
+      "bytes": 2865,
+      "sha256": "0c8edaafd39acda7fa08737bafab993b37e33bab659329caea6e2c2caa581482",
+      "preserved_path": "F:\\AIXM\\烟花爆竹-closeout-evidence-20261115\\untracked\\scripts\\ux-probe-20261112\\x2_amount.py",
+      "disposition": "应保留",
+      "reason": "历史审计/探针实现，仅用于理解和追溯旧观测；不适合作为现役回归直接运行，避免其硬编码原 main 写路径或启动浏览器/mock。原始字节仅外置保全。",
+      "candidate_path_status": "missing",
+      "referenced_by": [],
+      "exact_duplicate_preserved_paths": [],
+      "visual_review": null
+    },
+    {
+      "category": "untracked",
+      "path": "scripts/ux-probe-20261112/x_verify.py",
+      "bytes": 4258,
+      "sha256": "3b91c88313dac1c2772a97920a0f104f2c43e2f60c878fa984ee3477b5a25339",
+      "preserved_path": "F:\\AIXM\\烟花爆竹-closeout-evidence-20261115\\untracked\\scripts\\ux-probe-20261112\\x_verify.py",
+      "disposition": "应保留",
+      "reason": "历史审计/探针实现，仅用于理解和追溯旧观测；不适合作为现役回归直接运行，避免其硬编码原 main 写路径或启动浏览器/mock。原始字节仅外置保全。",
+      "candidate_path_status": "missing",
+      "referenced_by": [],
+      "exact_duplicate_preserved_paths": [],
+      "visual_review": null
+    }
+  ]
+}

@@ -1,5 +1,7 @@
 # 实现一致性审计（2026-11-12）
 
+> **历史审计**：范围、行号与运行时数值适用于 2026-11-12 的界面；第八节保留当日修复记录，现役候选状态见[总方案](superpowers/plans/2026-11-13-stability-repair.md)。原始探针、JSON 和截图已逐项哈希保全，具体位置见[遗留资料去向](stability-closeout/LEGACY-INVENTORY.md)。
+
 > 范围：`src/ui/**` 全部 18 个 tsx（其中 15 个含 `style={{…}}`）+ `src/styles.css` / `src/ui/record.css` / `src/tokens.css`
 > 方法：静态 grep + 代码阅读（每条都给 `文件:行号`）＋ Chromium 124 移动模拟 **390×844 / dsf=2 / is_mobile / has_touch / zh-CN** 运行时实测（`scripts/ux-audit-consistency-20261112/probe.py`、`probe2.py`，原始数值见 `runtime.json` / `runtime2.json`）。
 > 本次**只读**，未改任何 `src/` 文件。
@@ -265,6 +267,7 @@
 
 - 报告：`docs/ux-consistency-20261112.md`（本文）
 - 截图（390×844）：`docs/screenshots/consistency/` — `01-record` / `02-purchase` / `03-purchase-dates` / `04-date-input`（日期控件放大）/ `05-stock` / `06-report` / `07-more` / `08-products`（搜索框）/ `09-history` / `10-settings` / `11-settings-file` / `13-product-picker` / `14-record-line` / `15-picker-measured` / `16-record-with-order` / `17-stock-sheet` / `18-report-with-order` / `20-history-sheet` / `21-product-form`（复选框）/ `22-today-purchase-sheet`
+- 上述截图与下列脚本/JSON 是历史相对路径，未直接加入现役回归；副本位于 `F:\AIXM\烟花爆竹-closeout-evidence-20261115\untracked` 下相同路径，逐份哈希见[遗留资料去向](stability-closeout/LEGACY-INVENTORY.md)。
 - 运行时原始数值：`scripts/ux-audit-consistency-20261112/runtime.json`、`runtime2.json`
 - 探针脚本：`scripts/ux-audit-consistency-20261112/probe.py`、`probe2.py`、`count_inline.py`（均只读，不进构建）
 

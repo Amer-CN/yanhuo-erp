@@ -193,6 +193,69 @@ describe('idempotent ledger clear RPC', () => {
     ]);
   });
 
+  it('rejects finishing a confirmed clear operation with another id and preserves the receipt', async () => {
+    const scope = protocolScope(CFG);
+    const row: SyncProtocolRow = {
+      key: `clear:${scope}`,
+      kind: 'clear',
+      scope,
+      operationId: '00000000-0000-4000-8000-000000000001',
+      state: 'confirmed',
+      clearedAt: 1_800_000_000_000,
+      clearedCount: 3,
+      clearEpoch: 43
+    };
+    await table.put(row);
+
+    await expect(client.finishClearOperation(CFG, '00000000-0000-4000-8000-000000000002')).rejects.toThrow(
+      /operation id/i
+    );
+    expect(await client.pendingClear(CFG)).toEqual(row);
+  });
+
+  it('rejects finishing pending and unknown clear operations without changing their state', async () => {
+    const scope = protocolScope(CFG);
+    const operationId = '00000000-0000-4000-8000-000000000003';
+    for (const state of ['pending', 'unknown'] as const) {
+      const row: SyncProtocolRow = {
+        key: `clear:${scope}`,
+        kind: 'clear',
+        scope,
+        operationId,
+        state,
+        ...(state === 'unknown' ? { lastError: 'Outcome unknown; retry the same operation' } : {})
+      };
+      await table.put(row);
+
+      await expect(client.finishClearOperation(CFG, operationId)).rejects.toThrow(/unconfirmed/i);
+      expect(await client.pendingClear(CFG)).toEqual(row);
+    }
+  });
+
+  it('does not issue the destructive clear RPC when the write-ahead database write fails', async () => {
+    capabilities();
+    const failure = new Error('write-ahead database failure');
+    const failClearCreation = (_key: string, row: SyncProtocolRow): void => {
+      if (row.kind === 'clear') throw failure;
+    };
+    table.hook('creating', failClearCreation);
+    let result: unknown;
+    try {
+      result = await client.clearLedgerRpc(CFG).then(
+        () => undefined,
+        (error: unknown) => error
+      );
+    } finally {
+      table.hook('creating').unsubscribe(failClearCreation);
+    }
+
+    expect(fetchMock.mock.calls.map(([url]) => String(url))).toEqual([
+      'https://example.supabase.co/rest/v1/rpc/yh_sync_capabilities'
+    ]);
+    expect(result).toMatchObject({ message: 'write-ahead database failure' });
+    expect(await client.pendingClear(CFG)).toBeUndefined();
+  });
+
   it('keeps definite 4xx failures pending with a retryable error and the same operation id', async () => {
     const ids: ReturnType<typeof crypto.randomUUID>[] = ['00000000-0000-4000-8000-000000000004'];
     vi.spyOn(crypto, 'randomUUID').mockImplementation(() => ids.shift() ?? '00000000-0000-4000-8000-000000000005');

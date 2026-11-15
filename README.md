@@ -11,9 +11,9 @@
 
 ## 状态
 
-**当前工作分支交付状态：本地修复候选已验证，外部验收待完成。** 本轮从 `0953a9e` 基线修复编辑目标、同步队列、订单完整性、恢复/重连、事务清云与 PWA 更新流程；候选尚未部署，既有线上地址不代表已包含本轮修复。
+**当前工作分支交付状态：本地整合、门禁与独立真实协议验收通过，生产/目标真机待人工执行。** 修复交付从 `0953a9e` 基线完成编辑目标、同步队列、订单完整性、恢复/重连、事务清云与 PWA 更新；本轮从 `b738634` 安全整合旧资料与工具链补丁。候选尚未部署，既有线上地址不代表已包含这些修复。
 
-最终测试数量、覆盖率、E2E 结果和未完成项统一记录在[稳定性修复总方案的最终验收记录](docs/superpowers/plans/2026-11-13-stability-repair.md#最终验收记录2026-11-15)。本地 mock、fake-indexeddb 或 PostgreSQL WASM 验证不代表实际 PostgREST HTTP、多连接并发或两台真机已验收；本轮不 push、不部署、不操作生产账本。
+最终测试数量、覆盖率、E2E 结果和未完成项统一记录在[稳定性修复总方案的最终验收记录](docs/superpowers/plans/2026-11-13-stability-repair.md#最终验收记录2026-11-15)。本机真实 PostgreSQL/PostgREST HTTP、多连接验收已分别留证；mock/fake-indexeddb/WASM 各有自己的验证范围，均不能代替生产或两台目标真机。本轮不 push、不部署、不操作生产账本；将来执行顺序见[人工发布检查表](docs/stability-closeout/RELEASE-CHECKLIST.md)。
 
 以下是原有功能与历史里程碑，不能作为候选发布凭证：
 
@@ -72,7 +72,7 @@ python scripts/a11y-check.py
 
 PR 与 main 部署共用 [E2E action](.github/actions/e2e/action.yml)：保留 build、dev/preview、smoke/sync/offline 和零配置拦截；新增稳定性、恢复、合并、键盘、页面恢复、UI 边界、SQL 帮助与 PWA 更新为阻塞步骤；a11y 仍处观察期。实际 SQL/RLS、PostgREST HTTP 和多连接并发需要独立环境，按运维手册另行执行；普通 CI 不把缺环境跑成失败或 skip，也不将其记作已验收。
 
-界面截图在 [`docs/screenshots/ui/`](docs/screenshots/ui/)（含深色 / 浅色两套）。
+[`docs/screenshots/ui/`](docs/screenshots/ui/) 保存 2026-11-08 的 v1 历史截图（含购物车、结算和找零），不代表当前「记一笔」界面；当前操作以[使用说明](docs/02-使用说明.md)为准。
 
 ## 界面
 

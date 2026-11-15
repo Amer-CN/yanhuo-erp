@@ -2,8 +2,9 @@
 -- 由 psql 使用 ON_ERROR_STOP=1 执行；PGlite harness 单独验证入口 SQL，再执行验收事务。
 -- 先应用 prepare + finalize（新库也可应用 schema.sql）。所有测试更改最终 ROLLBACK。
 -- SQL/RLS 验证不等于真实 PostgREST HTTP 或多连接并发验证。
--- psql 入口要求 YH_TEST_DATABASE_URL=loopback，并显式传入预期数据库名：
--- psql "$YH_TEST_DATABASE_URL" -v yh_test_database_name=yh_stability_test -f supabase/tests/stability.sql
+-- 连接前必须由 wrapper 验证 YH_TEST_DATABASE_URL 仅 loopback、无 query，并显式指定预期库名：
+-- python scripts/run-supabase-sql-test.py --database yh_stability_test [--psql <absolute psql path>]
+-- wrapper 保留 SQL 内实际库名/地址/数据库级标记检查；URL 密码不进入进程命令行或输出。
 -- 测试库须由维护者预先专门标记（本脚本绝不自动标记数据库）：
 -- ALTER DATABASE yh_stability_test SET yh.protocol_test_database='stability-2026-11-13';
 -- 标记从 pg_db_role_setting 的数据库级配置读取，临时 SET 自定义 GUC 不能伪造。
@@ -11,28 +12,33 @@
 \if :{?yh_test_database_name}
 \else
 \echo 'FAIL: pass -v yh_test_database_name=<dedicated test database>'
-\quit 2
+-- psql 16 的 \quit 不接受退出码参数；用 ON_ERROR_STOP 下的 SQL 异常保证非零退出。
+do $$ begin raise exception 'SYNC_TEST_ENTRY_CONFIGURATION_REJECTED'; end; $$;
 \endif
 \getenv yh_test_database_url YH_TEST_DATABASE_URL
 \if :{?yh_test_database_url}
 \else
 \echo 'FAIL: YH_TEST_DATABASE_URL is required (isolated loopback test DB)'
-\quit 2
+-- psql 16 的 \quit 不接受退出码参数；用 ON_ERROR_STOP 下的 SQL 异常保证非零退出。
+do $$ begin raise exception 'SYNC_TEST_ENTRY_CONFIGURATION_REJECTED'; end; $$;
 \endif
-select :'yh_test_database_url' ~ '^postgres(ql)?://([^/@?#]*@)?(localhost|127[.]0[.]0[.]1|\[::1\])(:[0-9]+)?/[^/?#]+([?][^#]*)?$'
-  and :'yh_test_database_url' !~* '[?&](host|hostaddr|service|port)='
+-- 调用前先用 scripts/run-supabase-sql-test.py 校验 URL；SQL 内继续验证实际连接。
+-- 禁止所有 query（libpq 会解码 %68ostaddr 等 option 名），不只匹配明文 host。
+select :'yh_test_database_url' ~ '^postgres(ql)?://([^/@?#]*@)?(localhost|127[.]0[.]0[.]1|\[::1\])(:[0-9]+)?/[^/?#]+$'
   as yh_test_loopback \gset
 \if :yh_test_loopback
 \else
 \echo 'FAIL: YH_TEST_DATABASE_URL must name an isolated loopback PostgreSQL database'
-\quit 2
+-- psql 16 的 \quit 不接受退出码参数；用 ON_ERROR_STOP 下的 SQL 异常保证非零退出。
+do $$ begin raise exception 'SYNC_TEST_ENTRY_CONFIGURATION_REJECTED'; end; $$;
 \endif
 select coalesce(pg_catalog.inet_server_addr() <<= '127.0.0.0/8'::inet
   or pg_catalog.inet_server_addr()='::1'::inet,false) as yh_test_local_server \gset
 \if :yh_test_local_server
 \else
 \echo 'FAIL: connected PostgreSQL server is not loopback'
-\quit 2
+-- psql 16 的 \quit 不接受退出码参数；用 ON_ERROR_STOP 下的 SQL 异常保证非零退出。
+do $$ begin raise exception 'SYNC_TEST_ENTRY_CONFIGURATION_REJECTED'; end; $$;
 \endif
 -- ENTRY_DATABASE_GUARD_BEGIN：在任何业务 fixture 写入前验证实际连接身份和专用库标记。
 -- 仅接受不需 URI 解码的简单数据库名，拒绝编码/额外路径带来的 URL 与 -v 歧义。

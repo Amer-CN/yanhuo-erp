@@ -13,8 +13,8 @@
 ## 0. 状态、边界与读法
 
 - 计划日期：2026-11-13（Asia/Shanghai）。计划基线：`0953a9e5763cf402a0795a8e5c894b58848c036f`。
-- **当前状态：本地修复候选已验证，外部验收待完成。** B01–B07/F01–F05 的本地实现、回归与复审已完成；候选未合入 main、未推送或部署，未执行生产迁移、实际 PostgREST HTTP、多连接并发或目标真机验收。下方“最终验收记录”是本轮结果唯一来源，其他文档引用这里。
-- 实测基线（2026-11-13）：13 文件 / 140 用例通过，数据层行覆盖 84.45%，sync.ts 77.92%；lint 0 error / 32 warning；build 通过。smoke、mock sync、offline、a11y、零配置拦截通过。原版 e2e-merge 等旧 Toast 失败，临时副本改等内联回执后业务验证通过。
+- **当前状态：本地整合、自动门禁及独立真实 PostgreSQL/PostgREST/多连接验收通过，生产与目标真机待人工执行。** B01–B07/F01–F05 产品实现保持修复交付不变；`stability-closeout` 从 `b738634` 定点整合原资料、开发工具安全补丁与验收增强。候选未合入 main、未推送/部署、未执行生产 SQL或真实账本操作。下方“最终验收记录”是现役结果唯一来源，续办进度和人工步骤只作指针。
+- 实测基线（2026-11-13历史口径）：13 文件 / 140 用例通过，数据层行覆盖 84.45%，sync.ts 77.92%；lint 0 error / 32 warning；build 通过。smoke、mock sync、offline、a11y、零配置拦截通过。原版 e2e-merge 等旧 Toast 失败，临时副本改等内联回执后业务验证通过。
 - 当前工作区另有 17 个上一轮知识收尾文件改动及未跟踪证据。实施前保存差异清单，**禁止 git add .、git reset --hard、git clean，以及覆盖这些改动**。隔离分支/worktree 由执行阶段创建；本方案未自动 commit/push。
 - 不写生产 Supabase、不替用户轮换同步码、不触真实账本、不执行控制台迁移、不开放 0.0.0.0。云端脚本可编写和在隔离数据库测试；生产执行另列步骤。
 - 不重开基线已关闭的 D2/D4，不顺手拆所有大文件、清零 warning 或改 GlassKit 外观。既有 A6/A8/C8/E9/E10、N1/N3/N4 不属于本轮完成指标。
@@ -44,7 +44,31 @@
 
 ### 最终验收记录（2026-11-15）
 
-**结论：本地修复候选通过；外部验收待完成。** 执行于 Asia/Shanghai，保留 `stability-repair` worktree。最终实现提交为 `f4ec6864923d63cb95989ea92489abc97f253c0e`，与 `533c000`（数据层）、`1a21ca4`（协议包）构成最后三批实现。文档提交只改变说明，不改变产品源码。
+**现役结论：本地候选与独立真实服务验收通过；生产/目标真机 pending。** 整合基点为已交付 `b738634d2115f67c0d5a133811b5b2dd4a98039f`，产品实现仍是 `f4ec6864923d63cb95989ea92489abc97f253c0e`、`533c000` 与 `1a21ca4`；本次只变更文档/规则、独立验收脚本/测试与 Vite 工具链，没有修改产品源码或 schema/prepare/finalize。
+
+本轮复验（Asia/Shanghai）：
+
+| 验收面 | 2026-11-15 收尾实测 | 凭证相对本轮证据根 |
+|---|---|---|
+| Node24 核心门禁 | frozen install、`pnpm exec tsc --noEmit`、`pnpm lint`、331用例覆盖、build均exit 0；**0 error / 30 warning**，未增加 | `core-final/core-gates.json`、`lint.log` |
+| Node24 Vitest / coverage | **29 文件 / 331 通过 / 0 skip**；lines **90.86%**、branches **85.58%**、functions **92.62%**；sync lines **88.81%**，均不低于历史基线；阈值未变 | `core-final/test-cov.log`；新操作号/未确认/WAL护栏有4份独立 mutation 失败凭证，产品实现未改 |
+| Python / 安全入口 | **17/17**；新增真实失连代理、SQL连接前无query/库名/loopback、错误配置不启动psql/密码不进命令行；HTTP-only输入收紧后全套再跑17/17 | `core-final/python.log`、`python-closeout-final.log`；`protocol-http-only-red.log`、`sql-preconnect-red.log`、`sql-password-red.log` 与 final green |
+| build | exit 0；25 precache entries / **890.54 KiB**；backup静态/动态导入提示仍保留 | `core-final/build.log` |
+| 固定产物浏览器 | **14/14 组，0 skip**；F01 16/16、恢复7/7、UI边界12/12、SW更新5组；src/supabase/dist before/after哈希一致。构建标识为真实未提交状态 `b738634d-dirty`；后续仅测试/文档变化，最终核心重建生成相同资源名 | `browser-final/results.json`、`source-before.json`、`source-after.json` |
+| 真实 SQL/RLS | PostgreSQL **16.16 TCP**；schema 与 prepare/finalize 两路径现役 `stability.sql`通过并ROLLBACK；9类入口负向拒绝exit3、恢复正常通过 | `sql-real-final/results.json` **17项操作** |
+| Node22 / 连接前 SQL 与迁移保全 | Node22.22.1便携副本中冻结install、tsc、lint、331用例coverage和build均exit0（0 skip，lint0/30）；另新wrapper两库fixture通过；编码host参数在psql启动前exit2。额外旧id-PK样本1行，prepare→finalize→两脚本重跑后原业务投影哈希完全一致，第三库fixture通过 | `sql-wrapper-final/results.json` **19项操作**、`legacy-preservation.json`；Node22全量兼容证据见`node22/final-clean-results.json`及`project-final-manifest.json`（lines91.42%、branches85.67%、functions92.92%、sync lines88.81%）；未将初次未录的DDL控制台输出冒充已归档 |
+| 真实 HTTP/RLS / 并发 | PostgREST **16.5**，authenticator→anon（非superuser、非BYPASSRLS），两安装路径均 exit0：复合冲突键、header/RLS、旧epoch拒绝、清空PATCH/INSERT/双清并发、幂等回执；reconcile实际能力探针、变化基线拒绝→重新预览成功、错误账本/旧epoch拒绝→恢复、实际丢响应后同号重试逐字段保全后来数据与clear后receipt-first | `owned-http-final/schema-protocol.log`、`migration-protocol.log`、`results.json`；仅loopback路径转发代理，不mock业务响应 |
+| 持锁多连接 | 独立anon TCP事务与anon HTTP实观 ledger advisory锁已持有/另请求等待；clear→write与write→clear两顺序按实际commit完成，过期写不复活 | `lock-concurrency/results.json`及两组TCP输出 |
+| 工具链审计 | Vite **5.4.21→6.4.5**；React/Vitest/PWA版本不变。生产 **0**（exit0）；全依赖 **0 High / 5 Moderate / 1 Low**（exit1如实保留）。6.4.4另有同系列安全补丁故否决中间态；剩余Vitest/glob/minimatch/deepmerge后续任务 | `core-final/audit-*-after.log`、`core-gates.json`、[保留债务](../../stability-closeout/ACCEPTED-DEBT.md) |
+| 原资料保全 | 原main 17 tracked+218 untracked全部读审/逐项裁决并哈希保全；原件不动，15重复/203应保留，3旧计划不覆盖新版 | [235项清单](../../stability-closeout/legacy-manifest.json)、[去向说明](../../stability-closeout/LEGACY-INVENTORY.md) |
+| 生产 / main / push / deploy | **未执行、out-of-scope**；人工prepare→兼容前端→两台确认→finalize | [人工发布检查表](../../stability-closeout/RELEASE-CHECKLIST.md) |
+| 目标真机 / 营业日 / 恢复演练 | **pending**；不能由上述本机真实服务或浏览器代勾 | 同上 |
+
+本轮命令输出初始根为 `E:\Temp\yh-closeout-20261115`，验收证据最终逐文件哈希归档到 `F:\AIXM\烟花爆竹-closeout-evidence-20261115\closeout-run`，见[凭证索引](../../stability-closeout/EVIDENCE.md)。本地实际服务已停止，分支/工作树、临时测试库与证据保留。
+
+#### 初次修复交付记录（历史，2026-11-15）
+
+下表保留初次 `stability-repair` 验收时的数字和范围；**不是现役待办/通过清单**。其 `E:\Temp\yh-final-stability-20261115`、`E:\Temp\yh-stability-sql-20261113-cloud` 路径本轮实查已不存在，旧原始输出不可重新核验；本轮上表重新留证，不用历史文档代替当前证据。初次最终实现提交为 `f4ec6864923d63cb95989ea92489abc97f253c0e`。
 
 | 验收面 / 命令 | 实测结果与凭证 |
 |---|---|
@@ -58,24 +82,24 @@
 | PostgreSQL WASM | 最终协议执行 **15 fixture 组**、迁移约束 **28/28**、数据库入口身份护栏 **8/8**；schema / prepare 的条件上传各一套，**2/2**。覆盖 anon/RLS、历史数据保全、约束拒绝/回滚、清空 epoch、故障原子性、receipt-first 及精确远端基线。独立安装根 `E:\Temp\yh-stability-sql-20261113-cloud`，不是 psql TCP 或真实 HTTP |
 | 依赖审计 | 使用 `--registry=https://registry.npmjs.org`：生产依赖 **0**；全部依赖 **1 high / 12 moderate / 2 low**，均为开发工具链，未混入本轮大升级。high 为 Vite Windows launch-editor；开发服务仅 loopback。默认镜像不支持 audit endpoint，未把其错误算作审计结果。JSON 在上述证据根 |
 | 差异与复审 | `git diff --check` 通过；前后端专项规格/质量审查完成。最终 B04 指纹重放授权、条件上传及清空本机完成标记补丁复审均无未处理 Critical/Important |
-| 实际 psql TCP / PostgREST HTTP / 多连接并发 | **pending**：未执行，需独立环境，不记为产品失败、通过或 skip |
-| 生产迁移 / main 合并 / push / 部署 / 线上新构建验证 | **out-of-scope**：本轮未执行，未获授权；交付人工迁移顺序 |
-| 两台目标真机 / 安装态 PWA / 营业日与恢复演练 | **pending**：按下方真机矩阵人工验收 |
+| 专用 loopback psql TCP / PostgreSQL SQL RLS / PostgREST anon HTTP / 多连接并发 | **已实测通过**：PostgreSQL 16.16 与 PostgREST 16.5；新库schema、旧库prepare→finalize、真实anon header/RLS/复合冲突键/旧epoch拒绝/事务清空/幂等receipt/条件重连基线拒绝与丢响应同号重试均通过；两独立连接实际观测ledger advisory lock等待（clear→write、write→clear）。证据 `E:\Temp\yh-closeout-20261115\sql-real-final\results.json`、`sql-wrapper-final\results.json`、`owned-http-final\results.json`、`lock-concurrency\results.json`；服务由本轮runner启动并关闭，`owned-http-final\stopped.json`记录端口全闭。**仅本机隔离环境，不代表生产** |
+| 生产迁移 / main 合并 / push / 部署 / 线上新构建验证 | **out-of-scope**：本轮未执行，用户明确要求本地交付；交付人工迁移顺序 |
+| 两台目标真机 / 安装态 PWA / 营业日与恢复演练 | **pending**：未做目标设备/现场场景，按下方真机矩阵及[发布检查表](../../stability-closeout/RELEASE-CHECKLIST.md)人工验收 |
 
 实现与设计稿的精化：清空和条件上传使用 header-bound、固定 search_path 的最小 `SECURITY DEFINER` RPC；anon 不可直接写 state/receipt。重连不是最后一次 GET 后普通 POST，而是同账本锁内比较完整投影并原子上传；缺 RPC 明确暂停。显式保留本机整单时，仅为该单远端多余活明细登记墓碑。已定稿撤销指纹不随重放改写；本机清空完成标记与业务清理同事务，finish 失败重试不删后来新记的数据。
 
-保留的非阻塞项：既有大账本性能三项、5 条历史结构 Minor 和开发依赖告警不属于本轮清零指标；建商品异步核验期间第二次取消可能中止首次返回但草稿保留；部分协议错误分支缺独立故障注入，详见异味基线。源码、迁移包、分支和临时凭证保留供复核，未删除原工作区的 17 份知识收尾改动。
+保留的非阻塞项：既有大账本性能三项和5条历史结构 Minor 不在本轮重构范围；Vite High 已以6.4.5同系列安全补丁处理，开发依赖还余5 Moderate/1 Low。建商品异步核验期间第二次取消可能中止首次返回但草稿保留。原测试缺口中的finishClear错误operationId、pending/unknown、WAL数据库写失败禁止清空RPC已用真实Dexie测试和mutation红绿证据补齐；callback+release双失败独立注入、旧B01 gate release前未提交断言仍是后续测试任务，不从真实HTTP结果推断已覆盖。独立测试进程已停止；源、迁移和分支保留，原工作区17项与218未跟踪资料完整哈希保全，没有删除原件。
 
 知识收尾各事实面：
 
 | 事实面 | 状态 | 边界 |
 |---|---|---|
 | 代码 | changed-and-verified | 最终实现、红绿回归、完整门禁和复审通过 |
-| 运行态 | pending | 本机固定构建与 build 标识已核对；远端部署/真实云/目标手机未验证 |
-| 文档 | changed-and-verified | README、使用/云同步/运维、CHANGELOG、基线和子计划对齐；10 文档的 41 个相对链接、16 个锚点通过 |
+| 运行态 | changed-and-verified（仅本机隔离服务）；线上/生产 pending、out-of-scope | 本地固定构建、真实loopback PostgreSQL/PostgREST/anon HTTP与多连接已验证；远端部署、生产云和目标手机未验证 |
+| 文档 | changed-and-verified | README、使用/云同步/运维、CHANGELOG、基线和子计划对齐；本轮26份变更Markdown的117条相对链接/锚点通过；最终提交前再次检查 |
 | Agent 规则 | changed-and-verified | 当前 worktree 的 AGENTS 保留本轮权限边界和唯一验收索引；原主工作区已有改动未覆盖 |
 | 跨会话记忆 | not-applicable | 未创建或手改额外项目记忆，事实集中在正式文档 |
-| 工作区 | verified-current | 修复按白名单本地提交；保留隔离 worktree、分支与临时证据，未合并/推送/删除原资料 |
+| 工作区 | changed-and-verified | 原main仍只读；`stability-closeout` 从 `b738634` 定点整合、精确文件列表本地提交；原资料235项全哈希保全，原修复worktree、分支和复核证据均保留，未push/deploy/删除 |
 
 复核现场仍保留；清场不属于本轮交付。候选不称为“已上线”或“真机验证稳定版”。
 
@@ -228,7 +252,7 @@ git diff --check
 
 **允许结束编码的条件：** A–E 全绿，无未处理 P1，生产步骤清楚。
 
-**允许宣称稳定正式版的条件：** 编码条件 + 实际云端策略/协议验证 + 两台目标真机完整流程 + 营业日/恢复验收通过。用户没有提供设备或生产授权时，结论写“软件候选版通过，现场验收待完成”，不冒充已完成。
+**允许宣称稳定正式版的条件：** 编码条件 + 生产云端策略/协议验证 + 两台目标真机完整流程 + 营业日/恢复验收通过。本轮已通过的是独立 loopback PostgreSQL/PostgREST/anon HTTP与多连接门禁，不是生产云；没有两台目标设备/生产变更授权时，结论只能写“本地候选及独立协议验收通过，生产与现场验收待人工执行”，不冒充正式稳定版。
 
 ## 8. 技术依据与验证范围
 

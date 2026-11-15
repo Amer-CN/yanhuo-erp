@@ -267,7 +267,7 @@ notify pgrst, 'reload schema';
 - [ ] **8. 可重复运行的集成命令。** 新建 `scripts/e2e-supabase-protocol.py`（本任务文件列表的一部分），环境 `YH_PROTOCOL_TEST_URL/KEY` 必须全部设置且URL为loopback，否则退出；所有ledger用每次运行的随机前缀，不接受内置生产ledger。脚本用Python标准库HTTP执行anon请求，依次验证复合id、RLS、RPC、幂等重试、旧epoch写入拒绝与并发清空/写入。只允许清理本次随机ledger，无全表清理。SQL套件为事务包裹并最终ROLLBACK；运行前要求 `psql` 目标为独立测试DB且显式 `YH_TEST_DATABASE_URL` 为loopback。
 
 ```powershell
-psql "$env:YH_TEST_DATABASE_URL" -v ON_ERROR_STOP=1 -f supabase/tests/stability.sql
+python scripts/run-supabase-sql-test.py --database yh_stability_test
 python scripts/e2e-supabase-protocol.py
 ```
 
