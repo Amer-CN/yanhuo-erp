@@ -130,7 +130,8 @@ body {
   margin: 0;
   font-size: var(--yh-nav-title-size);
   text-align: left;
-  text-shadow: 0 2px 14px rgba(0, 0, 0, 0.35);
+  letter-spacing: var(--yh-tracking-tight);
+  text-shadow: none;
 }
 
 /*
@@ -433,6 +434,64 @@ body {
 
 /* ------------------------------------------------------------ 表单 */
 
+/* 轻玻璃：次要操作与内嵌容器退后一层，橙色主操作保持清晰。 */
+.glass-btn--secondary {
+  background: var(--gl-surface-2);
+  border-color: var(--yh-border-medium);
+  color: var(--yh-ink-1);
+  box-shadow: var(--gl-inset-subtle);
+}
+
+.glass-btn--secondary svg {
+  stroke: currentColor;
+}
+
+.glass-list__title-row > .amount {
+  margin-inline-start: auto;
+  flex: 0 0 auto;
+  font-weight: var(--yh-weight-semibold);
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
+.glass-card > .glass-list {
+  background: transparent;
+  border-color: transparent;
+  box-shadow: none;
+  backdrop-filter: none;
+  -webkit-backdrop-filter: none;
+}
+
+.glass-card .stat {
+  background: var(--gl-surface-1);
+  border-color: transparent;
+  box-shadow: none;
+  backdrop-filter: none;
+  -webkit-backdrop-filter: none;
+}
+
+.glass-tab-bar--floating {
+  --gl-tab-bar-active-glow: none;
+}
+
+.glass-btn,
+.glass-pill,
+.prod-btn,
+.glass-tab-bar__item {
+  touch-action: manipulation;
+}
+
+input,
+textarea,
+select {
+  caret-color: var(--yh-ink-accent);
+}
+
+::selection {
+  color: var(--yh-ink-1);
+  background: var(--yh-accent-soft);
+}
+
 .form-row {
   display: grid;
   grid-template-columns: 1fr 1fr;
@@ -660,7 +719,7 @@ body {
   background: var(--gl-surface-1);
   border: 1px solid var(--gl-border-subtle);
   border-radius: var(--gl-radius-btn);
-  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08), var(--gl-inset-subtle);
+  box-shadow: none;
   overflow: hidden;
 }
 
