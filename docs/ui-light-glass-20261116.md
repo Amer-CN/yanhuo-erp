@@ -18,7 +18,8 @@
 ## 验证
 
 - pnpm build：通过。
-- pnpm test：13 文件，140 测试通过。
+- 视觉分支原始基线：13 文件，140 测试通过。
+- 整合远端 main（4979478）后发布门禁：pnpm lint 0 errors（30 条既有 warning）、pnpm test:cov 29 文件 / 331 测试通过、总行覆盖率 90.86%、pnpm build 通过。
 - python scripts/e2e-smoke.py：开单、进货、库存、报表、商品和设置通过。
 - python scripts/a11y-check.py：标签、焦点、Esc、键盘行、触控和减动效检查通过。
 - Python Playwright：两主题 × 320/390/768/1440 宽度 × 记账/库存/报表/进货，共 32 组；长金额 123456.78；未发现页面横向溢出、导航遮盖、金额与结账按钮重叠、可见小按钮或常规输入不足 16px。
