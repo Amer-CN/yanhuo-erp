@@ -144,6 +144,53 @@ function needsSessionMigration(data: AppData): boolean {
   return data.orders.some((o) => !o.sessionId);
 }
 
+/**
+ * 只读 settings（小表）判断场次迁移是否已经做过。
+ * 启动快路径靠它避开「为了判断要不要迁移而把整库读进 JS」。
+ */
+async function hasSessionMigrationMark(idb: IDBDatabase): Promise<boolean> {
+  const settings = await readStore<Setting>(idb, 'settings');
+  return settings.some(
+    (s) => s.key === SETTING_KEYS.sessionsMigrated && s.value === SESSIONS_MIGRATED_VALUE
+  );
+}
+
+/**
+ * 用 count 判断订单里是否还有缺 sessionId 的记录。
+ * `sessionId` 是 v3 起的索引，没有值的记录不进索引，因此
+ * `索引 count < 总 count` 等价于「存在待迁移订单」，但不需要把订单正文
+ * 结构化克隆到 JS —— 这正是启动链上最贵的那一步。
+ */
+function hasOrdersWithoutSession(idb: IDBDatabase): Promise<boolean> {
+  if (!idb.objectStoreNames.contains('orders')) return Promise.resolve(false);
+  return new Promise((resolve, reject) => {
+    const tx = idb.transaction('orders', 'readonly');
+    const store = tx.objectStore('orders');
+    if (!store.indexNames.contains('sessionId')) {
+      // v3 之前的库：没有索引，一定需要迁移
+      resolve(true);
+      return;
+    }
+    let total = -1;
+    let withSession = -1;
+    const done = () => {
+      if (total >= 0 && withSession >= 0) resolve(withSession < total);
+    };
+    const totalReq = store.count();
+    totalReq.onsuccess = () => {
+      total = totalReq.result;
+      done();
+    };
+    totalReq.onerror = () => reject(totalReq.error ?? new Error('统计订单失败'));
+    const sessionReq = store.index('sessionId').count();
+    sessionReq.onsuccess = () => {
+      withSession = sessionReq.result;
+      done();
+    };
+    sessionReq.onerror = () => reject(sessionReq.error ?? new Error('统计场次订单失败'));
+  });
+}
+
 export interface SnapshotBeforeOpenResult {
   created: boolean;
   version: number;
@@ -161,6 +208,16 @@ export async function snapshotBeforeOpen(): Promise<SnapshotBeforeOpenResult> {
   const version = idb.version;
   try {
     if (created) return { created, version };
+
+    /*
+     * 启动快路径（绝大多数启动都会走这里）：
+     * 版本没变、场次迁移也做过、且没有缺 sessionId 的新单时，直接返回。
+     * 旧实现无条件把 7 张表读进 JS，只为做上面这两个判断；订单/流水是最大的两张表，
+     * 数据攒到几千单后，这段纯判断会占掉首屏几百毫秒。
+     */
+    if (version >= SCHEMA_VERSION && (await hasSessionMigrationMark(idb))) {
+      if (!(await hasOrdersWithoutSession(idb))) return { created, version };
+    }
 
     const data: AppData = {
       products: await readStore<Product>(idb, 'products'),

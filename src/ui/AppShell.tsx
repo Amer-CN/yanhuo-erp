@@ -502,14 +502,24 @@ const HistoryPage = lazy(() => import('./pages/HistoryPage'));
 const SettingsPage = lazy(() => import('./pages/SettingsPage'));
 const RecordEditor = lazy(() => import('./RecordEditor'));
 
-const preloadSecondaryPages = () => {
+/*
+ * 预取分两批：
+ * - 高频（进货、开单编辑器）在首屏提交后的第一个宏任务就开始。它们体积小
+ *   （合计约 11KB gzip），首屏关键资源已经下完，提前下载不会拖慢 LCP，
+ *   但能让摊主第一次点底部 tab 时不再等 RTT + 下载。
+ * - 其余页面等空闲时再取，避免 7 个 chunk 同时下载把慢网占满。
+ */
+const preloadHotPages = () => {
   void import('./pages/PurchasePage');
+  void import('./RecordEditor');
+};
+
+const preloadOtherPages = () => {
   void import('./pages/StockPage');
   void import('./pages/ReportPage');
   void import('./pages/ProductsPage');
   void import('./pages/HistoryPage');
   void import('./pages/SettingsPage');
-  void import('./RecordEditor');
 };
 
 /** 只读派生数据：放在 Context 里，页面按需消费，不再逐层传 props */
@@ -628,13 +638,21 @@ export function AppMain({ tab, sub, editor, pendingProductId, theme, onToggleThe
     useAppActions();
   // 首屏渲染完成后再空闲预取其余页面，切 tab / 开单时不等待下载。
   useEffect(() => {
+    /*
+     * 省流量模式不预取：慢网下这些 chunk 会与用户下一步操作抢带宽，
+     * 点击时反而要排队。
+     */
+    const conn = (navigator as { connection?: { saveData?: boolean } }).connection;
+    if (conn?.saveData) return;
+    const hot = window.setTimeout(preloadHotPages, 0);
     const canIdle = typeof window.requestIdleCallback === 'function';
-    const handle = canIdle
-      ? window.requestIdleCallback(preloadSecondaryPages, { timeout: 2500 })
-      : window.setTimeout(preloadSecondaryPages, 1200);
+    const rest = canIdle
+      ? window.requestIdleCallback(preloadOtherPages, { timeout: 1500 })
+      : window.setTimeout(preloadOtherPages, 1200);
     return () => {
-      if (canIdle) window.cancelIdleCallback(handle);
-      else window.clearTimeout(handle);
+      window.clearTimeout(hot);
+      if (canIdle) window.cancelIdleCallback(rest);
+      else window.clearTimeout(rest);
     };
   }, []);
 

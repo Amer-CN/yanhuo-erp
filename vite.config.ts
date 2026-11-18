@@ -4,6 +4,15 @@ import { VitePWA } from 'vite-plugin-pwa';
 
 export default defineConfig({
   base: './',
+  /*
+   * Dexie 的官方入口 import-wrapper.mjs 固定转出 dist/dexie.js（ES5 UMD）；
+   * 本应用只跑在现代浏览器 / PWA 环境，改指现代 ES 构建后 API 不变，
+   * 打包产物少约 13KB（gzip -2.5KB），并省掉 ES5 降级代码的解析执行。
+   * 见 .perf/ 的基线测量与 resolve-profile 归因（Dexie 是首屏最大单模块）。
+   */
+  resolve: {
+    alias: [{ find: /^dexie$/, replacement: 'dexie/dist/modern/dexie.min.mjs' }]
+  },
   plugins: [
     react(),
     VitePWA({

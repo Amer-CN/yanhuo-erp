@@ -866,6 +866,23 @@ async function bestEffortSnapshot(label: string, run: () => Promise<unknown>): P
  */
 export async function migrateSessions(): Promise<number> {
   const done = (await db.settings.get(SETTING_KEYS.sessionsMigrated))?.value;
+  /*
+   * 快路径：迁移标记已写过时，先确认「没有缺 sessionId 的订单」再返回。
+   * 这一步用 `sessionId` 索引 count（只读索引键，不反序列化订单正文），
+   * 替代过去每次启动都把整张 orders 表读进 JS 再 filter —— 启动链上最贵的一步。
+   * 没有索引的旧库会在 `where` 上抛错，落回下面的全表路径，语义不变。
+   */
+  if (done === SESSIONS_MIGRATED_VALUE) {
+    try {
+      const [total, withSession] = await Promise.all([
+        db.orders.count(),
+        db.orders.where('sessionId').above('').count()
+      ]);
+      if (withSession === total) return 0;
+    } catch {
+      // 旧库没有 sessionId 索引：走完整迁移判断
+    }
+  }
   const pending = (await db.orders.toArray())
     .filter((o) => !o.sessionId)
     .sort((a, b) => (a.createdAt < b.createdAt ? -1 : a.createdAt > b.createdAt ? 1 : 0));
