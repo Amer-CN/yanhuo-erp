@@ -220,18 +220,43 @@
   --yh-scrim: rgba(0, 0, 0, 0.5);
 
   /* 品牌极光：夜间余烬，不随主题变成青绿 */
-  --yh-aurora-1: rgba(255, 138, 0, 0.16);
-  --yh-aurora-2: rgba(196, 72, 24, 0.14);
-  --yh-aurora-3: rgba(255, 196, 120, 0.1);
+  --yh-aurora-1: rgba(255, 138, 0, 0.055);
+  --yh-aurora-2: rgba(196, 72, 24, 0.04);
+  --yh-aurora-3: rgba(255, 196, 120, 0.035);
+  --gl-color-bg-dark: var(--yh-canvas);
+  --gl-color-bg-mid: var(--yh-canvas-mid);
+  --gl-color-bg-light: #142d38;
+  --gl-bg-light-streak-1: rgba(90, 160, 170, 0.035);
+  --gl-bg-light-streak-2: rgba(110, 170, 180, 0.025);
+  --gl-bg-warm-glow: rgba(220, 160, 70, 0.035);
 
   /* GlassKit 桥接：组件库内部一律走这些语义值 */
   --gl-color-text-muted: var(--yh-ink-2);
   --gl-placeholder: var(--yh-ink-3);
   --gl-color-on-primary: var(--yh-on-accent);
+  --gl-color-primary-mid: color-mix(in srgb, var(--yh-orange-500) 76%, var(--yh-orange-600));
+  --gl-color-primary-dark: var(--yh-orange-600);
+  --gl-color-primary-text: var(--yh-ink-accent);
+  --gl-color-primary-on-glass: var(--yh-ink-accent);
   --gl-focus-ring: var(--yh-focus-ring);
   --gl-color-text-heading: var(--yh-ink-1);
   --gl-tab-bar-color: #c3d0d2;
   --gl-tab-bar-active-color: var(--yh-ink-accent);
+  --gl-tab-bar-spotlight-opacity: 0.55;
+  --gl-surface-1: rgba(255, 255, 255, 0.055);
+  --gl-surface-2: rgba(255, 255, 255, 0.075);
+  --gl-surface-3: rgba(255, 255, 255, 0.105);
+  --gl-surface-4: rgba(255, 255, 255, 0.13);
+  --gl-surface-5: rgba(255, 255, 255, 0.17);
+  --gl-border-subtle: rgba(255, 255, 255, 0.13);
+  --gl-border-medium: rgba(255, 255, 255, 0.22);
+  --gl-border-strong: rgba(255, 255, 255, 0.3);
+  --gl-inset-subtle: inset 0 1px 1px rgba(255, 255, 255, 0.06);
+  --gl-inset-medium: inset 0 1px 1px rgba(255, 255, 255, 0.09);
+  --gl-inset-strong: inset 0 1px 2px rgba(255, 255, 255, 0.12);
+  --gl-shadow-card: 0 6px 24px rgba(0, 0, 0, 0.16);
+  --gl-shadow-btn: 0 3px 12px rgba(0, 0, 0, 0.1);
+  --gl-shadow-btn-primary: 0 5px 18px color-mix(in srgb, var(--yh-orange-700) 22%, transparent), 0 2px 6px rgba(0, 0, 0, 0.12);
   --gl-bg-aurora-1: var(--yh-aurora-1);
   --gl-bg-aurora-2: var(--yh-aurora-2);
   --gl-bg-aurora-3: var(--yh-aurora-3);
@@ -282,9 +307,15 @@
 
   --yh-scrim: rgba(15, 31, 42, 0.32);
 
-  --yh-aurora-1: rgba(255, 176, 84, 0.22);
-  --yh-aurora-2: rgba(255, 138, 60, 0.14);
-  --yh-aurora-3: rgba(255, 220, 170, 0.2);
+  --yh-aurora-1: rgba(255, 176, 84, 0.09);
+  --yh-aurora-2: rgba(255, 138, 60, 0.055);
+  --yh-aurora-3: rgba(255, 220, 170, 0.08);
+  --gl-color-bg-dark: var(--yh-canvas);
+  --gl-color-bg-mid: var(--yh-canvas-mid);
+  --gl-color-bg-light: #f8fafc;
+  --gl-bg-light-streak-1: rgba(90, 160, 170, 0.025);
+  --gl-bg-light-streak-2: rgba(110, 170, 180, 0.02);
+  --gl-bg-warm-glow: rgba(220, 160, 70, 0.025);
 
   --gl-color-text-muted: var(--yh-ink-2);
   --gl-placeholder: var(--yh-ink-3);
@@ -293,9 +324,36 @@
   --gl-color-text-heading: var(--yh-ink-1);
   --gl-tab-bar-color: #5b6669;
   --gl-tab-bar-active-color: var(--yh-orange-800);
+  --gl-color-primary-on-glass: var(--yh-ink-accent);
+  --gl-surface-1: rgba(255, 255, 255, 0.62);
+  --gl-surface-2: rgba(255, 255, 255, 0.76);
+  --gl-surface-3: rgba(255, 255, 255, 0.84);
+  --gl-surface-4: rgba(255, 255, 255, 0.9);
+  --gl-surface-5: rgba(255, 255, 255, 0.96);
+  --gl-border-subtle: rgba(15, 31, 42, 0.1);
+  --gl-border-medium: rgba(15, 31, 42, 0.15);
+  --gl-border-strong: rgba(15, 31, 42, 0.22);
+  --gl-inset-subtle: inset 0 1px 1px rgba(255, 255, 255, 0.4);
+  --gl-inset-medium: inset 0 1px 1px rgba(255, 255, 255, 0.5);
+  --gl-inset-strong: inset 0 1px 2px rgba(255, 255, 255, 0.6);
+  --gl-shadow-card: 0 5px 20px rgba(15, 31, 42, 0.045);
+  --gl-shadow-btn: 0 2px 8px rgba(15, 31, 42, 0.06);
+  --gl-shadow-btn-primary: 0 4px 14px color-mix(in srgb, var(--yh-orange-700) 14%, transparent), 0 1px 4px rgba(15, 31, 42, 0.08);
   --gl-bg-aurora-1: var(--yh-aurora-1);
   --gl-bg-aurora-2: var(--yh-aurora-2);
   --gl-bg-aurora-3: var(--yh-aurora-3);
+}
+
+/* 字体和尺寸桥接：让组件库与业务列表使用同一套中文排版。 */
+:root {
+  --gl-font-family: var(--yh-font-sans);
+  --gl-font-size-base: 16px;
+  --gl-font-size-btn: 16px;
+  --gl-radius-card: var(--yh-radius-xl);
+  --gl-control-height: var(--yh-control-height);
+  --gl-btn-height: var(--yh-btn-height);
+  --gl-btn-height-sm: var(--yh-btn-height-sm);
+  --gl-btn-height-lg: var(--yh-btn-height-lg);
 }
 
 /* =====================================================================

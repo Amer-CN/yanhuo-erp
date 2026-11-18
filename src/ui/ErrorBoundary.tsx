@@ -73,22 +73,22 @@ export function ShellErrorFallback() {
   );
 }
 
-/** 页面级兜底：只坏了一页，重试本页即可，不影响开单 */
-export function PageErrorFallback({ error, onRetry }: { error: Error; onRetry: () => void }) {
+/** React.lazy 会缓存拒绝的导入 Promise；用户主动重载才会重新请求页面文件。 */
+export function PageErrorFallback({ error }: { error: Error }) {
   return (
     <div className="page-stack" role="alert">
       <Card>
         <h2 className="section-title">这一页没打开</h2>
         <p className="muted-text" style={{ marginTop: 'var(--yh-space-2)' }}>
-          页面文件没加载成功，弱网或刚更新时常见。其它页面照常能用。
+          页面文件没加载成功。网络恢复后可重新打开应用；未保存的单据草稿会保留。其它页面仍可使用。
         </p>
         {error.message ? (
           <p className="tiny-text" style={{ margin: 'var(--yh-space-1) 0 var(--yh-space-2)' }}>
             {error.message}
           </p>
         ) : null}
-        <Btn block onClick={onRetry}>
-          重试本页
+        <Btn block onClick={() => window.location.reload()}>
+          重新打开应用
         </Btn>
       </Card>
     </div>

@@ -2,6 +2,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   dropLocalRecord,
   getSyncConfig,
+  initialSyncPending,
   lastSyncAt,
   lastSyncError,
   remoteChangeList,
@@ -14,6 +15,8 @@ import {
   type SyncStatus
 } from '../db/sync';
 import { nextBackoff } from '../db/syncResolve';
+import { readSyncControl, SyncControlError } from '../db/syncControl';
+import { completeRecoveryCleanup } from '../db/dataRecovery';
 import { restoreOrder, updateProduct, voidOrder } from '../db/repo';
 import { fenToStr } from '../db/util';
 import type { Category, Product } from '../db/types';
@@ -40,12 +43,24 @@ export interface SyncApi extends SyncStatus {
   initialSync: InitialSyncState;
   /** B3：首轮已拉到的**行数**（「正在下载历史…（已拉 N 条）」；不是单数） */
   pulledCount: number;
+  deferredLines: number;
+  hasMore: boolean;
 }
 
 const PULL_INTERVAL = 10_000;
 
 /** 角标/列表最多保留多少条：只是「最近发生了什么」，不是审计日志 */
 const KEEP_CHANGES = 20;
+
+export function shouldRetrySyncError(error: unknown): boolean {
+  return !(error instanceof SyncControlError);
+}
+
+export function canUndoRemoteChange(change: RemoteChange): boolean {
+  if (change.kind !== 'order' || change.type === 'removed' || change.type === 'restored') return true;
+  if (!change.local?.voided && change.remote?.voided === true) return true;
+  return change.canUndo === true && Boolean(change.undoVersionKey);
+}
 
 /**
  * 一条改动说成人话。文案刻意带上「你填的是 / 你这边是」：
@@ -114,7 +129,7 @@ function undoSuccessMessage(change: RemoteChange): string {
 }
 
 /** 撤销：覆盖 → 恢复本地旧值；删除 → 把旧快照重建回来；复活 → 重新作废/删除 */
-async function applyUndo(change: RemoteChange): Promise<void> {
+async function applyUndo(change: RemoteChange): Promise<{ sessionSummaryUpdated?: boolean } | void> {
   if (change.type === 'overwritten') {
     if (change.kind === 'product') {
       const p = change.local as Partial<Product> | undefined;
@@ -142,13 +157,11 @@ async function applyUndo(change: RemoteChange): Promise<void> {
     }
     // 订单/场次等：覆盖可能发生在已结账的数据上，updateRecord 的 open 限制会挡住；
     // 直接按旧快照写回 + 入队回推（撤销是用户主动行为，本地优先不破）。
-    await restoreLocalSnapshot(change);
-    return;
+    return restoreLocalSnapshot(change);
   }
   if (change.type === 'removed') {
     // 本地行已被墓碑硬删，restoreOrder 找不到行；用快照连明细一起重建
-    await restoreLocalSnapshot(change);
-    return;
+    return restoreLocalSnapshot(change);
   }
   // restored：撤销复活 = 让它重新不计入账。订单沿用现有 voidOrder（可再「撤销作废」）。
   if (change.kind === 'order') {
@@ -172,11 +185,14 @@ export function useSync(showToast?: Done): SyncApi {
    * 首屏看起来像空账本，必须显式告诉用户，而不是先亮绿 ✓「已同步」。
    */
   const [initialSync, setInitialSync] = useState<InitialSyncState>(() =>
-    lastSyncAt() ? 'done' : 'idle'
+    initialSyncPending() ? 'idle' : 'done'
   );
   const [pulledCount, setPulledCount] = useState(0);
   /** 首轮是否还没成功结束：成功后置 false，后续增量轮不再进入「下载历史」分支、也不再弹 Toast */
-  const initialPending = useRef(!lastSyncAt());
+  const initialPending = useRef(initialSyncPending());
+  const [deferredLines, setDeferredLines] = useState(0);
+  const [hasMore, setHasMore] = useState(initialSyncPending);
+  const downloadedOrders = useRef(0);
   const changesRef = useRef<RemoteChange[]>([]);
   const toastRef = useRef<Done | undefined>(showToast);
   toastRef.current = showToast;
@@ -186,10 +202,11 @@ export function useSync(showToast?: Done): SyncApi {
   const syncRef = useRef<(silent?: boolean) => Promise<void>>(async () => undefined);
 
   const refresh = useCallback(async () => {
-    setConfigured(!!getSyncConfig());
+    const control = await readSyncControl();
+    setConfigured(!!getSyncConfig() && !control.paused);
     setPending(await syncPending());
     setLast(lastSyncAt());
-    setError(lastSyncError());
+    setError(control.paused ? control.reason : lastSyncError());
   }, []);
 
   const clearRemoteChanges = useCallback(() => {
@@ -199,14 +216,16 @@ export function useSync(showToast?: Done): SyncApi {
 
   const undoChange = useCallback(async (change: RemoteChange) => {
     try {
-      await applyUndo(change);
+      const result = await applyUndo(change);
       const left = changesRef.current.filter(
         (c) =>
           !(c.type === change.type && c.kind === change.kind && c.recordId === change.recordId)
       );
       changesRef.current = left;
       setRemoteChanges(left);
-      toastRef.current?.(undoSuccessMessage(change));
+      toastRef.current?.(result?.sessionSummaryUpdated === false
+        ? `${undoSuccessMessage(change)}；场次汇总重算未完成，请到报表核对`
+        : undoSuccessMessage(change), result?.sessionSummaryUpdated === false ? 'warning' : 'success');
     } catch (e) {
       // 失败必须如实说，否则用户以为已经撤销了（下次同步还会看到旧值）
       toastRef.current?.(`撤销失败：${e instanceof Error ? e.message : String(e)}`, 'error');
@@ -231,9 +250,12 @@ export function useSync(showToast?: Done): SyncApi {
       if (!toast) return;
       if (list.length === 1) {
         const change = list[0];
+        const canUndo = canUndoRemoteChange(change);
         toast(changeMessage(change), 'warning', {
-          label: '撤销',
-          onClick: () => void undoChange(change)
+          label: canUndo ? '撤销' : '查看核对',
+          onClick: canUndo
+            ? () => void undoChange(change)
+            : () => toastRef.current?.(change.undoDisabledReason ?? '订单明细尚未完整，请到销售记录核对', 'warning')
         });
         return;
       }
@@ -252,9 +274,14 @@ export function useSync(showToast?: Done): SyncApi {
 
   const syncNow = useCallback(
     async (silent = false) => {
+      await completeRecoveryCleanup();
       const cfg = getSyncConfig();
-      setConfigured(!!cfg);
-      if (!cfg) return;
+      const control = await readSyncControl();
+      setConfigured(!!cfg && !control.paused);
+      if (!cfg || control.paused || control.maintenance) {
+        if (control.paused && control.reason) setError(control.reason);
+        return;
+      }
       if (!navigator.onLine) {
         setOnline(false);
         return;
@@ -275,6 +302,8 @@ export function useSync(showToast?: Done): SyncApi {
       try {
         const result = await runSync(cfg, isInitial ? (n) => setPulledCount(n) : undefined);
         setError(null);
+        setDeferredLines(result.deferredLines);
+        setHasMore(result.hasMore);
         backoff.current = 0;
         if (retryTimer.current) {
           window.clearTimeout(retryTimer.current);
@@ -284,10 +313,11 @@ export function useSync(showToast?: Done): SyncApi {
         reportImpact(result.impact);
         if (isInitial) {
           // 首轮成功收尾：先落标记，再弹一次「已下载 N 单」，之后的增量轮不会再走这里
-          initialPending.current = false;
-          setInitialSync('done');
+          downloadedOrders.current += result.pulledOrders;
+          initialPending.current = result.hasMore;
+          setInitialSync(result.hasMore ? 'idle' : 'done');
           setPulledCount(result.pulled);
-          if (result.pulledOrders > 0) {
+          if (!result.hasMore && downloadedOrders.current > 0) {
             /*
              * 只弹一次（`initialPending` 已置 false，后续增量轮不会再进这个分支）。
              *
@@ -296,7 +326,7 @@ export function useSync(showToast?: Done): SyncApi {
              * 实测不延迟时这条「已下载」20ms 后就被示例商品提示顶掉 —— 用户等于没看到。
              * 稍等一拍再弹，既不抢首屏提示，也保证下载回执真的被看见。
              */
-            const downloaded = result.pulledOrders;
+            const downloaded = downloadedOrders.current;
             window.setTimeout(() => {
               toastRef.current?.(`已下载 ${downloaded} 单历史记录`, 'success', {
                 label: '知道了',
@@ -310,7 +340,8 @@ export function useSync(showToast?: Done): SyncApi {
         // 首轮失败：退回 idle（顶栏不再停在「正在下载历史」），下次重试会重新进入 running
         if (isInitial) setInitialSync('idle');
         // 失败后按 1s→2s→4s…→60s 退避重试；网络恢复由 online 事件另触发
-        if (navigator.onLine) {
+        const control = await readSyncControl();
+        if (navigator.onLine && !control.paused && shouldRetrySyncError(e)) {
           backoff.current = nextBackoff(backoff.current);
           if (retryTimer.current) window.clearTimeout(retryTimer.current);
           retryTimer.current = window.setTimeout(() => {
@@ -343,7 +374,14 @@ export function useSync(showToast?: Done): SyncApi {
     const onVis = () => {
       if (document.visibilityState === 'visible') void syncNow(true);
     };
-    const onConfig = () => void refresh();
+    const onConfig = () => {
+      if (retryTimer.current) window.clearTimeout(retryTimer.current);
+      retryTimer.current = undefined;
+      initialPending.current = initialSyncPending();
+      downloadedOrders.current = 0;
+      void refresh();
+      if (getSyncConfig()) void syncNow(true);
+    };
 
     window.addEventListener('online', onOnline);
     window.addEventListener('offline', onOffline);
@@ -383,7 +421,9 @@ export function useSync(showToast?: Done): SyncApi {
       remoteChanges,
       clearRemoteChanges,
       initialSync,
-      pulledCount
+      pulledCount,
+      deferredLines,
+      hasMore
     }),
     [
       configured,
@@ -396,7 +436,9 @@ export function useSync(showToast?: Done): SyncApi {
       remoteChanges,
       clearRemoteChanges,
       initialSync,
-      pulledCount
+      pulledCount,
+      deferredLines,
+      hasMore
     ]
   );
 }

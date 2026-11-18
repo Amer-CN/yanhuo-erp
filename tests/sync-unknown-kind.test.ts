@@ -24,6 +24,7 @@ beforeEach(async () => {
   vi.stubGlobal(
     'fetch',
     vi.fn(async (url: string, init?: RequestInit) => {
+      if (String(url).includes('/rpc/yh_sync_capabilities')) return Response.json({ code: 'PGRST202' }, { status: 404 });
       if (String(url).includes('on_conflict')) {
         posts.push(JSON.parse(String(init?.body ?? '[]')) as Record<string, unknown>[]);
         return new Response('', { status: 201 });

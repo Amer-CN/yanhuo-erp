@@ -1,5 +1,5 @@
 name: E2E
-description: 安装 Python/Playwright、启动 dev(5173) 与 preview(4173)、跑四个 E2E
+description: 安装 Python/Playwright、构建并启动 dev(5173) 与 preview(4173)、运行本地稳定性门禁
 
 inputs:
   node-version:
@@ -95,6 +95,51 @@ runs:
       shell: bash
       run: python scripts/e2e-offline.py
 
+    # 新增回归均为阻塞步骤。共用本次 Build 的 preview；更新回归复制 dist 并自建 4184 fixture。
+    - name: e2e stability (editor targets + save flows)
+      shell: bash
+      run: python scripts/e2e-stability.py --base http://127.0.0.1:4173/
+
+    - name: e2e sync recovery (mock Supabase)
+      shell: bash
+      env:
+        SYNC_RECOVERY_BASE: http://127.0.0.1:4173/
+      run: python scripts/e2e-sync-recovery.py
+
+    - name: e2e merge
+      shell: bash
+      env:
+        MERGE_BASE: http://127.0.0.1:4173/
+      run: python scripts/e2e-merge.py
+
+    - name: e2e sheet keyboard
+      shell: bash
+      env:
+        SHEET_BASE: http://127.0.0.1:4173/
+      run: python scripts/e2e-sheet-keyboard.py
+
+    - name: e2e page recovery
+      shell: bash
+      env:
+        PAGE_RECOVERY_BASE: http://127.0.0.1:4173/
+      run: python scripts/e2e-page-recovery.py
+
+    - name: e2e UI edge cases
+      shell: bash
+      run: python scripts/e2e-ui-edge.py --base http://127.0.0.1:4173/
+
+    - name: e2e canonical sync help
+      shell: bash
+      env:
+        STABILITY_BASE: http://127.0.0.1:4173/
+      run: python scripts/e2e-sync-help.py
+
+    - name: e2e PWA update (isolated fixture)
+      shell: bash
+      run: python scripts/e2e-update.py --dist dist
+
+    # 实际 SQL/RLS、PostgREST HTTP、多连接并发需独立测试环境，按运维手册另行执行。
+    # 此 action 不调用缺环境即失败的协议脚本，也不把环境缺失记成通过或 skip。
     # 依赖前面已启动的 dev server（http://127.0.0.1:5173/，a11y-check.py 的默认 BASE，不传参即用它）。
     # TODO(2026-11-10 起观察期)：稳定两周后去掉 continue-on-error，转为正式门禁。
     - name: 无障碍回归（观察期，不阻塞部署）

@@ -37,7 +37,7 @@ def main() -> int:
         amount = page.locator('.record-line input[inputmode="decimal"]').first
         amount.fill("20")
         page.screenshot(path=str(SHOT_DIR / "12-edit-order.png"))
-        page.get_by_role("button", name="只保存").click()
+        page.get_by_role("button", name="保存修改", exact=True).click()
         page.get_by_text("¥20.00", exact=False).first.wait_for(timeout=8000)
         page.wait_for_timeout(300)
         page.screenshot(path=str(SHOT_DIR / "13-edited-home.png"))

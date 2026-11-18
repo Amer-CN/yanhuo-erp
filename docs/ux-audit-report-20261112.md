@@ -1,5 +1,7 @@
 # 报表与对账 · 主动体验巡检（2026-11-12）
 
+> **历史审计**：以下数字与问题是 2026-11-12、main 基线 `0953a9e` 之前的界面实测，不作为当前候选的未修清单。后续修复见[异味基线第十八节](代码异味基线-20261110.md#十八合并后自检跨设备提示--报表细节2026-11-12)与[稳定性总方案](superpowers/plans/2026-11-13-stability-repair.md)。原始脚本、JSON、截图已逐份哈希保全，访问位置与适用边界见[遗留资料去向](stability-closeout/LEGACY-INVENTORY.md)。
+
 > 视角：烟花摊主，收摊后想弄清「今天赚了多少、钱对不对」。
 > 环境：390×844 / DPR3 / touch / preview `127.0.0.1:4173` / `localStorage['yh-sync-disabled']='1'`。
 > 方式：脚本直接把 20 单造进 IndexedDB（`scripts/ux-audit-20261112/plan.py`），再用 UI 实操取证；**未改任何源码**。
@@ -240,4 +242,4 @@ python scripts/ux-audit-20261112/sticky_controls.py  # 吸顶复核 → sticky.j
 python scripts/ux-audit-20261112/plan.py             # 期望值（手算口径）
 ```
 
-截图目录：`docs/screenshots/audit-report/`（21 张，编号与正文一致）。
+历史截图原相对目录为 `docs/screenshots/audit-report/`（21 张，编号与正文一致）；脚本与截图未直接混入现役回归，逐项副本在 `F:\AIXM\烟花爆竹-closeout-evidence-20261115\untracked` 下保留同一路径。参见[遗留资料去向](stability-closeout/LEGACY-INVENTORY.md)查哈希与适用版本；复现命令是当时记录，不能在现役候选无审核重跑。

@@ -16,7 +16,7 @@
 
 记账流程（v2「记一笔」，选择器与 `scripts/e2e-smoke.py` 完全一致）：
 首页「记一笔」→「添加商品」→ 点商品 →「完成（回单据）」→「保存并记下一单」
-→ 等「已记 1 单 ¥xx.xx」toast →「返回」→ 断言首页营业额。
+→ 等内联「已记 1 单 ¥xx.xx」回执 → 关闭自动重开的选商品层 →「返回」。
 
 为什么金额断言不在报表页：v2 报表按**本设备场次**统计
 （`src/ui/pages/ReportPage.tsx:425-428` 的 `deviceSessions`），合并进来的 A 端订单
@@ -88,7 +88,7 @@ def wait_app(page) -> None:
 
 
 def sell_product(page, name: str, expect_total: str) -> str:
-    """记一单（1 件）并回到首页，返回保存后的 toast 文案。
+    """记一单（1 件）并回到首页，返回保存后的回执文案。
 
     动作序列与 `scripts/e2e-smoke.py` 的 [2] 段逐条对应：那个脚本 CI 在跑，
     选择器以它为准（角色 / 文案定位，不用 CSS class），不要自己猜。
@@ -110,26 +110,23 @@ def sell_product(page, name: str, expect_total: str) -> str:
     # 4. 回单据 →「保存并记下一单」（andNext：留在编辑器，可继续开单）
     page.get_by_role("button", name="保存并记下一单").click()
 
-    # 5. 等「已记 1 单 ¥xx.xx」toast：金额也在这里断言，避免只测到「有单」
-    toast = wait_for_save_receipt(page, "已记 1 单", timeout=10000)
-    if toast is None:
-        raise AssertionError(f"保存后没等到「已记 1 单」提示（{name}）")
-    if expect_total not in toast:
-        errors.append(f"{name} 记账金额不对：{toast}（应含 {expect_total}）")
+    # 5. 连续开单保存回执在底栏内联，不是 Toast。
+    receipt = wait_for_save_receipt(page, "已记 1 单", timeout=10000)
+    if receipt is None:
+        raise AssertionError(f"保存后没等到底栏「已记 1 单」回执（{name}）")
+    if expect_total not in receipt:
+        errors.append(f"{name} 记账金额不对：{receipt}（应含 {expect_total}）")
 
-    # 6. 关掉「保存并记下一单」自动重开的选商品弹层（连续开单设计，RecordEditor.tsx
-    # 里 setPickOpen(true)），弹层遮罩会挡住开单页的「返回」。弹层是 setTimeout(30)
-    # 后才重开的，先给一帧让状态落定，再「存在且可见才点」，UI 再变也不会误报超时
-    page.wait_for_timeout(400)
-    finish = page.get_by_role("button", name="完成（回单据）")
-    if finish.count() > 0 and finish.first.is_visible():
-        finish.first.click()
-        page.wait_for_timeout(300)
+    # 自动重开的选商品层在保存后出现，400ms 入场锁结束后再关闭。
+    page.wait_for_selector(".glass-sheet", timeout=5000)
+    page.wait_for_timeout(500)
+    page.get_by_role("button", name="完成（回单据）", exact=True).click()
+    page.wait_for_timeout(300)
 
     # 7. 「返回」首页，等营业额刷新（替代固定 sleep：等文案比等时间稳）
     page.get_by_role("button", name="返回").click()
     expect(page.get_by_text(f"¥{expect_total}", exact=True).first).to_be_visible(timeout=10000)
-    return toast
+    return receipt
 
 
 def drain_toast(page, timeout: int = 12000) -> None:
@@ -210,6 +207,35 @@ def main() -> int:
         result_note.wait_for(timeout=10000)
         b.get_by_role("button", name="完成", exact=True).click()
         expect(result_note).to_have_count(0, timeout=10000)
+
+        # 再次导入同一文件：业务表主键集合与内容必须完全一致，不能只看 toast。
+        business_snapshot = """async () => {
+          const database = await new Promise((resolve, reject) => {
+            const request = indexedDB.open('yanhuo-erp');
+            request.onsuccess = () => resolve(request.result);
+            request.onerror = () => reject(request.error);
+          });
+          try {
+            const names = ['products', 'orders', 'lines'];
+            return await Promise.all(names.map(name => new Promise((resolve, reject) => {
+              const request = database.transaction(name, 'readonly').objectStore(name).getAll();
+              request.onsuccess = () => resolve(request.result.sort((a,b) => a.id.localeCompare(b.id)));
+              request.onerror = () => reject(request.error);
+            })));
+          } finally { database.close(); }
+        }"""
+        before_repeat = b.evaluate(business_snapshot)
+        b.set_input_files("input[type=file]", [])
+        b.set_input_files("input[type=file]", backup_path)
+        merge_btn.wait_for(timeout=15000)
+        drain_toast(b)
+        merge_btn.click()
+        expect(b.get_by_text("销售 +0 单", exact=False)).to_be_visible(timeout=10000)
+        result_note.wait_for(timeout=10000)
+        b.get_by_role("button", name="完成", exact=True).click()
+        expect(result_note).to_have_count(0, timeout=10000)
+        assert b.evaluate(business_snapshot) == before_repeat, "重复导入改写了商品/订单/明细或产生重复"
+        print("[B] 同一文件二次导入：商品、订单、明细集合与内容保持一致")
 
         # 商品没重复：回「更多」看商品数量（8 个示例商品固定 ID，合并后仍是 8）
         b.locator(".back-btn").click()

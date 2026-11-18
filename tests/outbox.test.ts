@@ -1,9 +1,10 @@
-import { beforeEach, describe, expect, it } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { db } from '../src/db/db';
 import {
   clearOutbox,
   enqueue,
   enqueueAllLocal,
+  enqueueInTx,
   enqueueMany,
   pendingCount
 } from '../src/db/outbox';
@@ -18,8 +19,46 @@ import {
 } from './helpers';
 
 beforeEach(resetDb);
+afterEach(() => vi.restoreAllMocks());
 
 describe('outbox', () => {
+  it('同毫秒每次入队均生成唯一 revision，主键仍去重', async () => {
+    vi.spyOn(Date, 'now').mockReturnValue(1000);
+    const revisions: (string | undefined)[] = [];
+    for (const op of ['upsert', 'upsert', 'delete', 'upsert'] as const) {
+      await enqueue('order', 'o1', op);
+      const row = await db.outbox.get('order:o1');
+      revisions.push(row?.revision);
+      expect(row).toMatchObject({ id: 'order:o1', queuedAt: 1000, op });
+    }
+    expect(revisions).toEqual(revisions.map(() => expect.any(String)));
+    expect(new Set(revisions).size).toBe(4);
+    expect(await pendingCount()).toBe(1);
+  });
+
+  it('批量和事务内入队也生成新 revision，queuedAt 保持批内序号排序', async () => {
+    vi.spyOn(Date, 'now').mockReturnValue(1000);
+    await enqueueMany([{ kind: 'order', recordId: 'o1' }, { kind: 'line', recordId: 'l1' }]);
+    const initial = await db.outbox.orderBy('queuedAt').toArray();
+    expect(initial.map((row) => row.id)).toEqual(['order:o1', 'line:l1']);
+    expect(initial.map((row) => row.queuedAt)).toEqual([1000, 1001]);
+    await db.transaction('rw', [db.outbox, db.syncMeta], () => enqueueInTx([
+      { kind: 'order', recordId: 'o1' }, { kind: 'line', recordId: 'l1' }
+    ]));
+    const replaced = await db.outbox.orderBy('queuedAt').toArray();
+    const revisions = [...initial, ...replaced].map((row) => row.revision);
+    expect(revisions).toEqual(revisions.map(() => expect.any(String)));
+    expect(new Set(revisions).size).toBe(4);
+    expect(replaced.map((row) => row.queuedAt)).toEqual([1000, 1001]);
+  });
+
+  it('单条 enqueue 本机专属 setting 是空操作，不向 Dexie put undefined', async () => {
+    for (const key of ['deviceId', 'deviceName', 'operatorSelf', 'sync-unknown-kinds']) {
+      await expect(enqueue('setting', key)).resolves.toBeUndefined();
+    }
+    expect(await pendingCount()).toBe(0);
+  });
+
   it('同 kind:recordId 重复入队只留 1 条，op 以最后一次为准', async () => {
     await enqueue('order', 'o1');
     await enqueue('order', 'o1', 'delete');

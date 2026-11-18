@@ -3,6 +3,7 @@ import { Plus, Package, ChevronRight, Power, Trash2 } from 'lucide-react';
 import type { Product } from '../../db/types';
 import { createProduct, deleteProduct, updateProduct, type ProductInput } from '../../db/repo';
 import { fenToStr, qtyToStr } from '../../db/util';
+import type { RecoveryDraft } from '../recordDraft';
 import {
   Btn,
   ConfirmSheet,
@@ -17,7 +18,12 @@ export default function ProductsPage({
   products,
   inv,
   onDone,
-  onCreated
+  onCreated,
+  onCreateCancelled,
+  recovery,
+  onReviewRecovery,
+  onDiscardRecovery,
+  onExportRecovery
 }: {
   products: Product[];
   inv: Map<string, number>;
@@ -28,6 +34,12 @@ export default function ProductsPage({
    * 从「更多 → 商品管理」进来时上层没有意图，什么也不做，就停在这一页。
    */
   onCreated?: (productId: string) => void;
+  /** 取消新建商品时放弃「建完返回开单页」；普通商品管理可不传。 */
+  onCreateCancelled?: () => void;
+  recovery?: RecoveryDraft | null;
+  onReviewRecovery?: () => void;
+  onDiscardRecovery?: () => void;
+  onExportRecovery?: () => void;
 }) {
   const [q, setQ] = useState('');
   const [editing, setEditing] = useState<Product | 'new' | null>(null);
@@ -90,6 +102,20 @@ export default function ProductsPage({
 
   return (
     <div className="page-stack">
+      {recovery ? (
+        <div className="stack-sm" role="status">
+          <p className="glass-hint glass-hint--error">
+            {recovery.reason}。{recovery.transientOnly
+              ? '草稿未能写入存储，仅本页暂存，请先导出再刷新。'
+              : '草稿已保留，刷新后仍可在这里核对；原目标无法保存。'}
+          </p>
+          <Btn block={false} onClick={onReviewRecovery}>核对保留草稿</Btn>
+          <Btn block={false} variant="secondary" onClick={onDiscardRecovery}>丢弃保留草稿</Btn>
+          {recovery.transientOnly ? (
+            <Btn block={false} variant="secondary" onClick={onExportRecovery}>导出保留草稿</Btn>
+          ) : null}
+        </div>
+      ) : null}
       <div className="row-between">
         <SearchField
           className="grow"
@@ -161,7 +187,10 @@ export default function ProductsPage({
       {editing ? (
         <ProductFormModal
           initial={editing === 'new' ? undefined : editing}
-          onClose={() => setEditing(null)}
+          onClose={() => {
+            if (editing === 'new') onCreateCancelled?.();
+            setEditing(null);
+          }}
           onSave={save}
           extraActions={
             editing !== 'new' ? (

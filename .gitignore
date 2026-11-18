@@ -2,6 +2,7 @@ node_modules
 dist
 dev-dist
 *.local
+.devserver.log
 .DS_Store
 Thumbs.db
 docs/screenshots/e2e/

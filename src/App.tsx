@@ -13,7 +13,7 @@ import { SETTING_KEYS } from './db/types';
 import type { Session, SessionSummary } from './db/types';
 import { fenToStr, isoToLocalDate, localDate } from './db/util';
 import { useSync } from './ui/useSync';
-import { draftFromOrder, type RecordDraft } from './ui/recordDraft';
+import { clearRecoveryDraft, draftFromOrder, loadRecoveryDraft, saveRecoveryDraft, type RecordDraft, type RecoveryDraft } from './ui/recordDraft';
 import {
   AppDataProvider,
   AppMain,
@@ -33,18 +33,21 @@ export default function App() {
   const [tab, setTab] = useState<Tab>('record');
   const [sub, setSub] = useState<SubPage>(null);
   const [editor, setEditor] = useState<EditorState | null>(null);
+  const [recovery, setRecovery] = useState<RecoveryDraft | null>(loadRecoveryDraft);
 
   const toastCtl = useToast();
   const { theme, toggleTheme } = useTheme();
   /**
-   * P9 的「意图」：只有「从开单页点去建商品」这一条路会把它置 true。
+   * 只有「从开单页点去建商品」才记录原编辑目标，返回时恢复同一张单/同一场。
    * 生命周期（写成 ref 是因为它只影响一次跳转，不该触发重渲染）：
    *   置位 → onCreateProductForEditor（开单页去建商品）
    *   清除 → ① onProductCreated（建好了：立刻消费掉，回开单页加行）
    *          ② 从商品管理退出去（onBack）或切 tab —— 用户放弃了这条流程
    * 不清就会变成永久跳转 bug：以后从「更多 → 商品管理」新建也会被弹回开单页。
    */
-  const createProductIntentRef = useRef(false);
+  const createProductIntentRef = useRef<EditorState | null>(null);
+  // 返回核验是异步读取；用户离开商品管理后，旧读取结果不能再把编辑器打开。
+  const createProductReturnRef = useRef<object | null>(null);
   /**
    * 建好、但还没被开单页消费掉的那个商品 id。
    * 必须是 state 而不是 ref：RecordEditor 要等到 `data.products` 里出现它才加行
@@ -53,7 +56,8 @@ export default function App() {
   const [pendingProductId, setPendingProductId] = useState<string | null>(null);
   /** 任何「离开商品管理」的路径都要清意图，避免泄漏到下一次新建 */
   const clearCreateIntent = () => {
-    createProductIntentRef.current = false;
+    createProductIntentRef.current = null;
+    createProductReturnRef.current = null;
     // 一并清掉待加入的商品：用户已经放弃这条流程，下次进开单页不该再冒出一行
     setPendingProductId(null);
   };
@@ -220,6 +224,7 @@ export default function App() {
             warnDays,
             editorInitial,
             lastClosed,
+            recovery,
             showToast: toastCtl.showToast
           }
         : null,
@@ -238,9 +243,23 @@ export default function App() {
       warnDays,
       editorInitial,
       lastClosed,
+      recovery,
       toastCtl.showToast
     ]
   );
+
+  const retainRecovery = useCallback((target: EditorState, reason: string) => {
+    if (target.mode === 'new' || !target.resumeDraft) return;
+    const retained: RecoveryDraft = {
+      mode: target.mode, orderId: target.orderId, sessionId: target.sessionId,
+      draft: target.resumeDraft, reason
+    };
+    const saved = saveRecoveryDraft(retained);
+    setRecovery({ ...retained, transientOnly: !saved });
+    toastCtl.showToast(saved
+      ? `无法返回：${reason}。草稿已保留，可在商品管理核对`
+      : `无法返回：${reason}。草稿未能写入存储，仅本页暂存，请先导出再刷新`, 'error');
+  }, [toastCtl]);
 
   /** 写操作单独一个 value：数据变化不会让它们的消费者重渲染 */
   const appActions = useMemo<AppActionsValue>(
@@ -274,10 +293,41 @@ export default function App() {
         }
       },
       /* P9：开单页「去建商品」—— 置意图后切到商品管理 */
-      onCreateProductForEditor: () => {
-        createProductIntentRef.current = true;
+      onCreateProductForEditor: (draft) => {
+        if (!editor) return;
+        createProductIntentRef.current = { ...editor, resumeDraft: draft };
+        createProductReturnRef.current = null;
         setEditor(null);
         setSub('products');
+      },
+      onCreateProductCancelled: () => {
+        if (!createProductIntentRef.current && !createProductReturnRef.current) return;
+        createProductIntentRef.current = null;
+        createProductReturnRef.current = null;
+      },
+      onReviewRecovery: () => {
+        if (!recovery) return;
+        setPendingProductId(null);
+        setEditor({
+          mode: recovery.mode, orderId: recovery.orderId, sessionId: recovery.sessionId,
+          resumeDraft: recovery.draft, saveBlockedReason: recovery.reason
+        });
+      },
+      onDiscardRecovery: () => {
+        if (!clearRecoveryDraft()) {
+          toastCtl.showToast('保留草稿未能清除，请稍后重试', 'error');
+          return;
+        }
+        setRecovery(null);
+      },
+      onExportRecovery: () => {
+        if (!recovery) return;
+        const url = URL.createObjectURL(new Blob([JSON.stringify(recovery, null, 2)], { type: 'application/json' }));
+        const link = document.createElement('a');
+        link.href = url;
+        link.download = '保留草稿.json';
+        link.click();
+        window.setTimeout(() => URL.revokeObjectURL(url), 1000);
       },
       /*
        * P9：商品管理「新建」保存成功。
@@ -289,11 +339,43 @@ export default function App() {
        * 永久跳转 bug —— 这是这类「建完回原页」功能最常见的翻车点。
        */
       onProductCreated: (productId) => {
-        if (!createProductIntentRef.current) return;
-        createProductIntentRef.current = false;
-        setSub(null);
-        setPendingProductId(productId);
-        setEditor({ mode: 'new' });
+        const target = createProductIntentRef.current;
+        if (!target) return;
+        createProductIntentRef.current = null;
+        const returning = {};
+        createProductReturnRef.current = returning;
+        void (async () => {
+          try {
+            // 建商品期间可能另一台设备已结账/删单，返回前读当前目标再决定。
+            if (target.mode !== 'new') {
+              const latest = await loadAll();
+              if (createProductReturnRef.current !== returning) return;
+              const order = latest.orders.find((o) => o.id === target.orderId);
+              const targetSessionId = target.mode === 'edit' ? order?.sessionId : target.sessionId;
+              const session = latest.sessions.find((s) => s.id === targetSessionId);
+              const reason = target.mode === 'edit'
+                ? !order || order.voided ? '原单已不存在或已作废'
+                  : !session ? '原场次已不存在'
+                    : session.status !== 'open' ? '原场次已结账，请从报表补记' : null
+                : !session ? '原补记场次已不存在'
+                  : session.status !== 'closed' ? '原补记场次已恢复进行中，请从记账页继续' : null;
+              if (reason) {
+                retainRecovery(target, reason);
+                return;
+              }
+            }
+            if (createProductReturnRef.current !== returning) return;
+            setSub(null);
+            setPendingProductId(productId);
+            setEditor(target);
+          } catch (e) {
+            if (createProductReturnRef.current === returning) {
+              retainRecovery(target, `暂时无法核验原单：${msgOf(e)}`);
+            }
+          } finally {
+            if (createProductReturnRef.current === returning) createProductReturnRef.current = null;
+          }
+        })();
       },
       /*
        * P9：RecordEditor 把 pendingProductId 加进草稿后回调这里清空。
@@ -303,7 +385,7 @@ export default function App() {
         setPendingProductId(null);
       }
     }),
-    [handleRecordSaved, openSession, closeFlow.setCloseOpen, setEditor, setSub, setTab, lastClosed, toastCtl.showToast]
+    [handleRecordSaved, openSession, closeFlow.setCloseOpen, setEditor, setSub, setTab, lastClosed, toastCtl.showToast, editor, recovery, retainRecovery]
   );
 
   return (

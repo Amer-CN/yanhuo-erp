@@ -21,6 +21,7 @@ import { groupOrdersBySession, pickOpenSession } from './sessionLogic';
 import { localDate, nowIso, uuid } from './util';
 import { enqueueInTx, syncWanted, type OutboxItem } from './outbox';
 import type { Table } from 'dexie';
+import { assertWritable } from './syncControl';
 
 /* ------------------------------------------------- 写入 + 入队同事务（M-1） */
 
@@ -45,7 +46,9 @@ export async function writeWithOutbox(
   write: () => Promise<void>,
   items: OutboxItem[]
 ): Promise<void> {
-  await db.transaction('rw', [...tables, db.outbox], async () => {
+  await assertWritable();
+  await db.transaction('rw', [...tables, db.outbox, db.syncMeta], async () => {
+    await assertWritable();
     await write();
     await enqueueInTx(items);
   });
@@ -77,7 +80,9 @@ export async function getAllSettings(): Promise<Record<string, string>> {
 
 /** 保证本机有一个稳定的 deviceId（事务内检查，避免 StrictMode 双执行重复生成） */
 export async function ensureDeviceId(): Promise<string> {
-  return db.transaction('rw', db.settings, async () => {
+  await assertWritable();
+  return db.transaction('rw', [db.settings, db.syncMeta], async () => {
+    await assertWritable();
     const existing = await db.settings.get(SETTING_KEYS.deviceId);
     if (existing?.value) return existing.value;
     const id = uuid();
@@ -506,7 +511,8 @@ function buildOrder(args: BuildOrderArgs): SalesOrder {
     totalFen: args.lines.reduce((s, l) => s + l.amountFen, 0),
     sessionId: args.sessionId,
     note: args.note?.trim() || undefined,
-    updatedAt: args.createdAt
+    updatedAt: args.createdAt,
+    lineIds: args.lines.map((line) => line.id)
   };
 }
 
@@ -567,7 +573,8 @@ export async function updateRecord(id: string, input: RecordInput): Promise<Sale
     payMethod: input.payMethod,
     totalFen,
     note: input.note?.trim() || undefined,
-    updatedAt: at
+    updatedAt: at,
+    lineIds: lines.map((line) => line.id)
   };
 
   await writeWithOutbox(
@@ -800,9 +807,20 @@ async function writeClosedSummaries(sessionIds: string[]): Promise<number> {
  * 作废 / 恢复订单后重算快照：只对已结账场次生效。
  * open 场次的报表本来就按 sessionReport 实时算，写快照只会给它凭空造一份 summary。
  */
-async function refreshClosedSessionSummary(sessionId?: string): Promise<void> {
+export async function refreshClosedSessionSummary(sessionId?: string): Promise<void> {
   if (!sessionId) return;
   await writeClosedSummaries([sessionId]);
+}
+
+/** B04 runs after its order transaction; refresh only the affected closed session. */
+export async function refreshClosedSessionSummaryAfterRemoteUndo(sessionId?: string): Promise<boolean | undefined> {
+  if (!sessionId) return undefined;
+  try {
+    return (await writeClosedSummaries([sessionId])) > 0;
+  } catch (error) {
+    console.warn(`[sync] 订单撤销已完成，但场次汇总重算失败（${sessionId}）`, error);
+    return false;
+  }
 }
 
 /**
@@ -1024,11 +1042,13 @@ export async function loadAll(): Promise<AppData> {
 }
 
 export async function clearAllData(): Promise<void> {
-  // 冲突留痕随本次「清空」一起删，避免清完还显示历史冲突数
+  await assertWritable();
+  // 冲突、撤销快照随本次「清空」一起删，避免残留误导撤销入口。
   await db.transaction(
     'rw',
-    [db.products, db.batches, db.orders, db.lines, db.adjustments, db.sessions, db.conflicts],
+    [db.products, db.batches, db.orders, db.lines, db.adjustments, db.sessions, db.settings, db.conflicts, db.remotePendingLines, db.remoteOrderUndo, db.outbox, db.syncMeta],
     async () => {
+      await assertWritable();
       await Promise.all([
         db.products.clear(),
         db.batches.clear(),
@@ -1036,14 +1056,15 @@ export async function clearAllData(): Promise<void> {
         db.lines.clear(),
         db.adjustments.clear(),
         db.sessions.clear(),
-        db.conflicts.clear()
+        db.conflicts.clear(),
+        db.remotePendingLines.clear(),
+        db.remoteOrderUndo.clear(),
+        db.outbox.clear()
       ]);
+      await db.settings.put({ key: SETTING_KEYS.seeded, value: '' });
+      await db.settings.put({ key: SETTING_KEYS.sessionsMigrated, value: '' });
     }
   );
-  // 这两次 setSetting 会登记发件箱，因此 outbox 必须最后清
-  await setSetting(SETTING_KEYS.seeded, '');
-  await setSetting(SETTING_KEYS.sessionsMigrated, '');
-  await db.outbox.clear();
 }
 
 export type { Setting };

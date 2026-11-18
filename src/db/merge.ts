@@ -3,8 +3,11 @@
 //       商品和设置是可变数据，按 updatedAt / 导入优先。
 
 import { db } from './db';
-import { enqueueAllLocal, syncWanted } from './outbox';
-import type { AppData, Product, Session, Setting } from './types';
+import { enqueueInTx, SKIP_SETTINGS, syncWanted, type OutboxItem } from './outbox';
+import { canonicalJson } from './canonical';
+import { restoreLocalBackup, type RecoveryResult } from './dataRecovery';
+import { assertWritable } from './syncControl';
+import type { AppData, Product, Session } from './types';
 import { SETTING_KEYS } from './types';
 import { mergeSessionPair } from './sessionLogic';
 import { nowIso } from './util';
@@ -92,15 +95,20 @@ export function parseBackup(text: string): BackupFile {
   };
 }
 
-/** 流水只增：按 id 取差集写入，返回实际新增条数 */
+/** 流水只增：按 id 取差集写入，返回实际新增行供同事务入队。 */
 async function addOnly<T extends { id: string }>(
   table: Table<T, string>,
   incoming: T[]
-): Promise<number> {
+): Promise<T[]> {
   const existing = new Set((await table.toArray()).map((x) => x.id));
-  const fresh = incoming.filter((x) => !existing.has(x.id));
+  const fresh: T[] = [];
+  for (const row of incoming) {
+    if (existing.has(row.id)) continue;
+    existing.add(row.id);
+    fresh.push(row);
+  }
   if (fresh.length > 0) await table.bulkPut(fresh);
-  return fresh.length;
+  return fresh;
 }
 
 /** 合并备份；同 id 的流水直接跳过，商品按 updatedAt 新者胜 */
@@ -119,10 +127,13 @@ export async function importMerge(backup: BackupFile): Promise<MergeResult> {
     settingsImported: 0
   };
 
+  await assertWritable();
   await db.transaction(
     'rw',
-    [db.products, db.batches, db.orders, db.lines, db.adjustments, db.sessions, db.settings],
+    [db.products, db.batches, db.orders, db.lines, db.adjustments, db.sessions, db.settings, db.outbox, db.syncMeta],
     async () => {
+      await assertWritable();
+      const changed: OutboxItem[] = [];
       // 商品：id 不存在则新增；存在则比 updatedAt
       const existingProducts = await db.products.bulkGet(data.products.map((p) => p.id));
       const toPutProducts: Product[] = [];
@@ -140,12 +151,21 @@ export async function importMerge(backup: BackupFile): Promise<MergeResult> {
         }
       }
       if (toPutProducts.length) await db.products.bulkPut(toPutProducts);
+      changed.push(...toPutProducts.map((row) => ({ kind: 'product' as const, recordId: row.id })));
 
-      // 流水：只增
-      result.batchesAdded = await addOnly(db.batches, data.batches);
-      result.ordersAdded = await addOnly(db.orders, data.orders);
-      result.linesAdded = await addOnly(db.lines, data.lines);
-      result.adjustmentsAdded = await addOnly(db.adjustments, data.adjustments);
+      // 流水：只增，只登记本次实际新增的行。
+      const batches = await addOnly(db.batches, data.batches ?? []);
+      const orders = await addOnly(db.orders, data.orders ?? []);
+      const lines = await addOnly(db.lines, data.lines ?? []);
+      const adjustments = await addOnly(db.adjustments, data.adjustments ?? []);
+      result.batchesAdded = batches.length;
+      result.ordersAdded = orders.length;
+      result.linesAdded = lines.length;
+      result.adjustmentsAdded = adjustments.length;
+      changed.push(...batches.map((row) => ({ kind: 'batch' as const, recordId: row.id })),
+        ...orders.map((row) => ({ kind: 'order' as const, recordId: row.id })),
+        ...lines.map((row) => ({ kind: 'line' as const, recordId: row.id })),
+        ...adjustments.map((row) => ({ kind: 'adjustment' as const, recordId: row.id })));
 
       // 场次：同 id 合并；closed 优先，其次 updatedAt 新者胜；补记计数取 max
       const incomingSessions = data.sessions ?? [];
@@ -160,62 +180,34 @@ export async function importMerge(backup: BackupFile): Promise<MergeResult> {
           continue;
         }
         const merged = mergeSessionPair(cur, inc);
-        toPutSessions.push(merged);
-        result.sessionsUpdated++;
+        if (canonicalJson(merged) !== canonicalJson(cur)) {
+          toPutSessions.push(merged);
+          result.sessionsUpdated++;
+        }
       }
       if (toPutSessions.length) await db.sessions.bulkPut(toPutSessions);
+      changed.push(...toPutSessions.map((row) => ({ kind: 'session' as const, recordId: row.id })));
 
-      // 设置：本机身份与操作人不覆盖（操作人按设备走）
-      const skip = new Set<string>(LOCAL_IDENTITY_KEYS);
-      const incoming = data.settings.filter((s) => !skip.has(s.key));
-      if (incoming.length) {
-        await db.settings.bulkPut(incoming);
-        result.settingsImported = incoming.length;
+      // 设置沿用本机身份保护，并与发件箱的本机诊断过滤规则一致。
+      const skip = new Set<string>([...LOCAL_IDENTITY_KEYS, ...SKIP_SETTINGS]);
+      const incoming = (data.settings ?? []).filter((row) => !skip.has(row.key));
+      const existingSettings = await db.settings.bulkGet(incoming.map((row) => row.key));
+      const settings = incoming.filter((row, index) => existingSettings[index]?.value !== row.value);
+      if (settings.length) {
+        await db.settings.bulkPut(settings);
+        result.settingsImported = settings.length;
       }
+      changed.push(...settings.map((row) => ({ kind: 'setting' as const, recordId: row.key })));
+      await enqueueInTx(changed);
     }
   );
 
-  // 合并进来的记录必须能被推送（L-1）：入队写在这里，而不是依赖调用方记得 `afterMerge()`。
-  // 事务不含 `db.outbox`（合并是整表 bulkPut，逐条登记与批量写同量级），
-  // 这一步失败只影响「何时推上去」，合并结果已经落库，不回滚。
-  await enqueueAllLocal();
   syncWanted();
 
   return result;
 }
 
-/** 整库替换（撤销合并 / 恢复快照用）：清空后写入给定备份 */
-export async function replaceAll(backup: BackupFile): Promise<void> {
-  const d = backup.data;
-  // 本机身份键保留原值（见 LOCAL_IDENTITY_KEYS）：快照里的 deviceId / operatorSelf
-  // 是「拍快照那台机器」的，原样覆盖会让本机场次立刻找不到、新单记到别人名下。
-  const localIdentity = (await db.settings.bulkGet(LOCAL_IDENTITY_KEYS)).filter(
-    (s): s is Setting => Boolean(s)
-  );
-  await db.transaction(
-    'rw',
-    [db.products, db.batches, db.orders, db.lines, db.adjustments, db.sessions, db.settings],
-    async () => {
-      await Promise.all([
-        db.products.clear(),
-        db.batches.clear(),
-        db.orders.clear(),
-        db.lines.clear(),
-        db.adjustments.clear(),
-        db.sessions.clear(),
-        db.settings.clear()
-      ]);
-      await db.products.bulkPut(d.products);
-      await db.batches.bulkPut(d.batches);
-      await db.orders.bulkPut(d.orders);
-      await db.lines.bulkPut(d.lines);
-      await db.adjustments.bulkPut(d.adjustments);
-      await db.sessions.bulkPut(d.sessions ?? []);
-      const settings = new Map(d.settings.map((s) => [s.key, s] as const));
-      for (const row of localIdentity) settings.set(row.key, row);
-      await db.settings.bulkPut([...settings.values()]);
-    }
-  );
-  // 这里**故意不** enqueueAllLocal：恢复快照后调用方会关闭云同步，
-  // 把旧快照整库标脏再推上去会覆盖另一台设备上更新的云端数据。
+/** 撤销合并沿用统一的本机恢复边界，提交后继续暂停同步。 */
+export function replaceAll(backup: BackupFile): Promise<RecoveryResult> {
+  return restoreLocalBackup(backup);
 }

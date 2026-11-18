@@ -11,7 +11,7 @@ import {
   localDate,
   qtyToStr
 } from '../../db/util';
-import { Btn, ConfirmSheet, Empty, Sheet, rowProps, type Done } from '../kit';
+import { Btn, ConfirmSheet, Empty, Sheet, type Done } from '../kit';
 
 /** 时间范围过滤：只换渲染窗口，不动数据 */
 type RangeKey = '7' | '30' | 'all';
@@ -197,59 +197,52 @@ export default function HistoryPage({
                     // 强光下只压透明度看不出「这单不算钱」，删除线是必需的
                     <li
                       key={o.id}
-                      className={`glass-list__item glass-list__item--interactive list-item${
+                      className={`glass-list__item glass-list__item--interactive list-item history-item${
                         o.voided ? ' is-voided' : ''
                       }`}
-                      {...rowProps(() => setOpenId(o.id))}
                     >
-                      <span className="glass-list__leading">
-                        <Receipt size={22} aria-hidden="true" />
-                      </span>
-                      <div className="glass-list__content">
-                        <div className="glass-list__title-row">
-                          <div className="glass-list__title">
-                            {isoToTime(o.createdAt)} · {o.operator}
-                          </div>
-                          <span
-                            className={`glass-badge ${
-                              o.payMethod === 'cash' ? '' : 'glass-badge--primary'
-                            }`}
-                          >
-                            {PAY_LABEL[o.payMethod]}
+                      <button
+                        type="button"
+                        className="history-item__detail"
+                        aria-label={`查看 ${isoToLocalDate(o.createdAt)} ${isoToTime(o.createdAt)} · ${o.operator}，¥${fenToStr(o.totalFen)}，${n} 个商品${o.voided ? '，已删除' : ''} 的详情`}
+                        onClick={() => setOpenId(o.id)}
+                      >
+                        <span className="glass-list__leading">
+                          <Receipt size={22} aria-hidden="true" />
+                        </span>
+                        <span className="glass-list__content">
+                          <span className="glass-list__title-row">
+                            <span className="glass-list__title">
+                              {isoToTime(o.createdAt)} · {o.operator}
+                            </span>
+                            <span
+                              className={`glass-badge ${
+                                o.payMethod === 'cash' ? '' : 'glass-badge--primary'
+                              }`}
+                            >
+                              {PAY_LABEL[o.payMethod]}
+                            </span>
+                            {o.voided ? (
+                              <span className="glass-badge glass-badge--error">已删除</span>
+                            ) : null}
                           </span>
-                          {o.voided ? (
-                            <span className="glass-badge glass-badge--error">已删除</span>
-                          ) : null}
-                        </div>
-                        <div className="glass-list__subtitle">{n} 个商品</div>
-                      </div>
-                      <div className="glass-list__trailing">
-                        {o.voided ? (
-                          // 常驻撤销入口：Toast 只停留几秒，用户回到列表也要能一眼撤销。
-                          // stopPropagation 防止冒泡到 <li> 的 rowProps（否则会顺带打开详情）。
-                          <button
-                            className="link-btn"
-                            type="button"
-                            aria-label={`撤销删除 ${isoToTime(o.createdAt)} 这一单`}
-                            disabled={restoring === o.id}
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              void undoDelete(o.id);
-                            }}
-                          >
-                            撤销
-                          </button>
-                        ) : (
-                          <span
-                            style={{
-                              fontWeight: 'var(--yh-weight-semibold)',
-                              fontVariantNumeric: 'tabular-nums'
-                            }}
-                          >
-                            ¥{fenToStr(o.totalFen)}
-                          </span>
-                        )}
-                      </div>
+                          <span className="glass-list__subtitle">{n} 个商品</span>
+                        </span>
+                        <span className="glass-list__trailing history-item__amount">
+                          ¥{fenToStr(o.totalFen)}
+                        </span>
+                      </button>
+                      {o.voided ? (
+                        <button
+                          className="link-btn history-item__undo"
+                          type="button"
+                          aria-label={`撤销删除 ${isoToTime(o.createdAt)} 这一单`}
+                          disabled={restoring === o.id}
+                          onClick={() => void undoDelete(o.id)}
+                        >
+                          撤销
+                        </button>
+                      ) : null}
                     </li>
                   );
                 })}

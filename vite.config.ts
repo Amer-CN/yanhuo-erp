@@ -1,8 +1,30 @@
 import { defineConfig } from 'vite';
 import react from '@vitejs/plugin-react';
 import { VitePWA } from 'vite-plugin-pwa';
+import { execFileSync } from 'node:child_process';
+import { env } from 'node:process';
+import { version } from './package.json';
 
-export default defineConfig({
+function buildId(command: string): string {
+  if (command === 'serve') return 'dev';
+  if (env.VITE_BUILD_ID?.trim()) return env.VITE_BUILD_ID.trim();
+  if (/^[0-9a-f]{7,40}$/i.test(env.GITHUB_SHA ?? '')) return env.GITHUB_SHA!.slice(0, 8);
+  try {
+    const git = (args: string[]) =>
+      execFileSync('git', args, {
+        encoding: 'utf8',
+        timeout: 3000,
+        stdio: ['ignore', 'pipe', 'ignore']
+      }).trim();
+    const sha = git(['rev-parse', '--short=8', 'HEAD']);
+    const dirty = git(['status', '--porcelain', '--untracked-files=normal']) ? '-dirty' : '';
+    return `${sha}${dirty}`;
+  } catch {
+    return `v${version}`;
+  }
+}
+
+export default defineConfig(({ command }) => ({
   base: './',
   /*
    * Dexie 的官方入口 import-wrapper.mjs 固定转出 dist/dexie.js（ES5 UMD）；
@@ -13,6 +35,7 @@ export default defineConfig({
   resolve: {
     alias: [{ find: /^dexie$/, replacement: 'dexie/dist/modern/dexie.min.mjs' }]
   },
+  define: { __APP_BUILD__: JSON.stringify(buildId(command)) },
   plugins: [
     react(),
     VitePWA({
@@ -48,4 +71,4 @@ export default defineConfig({
       ignored: ['**/*.tmpdir/**', '**/*.tmp', '**/.git/**', '**/dist/**']
     }
   }
-});
+}));

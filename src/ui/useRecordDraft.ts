@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState, type SetStateAction } from 'react';
 import type { Product } from '../db/types';
 import type { RecordInput } from '../db/repo';
 import { fenToStr } from '../db/util';
@@ -57,7 +57,8 @@ export function useRecordDraft({
   deviceId,
   sessionId,
   orderId,
-  initial
+  initial,
+  resumeDraft
 }: {
   mode: 'new' | 'edit' | 'patch';
   products: Product[];
@@ -67,9 +68,20 @@ export function useRecordDraft({
   sessionId?: string;
   orderId?: string;
   initial?: RecordDraft;
+  resumeDraft?: RecordDraft;
 }) {
   const draftStorageKey = draftKey(mode, orderId, sessionId);
   const [initialDraftState] = useState<{ draft: RecordDraft; restored: boolean }>(() => {
+    // 本次跨页返回优先于长期草稿和 DB 原值，允许空行；不产生「继续上次」提示。
+    if (resumeDraft) {
+      return {
+        draft: {
+          ...resumeDraft,
+          operator: operators.includes(resumeDraft.operator) ? resumeDraft.operator : operators[0] || '我'
+        },
+        restored: false
+      };
+    }
     const saved = loadDraft(draftStorageKey);
     const matched =
       Boolean(saved) &&
@@ -110,7 +122,14 @@ export function useRecordDraft({
       restored: false
     };
   });
-  const [draft, setDraft] = useState<RecordDraft>(initialDraftState.draft);
+  const [draft, setDraftState] = useState<RecordDraft>(initialDraftState.draft);
+  // 输入与离开可能在同一事件轮次发生；先同步 ref，立即落盘不依赖 effect 的 pending。
+  const currentDraftRef = useRef(draft);
+  const setDraft = useCallback((update: SetStateAction<RecordDraft>) => {
+    const next = typeof update === 'function' ? update(currentDraftRef.current) : update;
+    currentDraftRef.current = next;
+    setDraftState(next);
+  }, []);
   const [errorIndex, setErrorIndex] = useState<number | null>(null);
   const [errorText, setErrorText] = useState('');
   const [showDraftHint, setShowDraftHint] = useState(initialDraftState.restored);
@@ -162,6 +181,27 @@ export function useRecordDraft({
     pendingDraft.current = null;
     if (pending) saveDraft(pending.draft, pending.key);
   }, []);
+
+  /** 跳转建商品前保存当前完整草稿，含尚未来得及进入 debounce 队列的输入。 */
+  const persistDraftNow = useCallback(() => {
+    if (saveTimer.current) {
+      window.clearTimeout(saveTimer.current);
+      saveTimer.current = undefined;
+    }
+    pendingDraft.current = null;
+    const current = currentDraftRef.current;
+    const snapshot = {
+      ...current,
+      sessionId: mode === 'patch' ? sessionId : current.sessionId,
+      orderId: mode === 'edit' ? orderId : undefined
+    };
+    if (current.lines.length === 0 && !current.note.trim()) {
+      clearDraft(draftStorageKey);
+    } else {
+      saveDraft(snapshot, draftStorageKey);
+    }
+    return snapshot;
+  }, [draftStorageKey, mode, orderId, sessionId]);
 
   /**
    * 丢弃草稿：连 debounce 队列一起清。
@@ -472,7 +512,9 @@ export function useRecordDraft({
     resetDraft,
     /** 保存成功后丢弃草稿（含 debounce 队列），见 discardDraft 注释 */
     discardDraft,
-    /** 立即落盘（L-11；RecordEditor 保存前也可以主动调一次） */
+    /** 立即保存完整当前草稿，跳转前不依赖旧 pending */
+    persistDraftNow,
+    /** 立即落盘 debounce 队列（L-11） */
     flushDraft
   };
 }

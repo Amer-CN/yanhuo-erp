@@ -599,18 +599,21 @@ export function Sheet({
         if (dismissibleRef.current) close();
         return;
       }
-      if (e.key !== 'Tab') return;
+      if (e.key !== 'Tab' || sheetStack[sheetStack.length - 1] !== token) return;
+      // 只有栈顶面板处理 Tab；下层不能把上层焦点抢回自己的首控件。
+      const panelEl = panelRef.current;
+      if (!panelEl) return;
       const items = focusable();
-      if (items.length === 0) return;
+      if (items.length === 0) {
+        e.preventDefault();
+        panelEl.focus();
+        return;
+      }
       const firstEl = items[0];
       const lastEl = items[items.length - 1];
-      /*
-       * 焦点已经不在面板里（M-15）：initialFocus="panel" 时按 Shift+Tab 会从这里走出去，
-       * 或者用户用鼠标点了背景 —— 模态开着却把焦点送到背景页面，是硬伤。
-       * 先把它拉回面板内的另一端，再走下面的首尾循环。
-       */
-      const panelEl = panelRef.current;
-      if (panelEl && !panelEl.contains(document.activeElement)) {
+      const activeElement = document.activeElement;
+      // panel 自身 tabIndex=-1，首次反向 Tab 必须直接环绕，不能等逃出背景后再补救。
+      if (!panelEl.contains(activeElement) || (e.shiftKey && activeElement === panelEl)) {
         e.preventDefault();
         (e.shiftKey ? lastEl : firstEl).focus();
         return;

@@ -1,5 +1,7 @@
 # 双设备同步体验审计（摊主视角实操）· 2026-11-12
 
+> **历史审计**：本文描述 2026-11-12 当时的双 context/假后端；其旧冲突、PATCH 清空和撤销说明已由后续修复取代。现役协议见[云同步设置](03-云同步设置.md)，候选验收见[总方案](superpowers/plans/2026-11-13-stability-repair.md)。原始脚本、JSON、截图的持久保全位置与逐项去向见[遗留资料去向](stability-closeout/LEGACY-INVENTORY.md)，不能把本文当真实服务或目标手机验收。
+
 > 目的：产品定位是「两个人、两台手机，断网也能开单，联网自动同步」。代码层已有冲突留痕、回推、墓碑删除、每日重放，但**摊主实际会看到什么**从没验证过。本文只回答一件事：两台手机到底会不会打架，打架时人知不知道。
 >
 > 环境：`pnpm dev`（127.0.0.1:5173）+ 本地假 Supabase（127.0.0.1:54322，`scripts/ux-audit-sync-20261112/mock-supabase.mjs`）；Playwright Chromium，**两个独立 BrowserContext**（各自独立 localStorage / IndexedDB），`viewport 390×844`、`device_scale_factor=3`、`is_mobile=True`、`has_touch=True`、`locale=zh-CN`；同步配置指向本地假后端，**全程拦截网络**，未连接真实 Supabase（实测 `blocked urls: []`、`yh-sync-url=http://127.0.0.1:54322`）。
@@ -12,7 +14,7 @@
 > python scripts/ux-audit-sync-20261112/audit_sync.py 4    # 只跑场景 4
 > ```
 >
-> 原始观测数据：`scripts/ux-audit-sync-20261112/evidence.json`；截图：`docs/screenshots/audit-sync/`。
+> 原始观测数据的历史相对路径：`scripts/ux-audit-sync-20261112/evidence.json`；截图：`docs/screenshots/audit-sync/`。脚本与截图未直接加入现役回归；其逐项副本位于 `F:\AIXM\烟花爆竹-closeout-evidence-20261115\untracked` 下相同路径，具体哈希与去向见[遗留资料去向](stability-closeout/LEGACY-INVENTORY.md)。
 >
 > 全文约定：**「代码层」= 数据最终态正确；「用户感知」= 摊主屏幕上有没有字 / 图标 / 声音**。很多结论属于后者的空白，会单独标注「后端对了，人不知道」。
 

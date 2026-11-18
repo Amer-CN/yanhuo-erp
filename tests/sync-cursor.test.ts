@@ -72,7 +72,10 @@ beforeEach(async () => {
     clear: () => store.clear()
   });
   vi.stubGlobal('navigator', { onLine: true });
-  vi.stubGlobal('fetch', fetchMock);
+  vi.stubGlobal('fetch', async (url: string, init?: RequestInit) => {
+    if (String(url).includes('/rpc/yh_sync_capabilities')) return Response.json({ code: 'PGRST202' }, { status: 404 });
+    return fetchMock(url, init);
+  });
 });
 
 afterEach(() => {
@@ -312,9 +315,12 @@ describe('每日重放的 capped 判定（H-1）', () => {
     await syncNow(CFG);
     const urls = getUrls.slice(before);
     expect(urls).toHaveLength(2); // 增量轮 + 重放轮
-    for (const u of urls) {
-      expect(params(u).get('updated_at')).toBe(`gte.${BASE + 9999 - 300000}`);
-    }
+    expect(params(urls[0]).get('updated_at')).toBe(`gte.${BASE + 9999 - 300000}`);
+    // 每日重放续扫严格从已扫过的真实游标继续；重复扣 5 分钟会在密集账本永远扫前 1 万行。
+    expect(params(urls[1]).get('updated_at')).toBeNull();
+    expect(params(urls[1]).get('or')).toBe(
+      `(updated_at.gt.${BASE + 9999},and(updated_at.eq.${BASE + 9999},id.gt.mystery:r09999))`
+    );
     // 扫到尾之后标记才落地，续扫游标清掉
     expect(store.get('yh-sync-last-replay')).toBeTruthy();
     expect(store.get('yh-sync-last-replay-cursor')).toBeUndefined();

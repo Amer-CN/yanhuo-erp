@@ -1,0 +1,10 @@
+{
+  "ledger": "reconcile-test",
+  "expectedRows": [
+    { "id": "__ledger_cleared__:reconcile-test", "record_id": "__ledger_cleared__:reconcile-test", "kind": "ledger", "data": { "clearedAt": 5, "clearEpoch": 0 }, "updated_at": 5, "record_updated_at": 5, "deleted": false },
+    { "id": "product:p1", "record_id": "p1", "kind": "product", "data": { "id": "p1", "name": "原远端商品", "unitBase": "个", "priceList": 200, "updatedAt": "2026-11-01T10:00:00.000Z", "extra": { "values": [1, true, null, "原样保留"] } }, "updated_at": 10, "record_updated_at": 1793527200000, "deleted": false }
+  ],
+  "rows": [
+    { "id": "product:p1", "record_id": "p1", "ledger": "reconcile-test", "kind": "product", "data": { "id": "p1", "name": "确认后的商品", "unitBase": "个", "priceList": 100, "updatedAt": "2026-11-14T12:00:00.001Z", "extra": { "values": [2, false, null, "原样保留"] } }, "updated_at": 20, "record_updated_at": 1794657600001, "schema_version": 2, "clear_epoch": 0, "device_id": "fixture-device", "deleted": false }
+  ]
+}

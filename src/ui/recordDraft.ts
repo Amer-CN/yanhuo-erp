@@ -40,6 +40,53 @@ export const LAST_PAY_KEY = 'yh-last-pay';
 
 export type DraftMode = 'new' | 'edit' | 'patch';
 
+/** 仅目标核验失败时写入；与普通空草稿的自动恢复语义隔离。 */
+export interface RecoveryDraft {
+  mode: 'edit' | 'patch';
+  orderId?: string;
+  sessionId?: string;
+  draft: RecordDraft;
+  reason: string;
+  /** 写存储失败时仅本页暂存，必须明示并允许导出。 */
+  transientOnly?: boolean;
+}
+const RECOVERY_KEY = 'yh-record-recovery';
+
+export function saveRecoveryDraft(recovery: RecoveryDraft): boolean {
+  try {
+    const raw = JSON.stringify(recovery);
+    localStorage.setItem(RECOVERY_KEY, raw);
+    return localStorage.getItem(RECOVERY_KEY) === raw;
+  } catch {
+    return false;
+  }
+}
+
+export function loadRecoveryDraft(): RecoveryDraft | null {
+  try {
+    const raw = localStorage.getItem(RECOVERY_KEY);
+    if (!raw) return null;
+    const value = JSON.parse(raw) as Partial<RecoveryDraft>;
+    if ((value.mode !== 'edit' && value.mode !== 'patch') || typeof value.reason !== 'string' ||
+      !value.draft || !Array.isArray(value.draft.lines) || typeof value.draft.note !== 'string' ||
+      typeof value.draft.operator !== 'string' || !['cash', 'wechat', 'alipay'].includes(value.draft.payMethod)) return null;
+    if (value.mode === 'edit' && (!value.orderId || value.draft.orderId !== value.orderId)) return null;
+    if (value.mode === 'patch' && (!value.sessionId || value.draft.sessionId !== value.sessionId)) return null;
+    return value as RecoveryDraft;
+  } catch {
+    return null;
+  }
+}
+
+export function clearRecoveryDraft(): boolean {
+  try {
+    localStorage.removeItem(RECOVERY_KEY);
+    return localStorage.getItem(RECOVERY_KEY) === null;
+  } catch {
+    return false;
+  }
+}
+
 /**
  * 草稿键：new 用新键并从旧键兼容读取；edit/patch 按单据/场次隔离，避免互相覆盖。
  */

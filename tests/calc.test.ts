@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import type { Adjustment, Batch, SaleLine, SalesOrder } from '../src/db/types';
-import { expiryWarnings, fifoAllocate, inventoryMap } from '../src/db/calc';
+import { expiryWarnings, fifoAllocate, inventoryMap, productMarginsBySession, sessionReport } from '../src/db/calc';
 import { fenToStr, qtyToStr, strToFen } from '../src/db/util';
 
 function batch(id: string, qty: number, cost: number, date: string): Batch {
@@ -169,6 +169,19 @@ describe('库存与 FIFO 成本', () => {
 });
 
 describe('报表', () => {
+  it('历史本地 line 缺 discountFen 时场次与单品让利按 0 防御，不传播 NaN', () => {
+    const orders = [{ ...order('old', '2026-01-02T02:00:00', 'cash', 500), sessionId: 's1' }];
+    const legacy = { ...line('legacy', 'old', 2, 250, 250) };
+    delete (legacy as Partial<SaleLine>).discountFen;
+    const lines = [legacy];
+    const fifo = fifoAllocate([], orders, lines);
+    const report = sessionReport('s1', orders, lines, fifo);
+    const margins = productMarginsBySession('s1', orders, lines, fifo, () => '旧商品');
+    expect(report.discountFen).toBe(0);
+    expect(margins[0].discountFen).toBe(0);
+    expect(report.revenueFen).toBe(500);
+    expect(Number.isFinite(report.grossFen)).toBe(true);
+  });
   const batches = [batch('b1', 100, 100, '2026-01-01'), batch('b2', 100, 200, '2026-01-02')];
   const orders = [
     order('o1', '2026-01-02T02:00:00', 'cash', 45000),

@@ -89,7 +89,8 @@
 }
 
 .session-summary__revenue {
-  font-size: var(--yh-text-2xl);
+  font-size: clamp(var(--yh-text-2xl), 7vw, var(--yh-text-3xl));
+  letter-spacing: var(--yh-tracking-tight);
   font-weight: var(--yh-weight-semibold);
   color: var(--yh-ink-price);
   font-variant-numeric: tabular-nums;
@@ -1053,6 +1054,18 @@
 .report-table td {
   padding-left: var(--yh-space-2);
   padding-right: var(--yh-space-2);
+}
+
+/* 极窄屏把表格横向留白让给完整金额，保留 44px 排序按钮与吸顶表头。 */
+@media (max-width: 380px) {
+  .report-table th,
+  .report-table td {
+    padding-inline: var(--yh-space-0-5);
+  }
+
+  .glass-table-wrap:has(.report-table) {
+    margin-inline: calc(-1 * var(--yh-space-1));
+  }
 }
 
 /* 删除单弹层里的金额：灰 + 删除线，别让它看着像有效收入 */
