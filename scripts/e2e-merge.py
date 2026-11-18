@@ -36,7 +36,7 @@ sys.stderr.reconfigure(encoding="utf-8", errors="replace")
 
 from playwright.sync_api import expect, sync_playwright
 
-from e2e_util import wait_for_toast
+from e2e_util import wait_for_save_receipt, wait_for_toast
 
 BASE = os.environ.get("MERGE_BASE", "http://127.0.0.1:4173/")
 ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
@@ -111,7 +111,7 @@ def sell_product(page, name: str, expect_total: str) -> str:
     page.get_by_role("button", name="保存并记下一单").click()
 
     # 5. 等「已记 1 单 ¥xx.xx」toast：金额也在这里断言，避免只测到「有单」
-    toast = wait_for_toast(page, "已记 1 单", timeout=10000)
+    toast = wait_for_save_receipt(page, "已记 1 单", timeout=10000)
     if toast is None:
         raise AssertionError(f"保存后没等到「已记 1 单」提示（{name}）")
     if expect_total not in toast:

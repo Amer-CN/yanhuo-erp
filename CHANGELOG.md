@@ -22,6 +22,9 @@
 - 同步推送增加业务时间 `record_updated_at`，拉取水位仍用 `updated_at`（T09）。
 - 同步失败按 1s→2s→4s…→60s 退避，成功重置；10s 轮询在退避期间让路（T09）。
 - 删除无路由入口的 v1 收银：`SellPage.tsx`、`checkout`、`CheckoutInput`、`CartLineInput`（T06）。
+- 数据层性能（详见 `docs/performance-20261118.md`）：报表场次汇总改一次批量分组（`calc.sessionReports`），
+  报表页历史列表与「今天」合计不再逐场扫全库；`fifoAllocate` 排序键预算一次；同步冲突留痕改批量落库。
+  同负载 A/B：40 场汇总约 -77%、FIFO 约 -25%、冲突落库约 -71%，口径逐值不变。
 
 ### Fixed
 
@@ -29,6 +32,7 @@
 - 远端缺 `record_updated_at` 列时，用记录自身 `updatedAt` 兜底判定，远端编辑在迁移执行前也能生效（T09b）。
 - 缺列降级只在第一次 push 重试的问题：确认缺列后，后续 payload 直接省略该列，避免持续 400（T09b / T09 计划外修复）。
 - 旧版 `e2e-smoke` / `e2e-sync` / `e2e-offline` / `check-default-sync` 脚本仍在等 v1 商品网格，已迁到 v2 场次流程（T04a）。
+- `e2e-merge` 仍在等已被内联回执取代的「已记 1 单」toast，改回 `wait_for_save_receipt`（与 `e2e-smoke` 同口径），脚本恢复可运行。
 
 ### Security
 

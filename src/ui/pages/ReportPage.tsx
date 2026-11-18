@@ -18,6 +18,7 @@ import {
   expiryWarnings,
   productMarginsBySession,
   sessionReport,
+  sessionReports,
   type DayReport,
   type ExpiryWarning,
   type ProductMargin,
@@ -902,6 +903,16 @@ export default function ReportPage({
     [selected, orders, lines, fifo]
   );
 
+  /**
+   * 历史场次列表的汇总（M-006）：过去在渲染体里 `closed.map` 逐场调 sessionReport，
+   * 每场都 `orders.filter` + `lines.filter` 扫全库，且父组件每次重渲染（点开 Sheet、
+   * 切换选中场次）都会重跑一遍。这里改成一次批量分组并 memo，O(场次×明细) → O(场次+明细)。
+   */
+  const historySummaries = useMemo(
+    () => sessionReports(closed.map((s) => s.id), orders, lines, fifo),
+    [closed, orders, lines, fifo]
+  );
+
   const margins = useMemo(
     () =>
       selected
@@ -1125,7 +1136,7 @@ export default function ReportPage({
               </div>
             </li>
             {closed.map((s) => {
-              const rep = sessionReport(s.id, orders, lines, fifo);
+              const rep = historySummaries.get(s.id) ?? emptySessionSummary();
               return (
                 <li
                   key={s.id}

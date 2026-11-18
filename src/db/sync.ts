@@ -1415,17 +1415,30 @@ async function applyPlannedChanges(plan: RemotePlan): Promise<number> {
  * 这里复用已有行的自增主键原地更新 `at/local/remote`，一条记录永远只占一行。
  */
 async function saveConflicts(rows: SyncConflictRow[]): Promise<void> {
-  for (const row of rows) {
-    const existing = await db.conflicts
-      .where('[kind+recordId]')
-      .equals([row.kind, row.recordId])
-      .first();
-    if (existing && typeof existing.id === 'number') {
-      await db.conflicts.put({ ...row, id: existing.id });
-    } else {
-      await db.conflicts.add(row);
+  if (rows.length === 0) return;
+  /*
+   * 一页最多 PAGE_SIZE 条，原实现逐条 `where().first()` + `put()/add()`，每条 2 次 IDB 往返，
+   * 一页冲突多时就是 2N 次串行请求。改为**一次事务 + 一次复合索引查询 + 一次 bulkPut**：
+   * - 用 `[kind+recordId]` 复合索引批量取已有行（v5 起才有，见 db.ts）；
+   * - 批内重复键先合并（后者覆盖前者，与原「先 add 再 first 查到再 put」的结果一致），
+   *   否则同键两行会各自 add 出一条，破坏「一条记录只占一行」的去重口径。
+   */
+  await db.transaction('rw', db.conflicts, async () => {
+    const keys = rows.map((r) => [r.kind, r.recordId] as [string, string]);
+    const existing = await db.conflicts.where('[kind+recordId]').anyOf(keys).toArray();
+    const idOf = new Map<string, number>();
+    for (const row of existing) {
+      if (typeof row.id === 'number') idOf.set(`${row.kind}:${row.recordId}`, row.id);
     }
-  }
+
+    const byKey = new Map<string, SyncConflictRow>();
+    for (const row of rows) {
+      const key = `${row.kind}:${row.recordId}`;
+      const id = idOf.get(key);
+      byKey.set(key, id === undefined ? row : { ...row, id });
+    }
+    await db.conflicts.bulkPut([...byKey.values()]);
+  });
 }
 
 /** 一页应用结果（诊断口径，见 L-4） */

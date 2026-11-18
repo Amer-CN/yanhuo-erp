@@ -9,6 +9,7 @@
     "preview": "vite preview",
     "test": "vitest run",
     "test:cov": "vitest run --coverage",
+    "perf": "vitest run --config vitest.perf.config.ts",
     "lint": "eslint .",
     "format:check": "prettier --check ."
   },
@@ -40,3 +41,4 @@
     "workbox-window": "^7.4.1"
   }
 }
+

@@ -15,6 +15,7 @@ pnpm install
 pnpm dev      # http://localhost:5173
 pnpm build    # tsc --noEmit && vite build
 pnpm test     # 13 个测试文件 / 140 个用例（140 通过 / 0 失败 / 0 skip）
+pnpm perf     # 数据层性能基线（tests/perf/*.perf.ts，独立配置，不进 pnpm test）
 ```
 
 端到端（需要 Playwright + Chromium）：

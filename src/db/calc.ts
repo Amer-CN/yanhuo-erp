@@ -115,16 +115,22 @@ export function fifoAllocate(
   for (const o of orders) if (!o.voided) orderTime.set(o.id, o.createdAt);
 
   // 批次排队：到货时间 → 创建时间 → id
+  //
+  // 排序键在排序前**只算一次**（按对象引用缓存）：原实现放在比较函数里，每比较一次就
+  // 拼一个 ${receivedAt}|${createdAt}|${id} 字符串，400 批次约 3500 次比较 = 7000 次分配。
+  // 口径完全不变（仍是 batchOrderKey 的唯一来源），只是把 O(n log n) 次拼接降到 O(n) 次。
+  const orderKeyOf = new Map<Batch, string>();
   const byProduct = new Map<string, Batch[]>();
   for (const b of batches) {
+    orderKeyOf.set(b, batchOrderKey(b));
     const arr = byProduct.get(b.productId) ?? [];
     arr.push(b);
     byProduct.set(b.productId, arr);
   }
   for (const arr of byProduct.values()) {
     arr.sort((a, b) => {
-      const ka = batchOrderKey(a);
-      const kb = batchOrderKey(b);
+      const ka = orderKeyOf.get(a) as string;
+      const kb = orderKeyOf.get(b) as string;
       return ka < kb ? -1 : ka > kb ? 1 : 0;
     });
   }
@@ -136,15 +142,17 @@ export function fifoAllocate(
   // 商品兜底均价（分/基本单位）
   const avgCost = productAvgCostFen(batches);
 
-  // 销售明细按订单时间排序
-  const sorted = [...lines]
-    .filter((l) => orderTime.has(l.orderId))
-    .sort((a, b) => {
-      const ta = orderTime.get(a.orderId)!;
-      const tb = orderTime.get(b.orderId)!;
-      if (ta !== tb) return ta < tb ? -1 : 1;
-      return a.id < b.id ? -1 : a.id > b.id ? 1 : 0;
-    });
+  // 销售明细按订单时间排序（同样把每行的订单时间预算一次，比较函数里不再查 Map）
+  const timed: { line: SaleLine; at: string }[] = [];
+  for (const l of lines) {
+    if (!orderTime.has(l.orderId)) continue;
+    timed.push({ line: l, at: orderTime.get(l.orderId) as string });
+  }
+  timed.sort((a, b) => {
+    if (a.at !== b.at) return a.at < b.at ? -1 : 1;
+    return a.line.id < b.line.id ? -1 : a.line.id > b.line.id ? 1 : 0;
+  });
+  const sorted = timed.map((x) => x.line);
 
   const lineCost = new Map<string, number>();
   const uncoveredQtyByLine = new Map<string, number>();
@@ -293,6 +301,73 @@ export function sessionReport(
   };
 }
 
+/**
+ * 多场次汇总的批量接口：**一次**扫描 orders / lines，按场次分组累加。
+ *
+ * 为什么需要：报表页过去在渲染体里对每个历史场次调一次 `sessionReport`，
+ * 每次都要 `orders.filter` + `lines.filter` 扫全库，复杂度 O(场次数 × 明细数)；
+ * 40 场 × 6000 明细 = 24 万次判断，且父组件每次重渲染都要重跑一遍。
+ *
+ * 口径与 `sessionReport` **逐字段一致**（同一套作废/赠品/缺批次规则），
+ * 只是把「按场次过滤」换成「一次分组」：O(场次数 + 订单数 + 明细数)。
+ * 返回的 Map 只包含传入的 sessionIds（不存在的场次给全 0 报告）。
+ */
+export function sessionReports(
+  sessionIds: Iterable<string>,
+  orders: SalesOrder[],
+  lines: SaleLine[],
+  fifo: FifoResult
+): Map<string, SessionReport> {
+  const out = new Map<string, SessionReport>();
+  for (const id of sessionIds) {
+    if (!out.has(id)) out.set(id, emptySessionSummary());
+  }
+  if (out.size === 0) return out;
+
+  // 有效单 → 场次；同时累计收款。作废单不参与（与 sessionReport 的 filter 一致）
+  const orderSession = new Map<string, string>();
+  for (const o of orders) {
+    if (o.voided || !o.sessionId) continue;
+    const rep = out.get(o.sessionId);
+    if (!rep) continue;
+    orderSession.set(o.id, o.sessionId);
+    rep.orderCount += 1;
+    rep.revenueFen += o.totalFen;
+    if (o.payMethod === 'cash') rep.cashFen += o.totalFen;
+    else if (o.payMethod === 'wechat') rep.wechatFen += o.totalFen;
+    else rep.alipayFen += o.totalFen;
+  }
+
+  // 明细成本 / 让利 / 赠品 / 缺批次销量：只统计有效单下的明细
+  for (const l of lines) {
+    const sid = orderSession.get(l.orderId);
+    if (!sid) continue;
+    const rep = out.get(sid) as SessionReport;
+    rep.lineCount += 1;
+    const lineCost = fifo.lineCost.get(l.id) ?? 0;
+    rep.costFen += lineCost;
+    rep.uncoveredQty += fifo.uncoveredQtyByLine.get(l.id) ?? 0;
+    if (l.gift) {
+      rep.giftCostFen += lineCost;
+      rep.giftQty += l.qtyBase;
+    } else {
+      rep.discountFen += l.discountFen;
+    }
+  }
+
+  // 被排除的作废单：单独记账，不参与上面任何合计
+  for (const o of orders) {
+    if (!o.voided || !o.sessionId) continue;
+    const rep = out.get(o.sessionId);
+    if (!rep) continue;
+    rep.voidedCount += 1;
+    rep.voidedFen += o.totalFen;
+  }
+
+  for (const rep of out.values()) rep.grossFen = rep.revenueFen - rep.costFen;
+  return out;
+}
+
 /** 单品毛利（按场次）；成本缺失的商品排在最后 */
 export function productMarginsBySession(
   sessionId: string,
@@ -410,30 +485,42 @@ export function dayReport(
     giftQty: 0
   };
 
+  // 先挑出当天要统计的场次，再**一次**批量算汇总：
+  // 原来是逐场 sessionReport（每场都扫一遍全库订单与明细），这里降到一次扫描。
+  const closedIds: string[] = [];
+  const openIds: string[] = [];
   for (const s of sessions) {
     if (s.status === 'closed') {
       if (!s.closedAt || isoToLocalDate(s.closedAt) !== date) continue;
-      const rep = sessionReport(s.id, orders, lines, fifo);
-      out.sessionCount += 1;
-      out.orderCount += rep.orderCount;
-      out.lineCount += rep.lineCount;
-      out.revenueFen += rep.revenueFen;
-      out.cashFen += rep.cashFen;
-      out.wechatFen += rep.wechatFen;
-      out.alipayFen += rep.alipayFen;
-      out.costFen += rep.costFen;
-      out.grossFen += rep.grossFen;
-      out.discountFen += rep.discountFen;
-      out.giftCostFen += rep.giftCostFen;
-      out.giftQty += rep.giftQty;
-      out.voidedCount += rep.voidedCount;
-      out.voidedFen += rep.voidedFen;
-      if (rep.uncoveredQty > 0) out.costIncompleteSessions += 1;
+      closedIds.push(s.id);
       continue;
     }
     // 进行中：没有 closedAt，只能按开场时间判断「是不是今天开的这一场」
     if (isoToLocalDate(s.startedAt) !== date) continue;
-    const rep = sessionReport(s.id, orders, lines, fifo);
+    openIds.push(s.id);
+  }
+  const reports = sessionReports([...closedIds, ...openIds], orders, lines, fifo);
+
+  for (const id of closedIds) {
+    const rep = reports.get(id) as SessionReport;
+    out.sessionCount += 1;
+    out.orderCount += rep.orderCount;
+    out.lineCount += rep.lineCount;
+    out.revenueFen += rep.revenueFen;
+    out.cashFen += rep.cashFen;
+    out.wechatFen += rep.wechatFen;
+    out.alipayFen += rep.alipayFen;
+    out.costFen += rep.costFen;
+    out.grossFen += rep.grossFen;
+    out.discountFen += rep.discountFen;
+    out.giftCostFen += rep.giftCostFen;
+    out.giftQty += rep.giftQty;
+    out.voidedCount += rep.voidedCount;
+    out.voidedFen += rep.voidedFen;
+    if (rep.uncoveredQty > 0) out.costIncompleteSessions += 1;
+  }
+  for (const id of openIds) {
+    const rep = reports.get(id) as SessionReport;
     out.openSessionCount += 1;
     out.openRevenueFen += rep.revenueFen;
   }
