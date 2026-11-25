@@ -1502,6 +1502,33 @@ select {
   border: 1px solid var(--gl-border-subtle);
 }
 
+.merge-order-choices {
+  display: grid;
+  gap: var(--yh-space-3);
+  margin-top: var(--yh-space-2);
+}
+
+.merge-order-choice {
+  display: grid;
+  gap: var(--yh-space-2);
+  padding: var(--yh-space-3);
+  border-radius: var(--yh-radius-md);
+  background: var(--gl-surface-2);
+  border: 1px solid var(--gl-border-subtle);
+}
+
+.merge-order-choice__summary {
+  display: grid;
+  gap: var(--yh-space-1);
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
+.merge-order-choice__summary span {
+  color: var(--gl-color-text-muted);
+  font-size: var(--yh-text-xs);
+}
+
 .merge-diff {
   margin: var(--yh-gap-tight) 0 0;
   padding-left: var(--yh-space-4);

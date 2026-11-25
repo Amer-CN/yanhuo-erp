@@ -21,7 +21,8 @@ import { groupOrdersBySession, pickOpenSession } from './sessionLogic';
 import { localDate, nowIso, uuid } from './util';
 import { enqueueInTx, syncWanted, type OutboxItem } from './outbox';
 import type { Table } from 'dexie';
-import { assertWritable } from './syncControl';
+import { assertWritable, captureWriteGeneration, assertWriteGeneration } from './syncControl';
+import { canonicalJson } from './canonical';
 
 /* ------------------------------------------------- 写入 + 入队同事务（M-1） */
 
@@ -40,15 +41,17 @@ import { assertWritable } from './syncControl';
  * @param tables 本次业务写入涉及的表（不含 outbox，由本函数补上）
  * @param write 业务写入（必须在同一事务内完成，不要在这里面再开事务）
  * @param items 需要登记到发件箱的记录
+ * @param expectedGeneration 命令首次读取业务状态之前捕获的代际；恢复后不得重用旧快照
  */
 export async function writeWithOutbox(
   tables: Table[],
   write: () => Promise<void>,
-  items: OutboxItem[]
+  items: OutboxItem[],
+  expectedGeneration: number
 ): Promise<void> {
-  await assertWritable();
+  await assertWriteGeneration(expectedGeneration);
   await db.transaction('rw', [...tables, db.outbox, db.syncMeta], async () => {
-    await assertWritable();
+    await assertWriteGeneration(expectedGeneration);
     await write();
     await enqueueInTx(items);
   });
@@ -61,13 +64,15 @@ export async function getSetting(key: string): Promise<string | undefined> {
   return (await db.settings.get(key))?.value;
 }
 
-export async function setSetting(key: string, value: string): Promise<void> {
+export async function setSetting(key: string, value: string, expectedGeneration?: number): Promise<void> {
+  const generation = expectedGeneration ?? await captureWriteGeneration();
   await writeWithOutbox(
     [db.settings],
     async () => {
       await db.settings.put({ key, value });
     },
-    [{ kind: 'setting', recordId: key }]
+    [{ kind: 'setting', recordId: key }],
+    generation
   );
 }
 
@@ -101,6 +106,7 @@ export async function ensureDeviceId(): Promise<string> {
  * 所以这一步不会产生发件箱行。
  */
 export async function ensureBootstrapSettings(defaults: Record<string, string>): Promise<void> {
+  const generation = await captureWriteGeneration();
   const keys = Object.keys(defaults);
   const rows = await db.settings.toArray();
   const present = new Map(rows.map((r) => [r.key, r.value]));
@@ -120,7 +126,8 @@ export async function ensureBootstrapSettings(defaults: Record<string, string>):
     async () => {
       await db.settings.bulkPut(writeKeys.map((k) => ({ key: k, value: toWrite[k] })));
     },
-    writeKeys.map((k) => ({ kind: 'setting' as const, recordId: k }))
+    writeKeys.map((k) => ({ kind: 'setting' as const, recordId: k })),
+    generation
   );
 }
 
@@ -137,6 +144,7 @@ export interface ProductInput {
 }
 
 export async function createProduct(input: ProductInput): Promise<Product> {
+  const generation = await captureWriteGeneration();
   const t = nowIso();
   const p: Product = {
     id: uuid(),
@@ -156,14 +164,20 @@ export async function createProduct(input: ProductInput): Promise<Product> {
     async () => {
       await db.products.put(p);
     },
-    [{ kind: 'product', recordId: p.id }]
+    [{ kind: 'product', recordId: p.id }],
+    generation
   );
   return p;
 }
 
-export async function updateProduct(id: string, patch: Partial<ProductInput> & { archived?: boolean }): Promise<void> {
+export async function updateProduct(id: string, patch: Partial<ProductInput> & { archived?: boolean }, expectedGeneration?: number, expectedCurrentFingerprint?: string): Promise<void> {
+  const generation = expectedGeneration ?? await captureWriteGeneration();
   const old = await db.products.get(id);
-  if (!old) return;
+  if (!old) {
+    if (expectedGeneration !== undefined) await assertWriteGeneration(expectedGeneration);
+    if (expectedCurrentFingerprint !== undefined) throw new Error('本机商品已变化，请重新核对');
+    return;
+  }
   const next: Product = { ...old, ...patch, updatedAt: nowIso() } as Product;
   // 用户动过商品内容，就不再算示例
   const touched = ['name', 'category', 'unitBase', 'boxQty', 'priceList', 'negotiable'].some(
@@ -177,20 +191,28 @@ export async function updateProduct(id: string, patch: Partial<ProductInput> & {
   await writeWithOutbox(
     [db.products],
     async () => {
+      const current = await db.products.get(id);
+      if (expectedCurrentFingerprint !== undefined) {
+        if (canonicalJson(current ?? null) !== expectedCurrentFingerprint) {
+          throw new Error('本机商品在撤销前已修改，请重新核对');
+        }
+      }
       await db.products.put(next);
     },
-    [{ kind: 'product', recordId: id }]
+    [{ kind: 'product', recordId: id }],
+    generation
   );
 }
 
 export async function deleteProduct(id: string): Promise<void> {
+  const generation = await captureWriteGeneration();
   // 有流水的商品不能删，只能停用
   const used =
     (await db.batches.where('productId').equals(id).count()) +
     (await db.lines.where('productId').equals(id).count()) +
     (await db.adjustments.where('productId').equals(id).count());
   if (used > 0) {
-    await updateProduct(id, { archived: true });
+    await updateProduct(id, { archived: true }, generation);
     return;
   }
   await writeWithOutbox(
@@ -198,7 +220,8 @@ export async function deleteProduct(id: string): Promise<void> {
     async () => {
       await db.products.delete(id);
     },
-    [{ kind: 'product', recordId: id, op: 'delete' }]
+    [{ kind: 'product', recordId: id, op: 'delete' }],
+    generation
   );
 }
 
@@ -226,6 +249,7 @@ function isFifoLast(siblings: Batch[], batch: Batch): boolean {
 }
 
 export async function createBatch(input: BatchInput, deviceId: string): Promise<Batch> {
+  const generation = await captureWriteGeneration();
   // 与明细侧 buildLines 的 INVALID_QTY 对称的兜底校验。
   // 进货页本身已有 qtyBase <= 0 的前置校验，这里防的是「同步 / 合并 / 脚本」这条旁路：
   // NaN 或负数批次会污染 inventoryMap 的库存累加、fifoAllocate 的兜底均价与已结账快照成本。
@@ -260,14 +284,15 @@ export async function createBatch(input: BatchInput, deviceId: string): Promise<
     async () => {
       await db.batches.put(b);
     },
-    [{ kind: 'batch', recordId: b.id }]
+    [{ kind: 'batch', recordId: b.id }],
+    generation
   );
   // 新批次可能改写历史成本：① 插进 FIFO 队列中间（补录一张旧送货单）会顶替后面明细的成本；
   // ② 该商品本来就超卖时，兜底均价被重新加权。判断 + 重算都放在 best-effort 里：
   // 进货已经落库入队，不能因为补偿重算失败把「已进货」报成失败（用户会重录一条）。
   await bestEffortSnapshot(`补录进货后重算场次快照（商品 ${b.productId}）`, async () => {
     const siblings = await db.batches.where('productId').equals(b.productId).toArray();
-    await refreshClosedSummariesAfterBatchChange(b.productId, !isFifoLast(siblings, b), b.qtyBase);
+    await refreshClosedSummariesAfterBatchChange(b.productId, !isFifoLast(siblings, b), b.qtyBase, generation);
   });
   return b;
 }
@@ -282,6 +307,7 @@ const BATCH_IN_USE_MSG =
 
 /** 删除进货批次；已经被 FIFO 扣过的批次不允许删（会不可逆改写历史成本） */
 export async function deleteBatch(id: string): Promise<void> {
+  const generation = await captureWriteGeneration();
   const batch = await db.batches.get(id);
   // 批次不存在时保持原行为（直接删 + 入队 delete），不新增错误分支
   if (batch) {
@@ -299,13 +325,14 @@ export async function deleteBatch(id: string): Promise<void> {
     async () => {
       await db.batches.delete(id);
     },
-    [{ kind: 'batch', recordId: id, op: 'delete' }]
+    [{ kind: 'batch', recordId: id, op: 'delete' }],
+    generation
   );
   // 兜底均价按该商品全部批次加权，删批次理论上会改变超卖明细成本；
   // 正常情形（remaining === qtyBase）下该商品不可能有超卖明细，这里只是低成本兜底校验。
   if (batch) {
     await bestEffortSnapshot(`删除进货后重算场次快照（商品 ${batch.productId}）`, () =>
-      refreshClosedSummariesAfterBatchChange(batch.productId, false, -batch.qtyBase)
+      refreshClosedSummariesAfterBatchChange(batch.productId, false, -batch.qtyBase, generation)
     );
   }
 }
@@ -347,7 +374,8 @@ export async function getOpenSession(deviceId: string): Promise<Session | undefi
 }
 
 /** 取本机 open 场次；没有就开一场（第一笔记账时调用） */
-export async function ensureOpenSession(deviceId: string, operator: string): Promise<Session> {
+export async function ensureOpenSession(deviceId: string, operator: string, expectedGeneration?: number): Promise<Session> {
+  const generation = expectedGeneration ?? await captureWriteGeneration();
   const existing = await getOpenSession(deviceId);
   if (existing) return existing;
 
@@ -366,7 +394,8 @@ export async function ensureOpenSession(deviceId: string, operator: string): Pro
     async () => {
       await db.sessions.put(session);
     },
-    [{ kind: 'session', recordId: session.id }]
+    [{ kind: 'session', recordId: session.id }],
+    generation
   );
   return session;
 }
@@ -518,9 +547,10 @@ function buildOrder(args: BuildOrderArgs): SalesOrder {
 
 /** 保存一单：事务内写 order + lines；自动挂到本机 open 场次 */
 export async function saveRecord(input: RecordInput): Promise<SalesOrder> {
+  const generation = await captureWriteGeneration();
   const session = input.sessionId
     ? await getSession(input.sessionId)
-    : await ensureOpenSession(input.deviceId, input.operator);
+    : await ensureOpenSession(input.deviceId, input.operator, generation);
   if (!session) throw new RecordError('SESSION_NOT_FOUND', SESSION_GONE_MSG);
   if (session.status !== 'open') {
     throw new RecordError('SESSION_CLOSED', '这一场已结账，用补记');
@@ -549,13 +579,15 @@ export async function saveRecord(input: RecordInput): Promise<SalesOrder> {
     [
       { kind: 'order', recordId: order.id },
       ...lines.map((l) => ({ kind: 'line' as const, recordId: l.id }))
-    ]
+    ],
+    generation
   );
   return order;
 }
 
 /** 编辑进行中的单（仅本场 open）。明细整组替换。 */
 export async function updateRecord(id: string, input: RecordInput): Promise<SalesOrder> {
+  const generation = await captureWriteGeneration();
   const old = await db.orders.get(id);
   if (!old) throw new RecordError('SESSION_NOT_FOUND', '这单找不到了，刷新看看');
   const session = old.sessionId ? await db.sessions.get(old.sessionId) : undefined;
@@ -588,13 +620,16 @@ export async function updateRecord(id: string, input: RecordInput): Promise<Sale
       { kind: 'order', recordId: id },
       ...oldLines.map((l) => ({ kind: 'line' as const, recordId: l.id, op: 'delete' as const })),
       ...lines.map((l) => ({ kind: 'line' as const, recordId: l.id }))
-    ]
+    ],
+    generation
   );
   return order;
 }
 
 /** 删除进行中的单（仅本场 open）。已结账场次只能补记/作废。 */
-export async function deleteRecord(id: string): Promise<void> {
+export async function deleteRecord(id: string, expectedGeneration?: number): Promise<void> {
+  const generation = expectedGeneration ?? await captureWriteGeneration();
+  if (expectedGeneration !== undefined) await assertWriteGeneration(expectedGeneration);
   const order = await db.orders.get(id);
   if (!order) return;
   const session = order.sessionId ? await db.sessions.get(order.sessionId) : undefined;
@@ -611,17 +646,19 @@ export async function deleteRecord(id: string): Promise<void> {
     [
       { kind: 'order', recordId: id, op: 'delete' },
       ...lines.map((l) => ({ kind: 'line' as const, recordId: l.id, op: 'delete' as const }))
-    ]
+    ],
+    generation
   );
 }
 
 /** 撤销补记：删除已结账场次里的补记单，补记计数 −1，重算快照 */
 export async function undoPatchedRecord(id: string): Promise<void> {
+  const generation = await captureWriteGeneration();
   const order = await db.orders.get(id);
   if (!order?.sessionId) return;
   const session = await db.sessions.get(order.sessionId);
   if (!session || session.status !== 'closed') {
-    await deleteRecord(id);
+    await deleteRecord(id, generation);
     return;
   }
   const lines = await db.lines.where('orderId').equals(id).toArray();
@@ -646,12 +683,14 @@ export async function undoPatchedRecord(id: string): Promise<void> {
       { kind: 'order', recordId: id, op: 'delete' },
       ...lines.map((l) => ({ kind: 'line' as const, recordId: l.id, op: 'delete' as const })),
       { kind: 'session', recordId: session.id }
-    ]
+    ],
+    generation
   );
 }
 
 /** 收摊结账：算快照 → 标记 closed；不删任何单 */
 export async function closeSession(sessionId: string, operator: string): Promise<Session> {
+  const generation = await captureWriteGeneration();
   const session = await db.sessions.get(sessionId);
   if (!session) throw new RecordError('SESSION_NOT_FOUND', SESSION_GONE_MSG);
   if (session.status === 'closed') {
@@ -674,13 +713,15 @@ export async function closeSession(sessionId: string, operator: string): Promise
     async () => {
       await db.sessions.put(next);
     },
-    [{ kind: 'session', recordId: sessionId }]
+    [{ kind: 'session', recordId: sessionId }],
+    generation
   );
   return next;
 }
 
 /** 撤销结账：仅下一场尚未开始时允许 */
 export async function reopenSession(sessionId: string): Promise<Session> {
+  const generation = await captureWriteGeneration();
   const session = await db.sessions.get(sessionId);
   if (!session) throw new RecordError('SESSION_NOT_FOUND', SESSION_GONE_MSG);
   if (session.status !== 'closed') {
@@ -699,13 +740,15 @@ export async function reopenSession(sessionId: string): Promise<Session> {
     async () => {
       await db.sessions.put(next);
     },
-    [{ kind: 'session', recordId: sessionId }]
+    [{ kind: 'session', recordId: sessionId }],
+    generation
   );
   return next;
 }
 
 /** 补记到已结账场次：写单 + patchedCount +1 + 重算快照 */
 export async function addPatchedRecord(input: RecordInput & { sessionId: string }): Promise<SalesOrder> {
+  const generation = await captureWriteGeneration();
   const session = await db.sessions.get(input.sessionId);
   if (!session) throw new RecordError('SESSION_NOT_FOUND', SESSION_GONE_MSG);
   if (session.status !== 'closed') {
@@ -748,7 +791,8 @@ export async function addPatchedRecord(input: RecordInput & { sessionId: string 
       { kind: 'order', recordId: order.id },
       ...lines.map((l) => ({ kind: 'line' as const, recordId: l.id })),
       { kind: 'session', recordId: session.id }
-    ]
+    ],
+    generation
   );
   return order;
 }
@@ -759,6 +803,7 @@ export async function addPatchedRecord(input: RecordInput & { sessionId: string 
  * 统一收敛留给性能批次（M-001 / M-006 / M-008），不要在这里再加一遍全量重放。
  */
 export async function refreshSessionSummary(sessionId: string): Promise<SessionSummary | undefined> {
+  const generation = await captureWriteGeneration();
   const session = await db.sessions.get(sessionId);
   if (!session) return undefined;
   const { orders, lines, batches } = await loadLedger();
@@ -768,7 +813,8 @@ export async function refreshSessionSummary(sessionId: string): Promise<SessionS
     async () => {
       await db.sessions.put({ ...session, summary, updatedAt: nowIso() });
     },
-    [{ kind: 'session', recordId: sessionId }]
+    [{ kind: 'session', recordId: sessionId }],
+    generation
   );
   return summary;
 }
@@ -778,7 +824,8 @@ export async function refreshSessionSummary(sessionId: string): Promise<SessionS
  * 口径与 migrateSessions 一致，避免 N 个场次触发 N 次全量重放。
  * 只处理 status === 'closed' 的场次：open 场次的报表由 sessionReport 实时算。
  */
-async function writeClosedSummaries(sessionIds: string[]): Promise<number> {
+async function writeClosedSummaries(sessionIds: string[], expectedGeneration?: number): Promise<number> {
+  const generation = expectedGeneration ?? await captureWriteGeneration();
   const ids = [...new Set(sessionIds)];
   if (ids.length === 0) return 0;
   const rows = await db.sessions.bulkGet(ids);
@@ -798,7 +845,8 @@ async function writeClosedSummaries(sessionIds: string[]): Promise<number> {
     async () => {
       await db.sessions.bulkPut(next);
     },
-    next.map((s) => ({ kind: 'session' as const, recordId: s.id }))
+    next.map((s) => ({ kind: 'session' as const, recordId: s.id })),
+    generation
   );
   return next.length;
 }
@@ -807,9 +855,9 @@ async function writeClosedSummaries(sessionIds: string[]): Promise<number> {
  * 作废 / 恢复订单后重算快照：只对已结账场次生效。
  * open 场次的报表本来就按 sessionReport 实时算，写快照只会给它凭空造一份 summary。
  */
-export async function refreshClosedSessionSummary(sessionId?: string): Promise<void> {
+export async function refreshClosedSessionSummary(sessionId?: string, expectedGeneration?: number): Promise<void> {
   if (!sessionId) return;
-  await writeClosedSummaries([sessionId]);
+  await writeClosedSummaries([sessionId], expectedGeneration);
 }
 
 /** B04 runs after its order transaction; refresh only the affected closed session. */
@@ -843,8 +891,10 @@ export async function refreshClosedSessionSummaryAfterRemoteUndo(sessionId?: str
 async function refreshClosedSummariesAfterBatchChange(
   productId: string,
   fifoReordered: boolean,
-  stockedDeltaQty: number
+  stockedDeltaQty: number,
+  generation: number
 ): Promise<number> {
+  await assertWriteGeneration(generation);
   const { batches, lines, orders } = await loadProductLedger(productId);
   const active = activeOrderIds(orders);
   if (!fifoReordered) {
@@ -860,7 +910,7 @@ async function refreshClosedSummariesAfterBatchChange(
   for (const o of orders) {
     if (o.sessionId && active.has(o.id)) sessionIds.add(o.sessionId);
   }
-  return writeClosedSummaries([...sessionIds]);
+  return writeClosedSummaries([...sessionIds], generation);
 }
 
 /**
@@ -883,6 +933,7 @@ async function bestEffortSnapshot(label: string, run: () => Promise<unknown>): P
  * 幂等：完成后写 setting sessionsMigrated=1。
  */
 export async function migrateSessions(): Promise<number> {
+  const generation = await captureWriteGeneration();
   const done = (await db.settings.get(SETTING_KEYS.sessionsMigrated))?.value;
   /*
    * 快路径：迁移标记已写过时，先确认「没有缺 sessionId 的订单」再返回。
@@ -906,7 +957,7 @@ export async function migrateSessions(): Promise<number> {
     .sort((a, b) => (a.createdAt < b.createdAt ? -1 : a.createdAt > b.createdAt ? 1 : 0));
   if (pending.length === 0) {
     if (done !== SESSIONS_MIGRATED_VALUE) {
-      await setSetting(SETTING_KEYS.sessionsMigrated, SESSIONS_MIGRATED_VALUE);
+      await setSetting(SETTING_KEYS.sessionsMigrated, SESSIONS_MIGRATED_VALUE, generation);
     }
     return 0;
   }
@@ -960,7 +1011,8 @@ export async function migrateSessions(): Promise<number> {
       ...migratedOrders
         .filter((o) => sessionOfOrder.has(o.id))
         .map((o) => ({ kind: 'order' as const, recordId: o.id }))
-    ]
+    ],
+    generation
   );
   return sessions.length;
 }
@@ -970,33 +1022,53 @@ export async function migrateSessions(): Promise<number> {
  * 作废本身已经生效，快照重算失败不能把结果报成失败。
  * 重算口径是 O(全库明细)（见 refreshSessionSummary 注释），留给性能批次统一处理。
  */
-export async function voidOrder(id: string): Promise<void> {
+export async function voidOrder(id: string, expectedGeneration?: number, expectedCurrentFingerprint?: string): Promise<void> {
+  const generation = expectedGeneration ?? await captureWriteGeneration();
+  if (expectedGeneration !== undefined) await assertWriteGeneration(expectedGeneration);
   const o = await db.orders.get(id);
-  if (!o) return;
+  if (!o) {
+    if (expectedCurrentFingerprint !== undefined) throw new Error('本机订单已变化，请重新核对');
+    return;
+  }
   await writeWithOutbox(
     [db.orders],
     async () => {
+      const current = await db.orders.get(id);
+      if (expectedCurrentFingerprint !== undefined && canonicalJson(current ?? null) !== expectedCurrentFingerprint) {
+        throw new Error('本机订单在撤销前已修改，请重新核对');
+      }
       await db.orders.put({ ...o, voided: true, updatedAt: nowIso() });
     },
-    [{ kind: 'order', recordId: id }]
+    [{ kind: 'order', recordId: id }],
+    generation
   );
-  await bestEffortSnapshot('作废订单后重算场次快照', () => refreshClosedSessionSummary(o.sessionId));
+  await bestEffortSnapshot('作废订单后重算场次快照', () => refreshClosedSessionSummary(o.sessionId, generation));
 }
 
 /** 撤销作废：与 voidOrder 同口径（先落库入队，快照重算 best-effort） */
-export async function restoreOrder(id: string): Promise<void> {
+export async function restoreOrder(id: string, expectedGeneration?: number, expectedCurrentFingerprint?: string): Promise<void> {
+  const generation = expectedGeneration ?? await captureWriteGeneration();
+  if (expectedGeneration !== undefined) await assertWriteGeneration(expectedGeneration);
   const o = await db.orders.get(id);
-  if (!o) return;
+  if (!o) {
+    if (expectedCurrentFingerprint !== undefined) throw new Error('本机订单已变化，请重新核对');
+    return;
+  }
   const next = { ...o, updatedAt: nowIso() };
   delete next.voided;
   await writeWithOutbox(
     [db.orders],
     async () => {
+      const current = await db.orders.get(id);
+      if (expectedCurrentFingerprint !== undefined && canonicalJson(current ?? null) !== expectedCurrentFingerprint) {
+        throw new Error('本机订单在撤销前已修改，请重新核对');
+      }
       await db.orders.put(next);
     },
-    [{ kind: 'order', recordId: id }]
+    [{ kind: 'order', recordId: id }],
+    generation
   );
-  await bestEffortSnapshot('恢复订单后重算场次快照', () => refreshClosedSessionSummary(o.sessionId));
+  await bestEffortSnapshot('恢复订单后重算场次快照', () => refreshClosedSessionSummary(o.sessionId, generation));
 }
 
 /* ------------------------------------------------------------------ 调整 */
@@ -1005,6 +1077,7 @@ export async function createAdjustment(
   input: { productId: string; qtyBase: number; type: AdjustType; reason?: string },
   deviceId: string
 ): Promise<Adjustment> {
+  const generation = await captureWriteGeneration();
   const createdAt = nowIso();
   const a: Adjustment = {
     id: uuid(),
@@ -1021,7 +1094,8 @@ export async function createAdjustment(
     async () => {
       await db.adjustments.put(a);
     },
-    [{ kind: 'adjustment', recordId: a.id }]
+    [{ kind: 'adjustment', recordId: a.id }],
+    generation
   );
   return a;
 }

@@ -41,6 +41,10 @@ export interface SyncConflictRow {
   local: string;
   /** 远端记录 JSON */
   remote: string;
+  /** 产生冲突时的数据代际；旧行缺失时按 0 处理。 */
+  dataGeneration?: number;
+  /** 产生冲突时该记录已有的 outbox revision；null 表示当时没有待推送行。 */
+  localRevision?: string | null;
 }
 
 /** 暂未找到主单的远端明细：持久保留原远端版本，不进入库存/报表。 */

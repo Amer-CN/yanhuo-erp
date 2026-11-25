@@ -109,7 +109,7 @@ describe('生产 facade 的事务边界', () => {
         expect(seen).toHaveLength(1);
         expect(seen[0]).toBe(tx);
         await table.put({
-          key: 'state', generation: 0, paused: false, reason: null,
+          key: 'state', generation: 0, dataGeneration: 0, paused: false, reason: null,
           maintenance: false, fence: 0, ownerId: null, expiresAt: 0
         });
       });
@@ -136,7 +136,7 @@ describe('生产 facade 的事务边界', () => {
 describe('持久化同步租约', () => {
   it('新库返回 state 默认值；callback 在事务外，租约持有 30 秒且 finally 释放', async () => {
     expect(await first.read()).toEqual({
-      key: 'state', generation: 0, paused: false, reason: null,
+      key: 'state', generation: 0, dataGeneration: 0, paused: false, reason: null,
       maintenance: false, fence: 0, ownerId: null, expiresAt: 0
     });
     const result = await first.runExclusive(async (lease) => {

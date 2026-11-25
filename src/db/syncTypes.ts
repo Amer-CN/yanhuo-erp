@@ -1,6 +1,8 @@
 export interface SyncControlRow {
   key: 'state';
   generation: number;
+  /** 仅在维护/恢复/清空/重连确认造成数据换代时递增；普通 pause 不变。 */
+  dataGeneration: number;
   paused: boolean;
   reason: string | null;
   maintenance: boolean;

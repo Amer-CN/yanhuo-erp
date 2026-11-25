@@ -2,10 +2,13 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { db } from '../src/db/db';
 import { remoteChangeList, restoreLocalSnapshot, syncNow, type Kind, type RemoteChange } from '../src/db/sync';
-import type { SalesOrder, SessionSummary } from '../src/db/types';
+import { updateProduct, voidOrder, restoreOrder } from '../src/db/repo';
+import { canonicalJson } from '../src/db/canonical';
+import { restoreLocalBackup } from '../src/db/dataRecovery';
+import { EMPTY_DATA, type SalesOrder, type SessionSummary } from '../src/db/types';
 import { localDate } from '../src/db/util';
 import { remoteOrderVersionKey } from '../src/db/remoteOrderUndo';
-import { makeLine, makeOrder, makeSession, resetDb, T0 } from './helpers';
+import { makeLine, makeOrder, makeProduct, makeSession, resetDb, T0 } from './helpers';
 
 const CFG = { url: 'http://127.0.0.1:54321', anonKey: 'fake-b04', ledgerKey: 'b04-test-only' };
 const BASE = Date.parse('2026-11-02T10:00:00.000Z');
@@ -120,6 +123,57 @@ describe('完整订单远端撤销', () => {
     const sameTimeReplacement = remote('order', 'x', order('x', 2000, ['line-b'], REMOTE_AT), BASE);
     expect(remoteOrderVersionKey(base)).not.toBe(remoteOrderVersionKey(sameTimeReplacement));
   });
+  it('rejects a product undo after a newer same-generation local edit', async () => {
+    const before = makeProduct('p1', { priceList: 100 });
+    const remote = makeProduct('p1', { priceList: 200, updatedAt: REMOTE_AT });
+    await db.products.put(remote);
+    await db.products.update('p1', { priceList: 300, updatedAt: '2026-11-04T10:00:00.000Z' });
+
+    await expect(updateProduct('p1', { priceList: before.priceList }, undefined, canonicalJson(remote)))
+      .rejects.toThrow(/修改|变化|新/);
+
+    expect((await db.products.get('p1'))?.priceList).toBe(300);
+  });
+
+  it('rejects order void and restore undos after a newer same-generation local edit', async () => {
+    const current = makeOrder('o1', 1000, 's1', { updatedAt: REMOTE_AT });
+    await db.orders.put(current);
+    await db.orders.update('o1', { totalFen: 3000, updatedAt: '2026-11-04T10:00:00.000Z' });
+
+    await expect(voidOrder('o1', undefined, canonicalJson(current))).rejects.toThrow(/修改|变化|新/);
+    await expect(restoreOrder('o1', undefined, canonicalJson(current))).rejects.toThrow(/修改|变化|新/);
+    expect((await db.orders.get('o1'))?.totalFen).toBe(3000);
+  });
+
+  it('rejects a generic session undo after a newer same-generation local edit', async () => {
+    const before = makeSession('s1', { status: 'closed', closedAt: T0, note: 'before' });
+    const remote = makeSession('s1', { status: 'closed', closedAt: T0, note: 'remote', updatedAt: REMOTE_AT });
+    await db.sessions.put(remote);
+    await db.sessions.update('s1', { note: 'newer-local', updatedAt: '2026-11-04T10:00:00.000Z' });
+
+    await expect(restoreLocalSnapshot({
+      type: 'overwritten', kind: 'session', recordId: 's1', label: 's1', local: { ...before },
+      currentFingerprint: canonicalJson(remote)
+    })).rejects.toThrow(/修改|变化|新/);
+
+    expect((await db.sessions.get('s1'))?.note).toBe('newer-local');
+  });
+
+  it('rejects an undo intent created before a local recovery', async () => {
+    await seed();
+    cloud = editRows();
+    const [change] = changes(await syncNow(CFG));
+    expect(change).toBeTruthy();
+
+    await restoreLocalBackup({ app: 'yanhuo-erp', version: 2, exportedAt: T0,
+      deviceId: 'other-device', data: structuredClone(EMPTY_DATA) });
+
+    await expect(restoreLocalSnapshot(change)).rejects.toThrow(/账本已更新|数据已|恢复|刷新/);
+    expect(await db.orders.get('x')).toBeUndefined();
+    expect(await db.lines.where('orderId').equals('x').count()).toBe(0);
+    expect(await db.outbox.count()).toBe(0);
+  });
+
   it('真实 syncNow 改成 20元/2件后撤销为 10元/1件，删除新明细并用新业务版本回推', async () => {
     await seed();
     cloud = editRows();

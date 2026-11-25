@@ -25,6 +25,7 @@ export const SKIP_SETTINGS = new Set<string>([
   'deviceId',
   'deviceName',
   'operatorSelf',
+  'mergeUndoSnapshotId',
   UNKNOWN_KINDS_KEY
 ]);
 

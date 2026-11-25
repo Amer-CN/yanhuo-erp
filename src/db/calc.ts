@@ -201,24 +201,37 @@ export interface ProductMargin {
   uncoveredQty?: number;
 }
 
-/** 收款汇总：cash 记现金，wechat 记微信，其余一律记支付宝（沿用既有语义） */
-function sumPayments(orders: SalesOrder[]): {
-  cashFen: number;
-  wechatFen: number;
-  alipayFen: number;
-  revenueFen: number;
-} {
-  let cashFen = 0;
-  let wechatFen = 0;
-  let alipayFen = 0;
-  let revenueFen = 0;
-  for (const o of orders) {
-    if (o.payMethod === 'cash') cashFen += o.totalFen;
-    else if (o.payMethod === 'wechat') wechatFen += o.totalFen;
-    else alipayFen += o.totalFen;
-    revenueFen += o.totalFen;
+/** 单场与批量共用的订单累加；作废单只进入对账说明。 */
+function addOrderToReport(report: SessionReport, order: SalesOrder): void {
+  if (order.voided) {
+    report.voidedCount += 1;
+    report.voidedFen += order.totalFen;
+    return;
   }
-  return { cashFen, wechatFen, alipayFen, revenueFen };
+  report.orderCount += 1;
+  report.revenueFen += order.totalFen;
+  if (order.payMethod === 'cash') report.cashFen += order.totalFen;
+  else if (order.payMethod === 'wechat') report.wechatFen += order.totalFen;
+  else report.alipayFen += order.totalFen;
+}
+
+/** 单场与批量共用的明细累加；旧明细缺 discountFen 时按 0。 */
+function addLineToReport(report: SessionReport, line: SaleLine, fifo: FifoResult): void {
+  report.lineCount += 1;
+  const lineCost = fifo.lineCost.get(line.id) ?? 0;
+  report.costFen += lineCost;
+  report.uncoveredQty += fifo.uncoveredQtyByLine.get(line.id) ?? 0;
+  if (line.gift) {
+    report.giftCostFen += lineCost;
+    report.giftQty += line.qtyBase;
+  } else {
+    report.discountFen += line.discountFen ?? 0;
+  }
+}
+
+function finalizeReport(report: SessionReport): SessionReport {
+  report.grossFen = report.revenueFen - report.costFen;
+  return report;
 }
 
 /**
@@ -249,56 +262,17 @@ export function sessionReport(
   lines: SaleLine[],
   fifo: FifoResult
 ): SessionReport {
-  const sel = orders.filter((o) => o.sessionId === sessionId && !o.voided);
-  const orderIds = new Set(sel.map((o) => o.id));
-  const selLines = lines.filter((l) => orderIds.has(l.orderId));
-
-  const { cashFen: cash, wechatFen: wechat, alipayFen: alipay, revenueFen: revenue } =
-    sumPayments(sel);
-
-  let cost = 0;
-  let discount = 0;
-  let giftCost = 0;
-  let giftQty = 0;
-  // 本场缺批次的销量（基本单位）：按明细汇总 fifo 的逐行缺失量
-  let uncoveredQty = 0;
-  for (const l of selLines) {
-    const lineCost = fifo.lineCost.get(l.id) ?? 0;
-    cost += lineCost;
-    uncoveredQty += fifo.uncoveredQtyByLine.get(l.id) ?? 0;
-    if (l.gift) {
-      giftCost += lineCost;
-      giftQty += l.qtyBase;
-    } else {
-      // 赠品行即使历史数据里带了 discountFen，也不计入让利
-      discount += l.discountFen ?? 0;
-    }
+  const report = emptySessionSummary();
+  const activeOrderIds = new Set<string>();
+  for (const order of orders) {
+    if (order.sessionId !== sessionId) continue;
+    addOrderToReport(report, order);
+    if (!order.voided) activeOrderIds.add(order.id);
   }
-
-  let voidedCount = 0;
-  let voidedFen = 0;
-  for (const o of orders) {
-    if (o.sessionId !== sessionId || !o.voided) continue;
-    voidedCount += 1;
-    voidedFen += o.totalFen;
+  for (const line of lines) {
+    if (activeOrderIds.has(line.orderId)) addLineToReport(report, line, fifo);
   }
-
-  return {
-    orderCount: sel.length,
-    lineCount: selLines.length,
-    revenueFen: revenue,
-    cashFen: cash,
-    wechatFen: wechat,
-    alipayFen: alipay,
-    costFen: cost,
-    grossFen: revenue - cost,
-    discountFen: discount,
-    giftCostFen: giftCost,
-    giftQty,
-    voidedCount,
-    voidedFen,
-    uncoveredQty
-  };
+  return finalizeReport(report);
 }
 
 /**
@@ -324,47 +298,24 @@ export function sessionReports(
   }
   if (out.size === 0) return out;
 
-  // 有效单 → 场次；同时累计收款。作废单不参与（与 sessionReport 的 filter 一致）
+  // 有效单 → 场次；同时累计收款。作废单只进入对账说明。
   const orderSession = new Map<string, string>();
-  for (const o of orders) {
-    if (o.voided || !o.sessionId) continue;
-    const rep = out.get(o.sessionId);
-    if (!rep) continue;
-    orderSession.set(o.id, o.sessionId);
-    rep.orderCount += 1;
-    rep.revenueFen += o.totalFen;
-    if (o.payMethod === 'cash') rep.cashFen += o.totalFen;
-    else if (o.payMethod === 'wechat') rep.wechatFen += o.totalFen;
-    else rep.alipayFen += o.totalFen;
+  for (const order of orders) {
+    if (!order.sessionId) continue;
+    const report = out.get(order.sessionId);
+    if (!report) continue;
+    addOrderToReport(report, order);
+    if (!order.voided) orderSession.set(order.id, order.sessionId);
   }
 
-  // 明细成本 / 让利 / 赠品 / 缺批次销量：只统计有效单下的明细
-  for (const l of lines) {
-    const sid = orderSession.get(l.orderId);
-    if (!sid) continue;
-    const rep = out.get(sid) as SessionReport;
-    rep.lineCount += 1;
-    const lineCost = fifo.lineCost.get(l.id) ?? 0;
-    rep.costFen += lineCost;
-    rep.uncoveredQty += fifo.uncoveredQtyByLine.get(l.id) ?? 0;
-    if (l.gift) {
-      rep.giftCostFen += lineCost;
-      rep.giftQty += l.qtyBase;
-    } else {
-      rep.discountFen += l.discountFen;
-    }
+  // 明细成本 / 让利 / 赠品 / 缺批次销量：只统计有效单下的明细。
+  for (const line of lines) {
+    const sessionId = orderSession.get(line.orderId);
+    if (!sessionId) continue;
+    addLineToReport(out.get(sessionId)!, line, fifo);
   }
 
-  // 被排除的作废单：单独记账，不参与上面任何合计
-  for (const o of orders) {
-    if (!o.voided || !o.sessionId) continue;
-    const rep = out.get(o.sessionId);
-    if (!rep) continue;
-    rep.voidedCount += 1;
-    rep.voidedFen += o.totalFen;
-  }
-
-  for (const rep of out.values()) rep.grossFen = rep.revenueFen - rep.costFen;
+  for (const report of out.values()) finalizeReport(report);
   return out;
 }
 

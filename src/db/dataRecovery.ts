@@ -104,7 +104,8 @@ function recoverLocal(replacement: (current: BackupFile) => BackupFile, reason: 
       await db.adjustments.bulkPut(data.adjustments ?? []);
       await db.sessions.bulkPut(data.sessions ?? []);
       const settings = new Map((data.settings ?? [])
-        .filter((row) => row.key !== UNKNOWN_KINDS_KEY).map((row) => [row.key, row]));
+        .filter((row) => row.key !== UNKNOWN_KINDS_KEY && row.key !== SETTING_KEYS.mergeUndoSnapshotId)
+        .map((row) => [row.key, row]));
       for (const row of identity) settings.set(row.key, row);
       await db.settings.bulkPut([...settings.values()]);
       await pending.put({ key: RECOVERY_PENDING_KEY, generation: lease.generation, token: crypto.randomUUID() });

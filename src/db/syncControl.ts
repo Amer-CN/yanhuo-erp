@@ -6,7 +6,7 @@ export type { SyncCallback, SyncControlRow, SyncLease } from './syncTypes';
 const LEASE_MS = 30_000;
 const HEARTBEAT_MS = 10_000;
 const initial = (): SyncControlRow => ({
-  key: 'state', generation: 0, paused: false, reason: null,
+  key: 'state', generation: 0, dataGeneration: 0, paused: false, reason: null,
   maintenance: false, fence: 0, ownerId: null, expiresAt: 0
 });
 
@@ -29,7 +29,7 @@ export class SyncMaintenanceError extends SyncControlError {
   constructor() { super('SYNC_MAINTENANCE', '账本维护中，请稍后再试'); }
 }
 export class SyncGenerationMismatchError extends SyncControlError {
-  constructor() { super('SYNC_GENERATION_MISMATCH', '暂停状态已改变，请重新确认'); }
+  constructor() { super('SYNC_GENERATION_MISMATCH', '账本已更新，请刷新后重试'); }
 }
 
 /** 事务只覆盖控制行读写；调用方必须在每个业务提交事务内再次 assertCurrent。 */
@@ -45,7 +45,7 @@ export class SyncCoordinator {
   }
 
   private state(): Promise<SyncControlRow> {
-    return this.table.get('state').then((row) => row ?? initial());
+    return this.table.get('state').then((row) => row ? { ...row, dataGeneration: row.dataGeneration ?? 0 } : initial());
   }
 
   read(): Promise<SyncControlRow> { return this.transaction('r', () => this.state()); }
@@ -73,6 +73,22 @@ export class SyncCoordinator {
     await this.transaction('r', async () => {
       // 过期维护也必须显式完成/接管后才解锁，不能因页面挂起自动放行写入。
       if ((await this.state()).maintenance) throw new SyncMaintenanceError();
+    });
+  }
+
+  async captureWriteGeneration(): Promise<number> {
+    return this.transaction('r', async () => {
+      const row = await this.state();
+      if (row.maintenance) throw new SyncMaintenanceError();
+      return row.dataGeneration;
+    });
+  }
+
+  async assertWriteGeneration(expectedGeneration: number): Promise<void> {
+    await this.transaction('r', async () => {
+      const row = await this.state();
+      if (row.maintenance) throw new SyncMaintenanceError();
+      if (row.dataGeneration !== expectedGeneration) throw new SyncGenerationMismatchError();
     });
   }
 
@@ -114,8 +130,8 @@ export class SyncCoordinator {
       }
       const next: SyncControlRow = {
         ...current, ownerId, fence: current.fence + 1, expiresAt: Date.now() + LEASE_MS,
-        ...(maintenance ? { generation: current.generation + 1, paused: true,
-          maintenance: true, reason: reason ?? null } : {})
+        ...(maintenance ? { generation: current.generation + 1, dataGeneration: current.dataGeneration + 1,
+          paused: true, maintenance: true, reason: reason ?? null } : {})
       };
       await this.table.put(next);
       return next;
@@ -212,3 +228,9 @@ export function runMaintenance<T>(reason: string, callback: SyncCallback<T>): Pr
   return coordinator().runMaintenance(reason, callback);
 }
 export function assertWritable(): Promise<void> { return coordinator().assertWritable(); }
+/** 在业务命令读取旧状态之前捕获；普通暂停不阻断本机离线写入。 */
+export function captureWriteGeneration(): Promise<number> { return coordinator().captureWriteGeneration(); }
+/** 必须在包含 syncMeta 的业务提交事务内调用，拒绝恢复换代后的陈旧命令。 */
+export function assertWriteGeneration(expectedGeneration: number): Promise<void> {
+  return coordinator().assertWriteGeneration(expectedGeneration);
+}

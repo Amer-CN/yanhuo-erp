@@ -6,6 +6,7 @@ import { db, SCHEMA_VERSION } from './db';
 import { exportBackup, type BackupFile } from './merge';
 import { restoreLocalBackup } from './dataRecovery';
 import { ensureDeviceId } from './repo';
+import { uuid } from './util';
 import {
   SETTING_KEYS,
   SESSIONS_MIGRATED_VALUE,
@@ -19,7 +20,7 @@ import {
   type Setting
 } from './types';
 
-export type SnapshotReason = 'close' | 'manual' | 'pre-migrate' | 'pre-recovery';
+export type SnapshotReason = 'close' | 'manual' | 'pre-migrate' | 'pre-recovery' | 'pre-merge';
 
 export interface SnapshotRow {
   id?: number;
@@ -29,6 +30,12 @@ export interface SnapshotRow {
   deviceId: string;
   /** 与手动导出完全相同的备份结构 */
   file: BackupFile;
+  /** pre-merge 提交前为 true；成功后转正，未被指针引用的 pending 可清理。 */
+  pending?: boolean;
+  /** 跨标签页预留令牌；只有持有者能提交或放弃。 */
+  reservationToken?: string;
+  /** 预留到期时间；崩溃遗留只在过期后回收。 */
+  reservationExpiresAt?: number;
 }
 
 class BackupDB extends Dexie {
@@ -43,19 +50,45 @@ class BackupDB extends Dexie {
 export const backupDb = new BackupDB();
 
 /** 生成并持久保存快照；恢复路径传入维护中捕获的 file，避开业务写入守门。 */
-export async function createSnapshot(reason: SnapshotReason, captured?: BackupFile): Promise<SnapshotRow> {
+export async function createSnapshot(reason: SnapshotReason, captured?: BackupFile, prune = true): Promise<SnapshotRow> {
   const deviceId = captured?.deviceId ?? await ensureDeviceId();
   const file = captured ?? await exportBackup(deviceId);
+  const reserved = reason === 'pre-merge' && !prune;
   const row: SnapshotRow = {
     at: new Date().toISOString(),
     reason,
     schemaVersion: db.verno,
     deviceId,
-    file
+    file,
+    ...(reserved ? { pending: true, reservationToken: uuid(), reservationExpiresAt: Date.now() + 24 * 60 * 60_000 } : {})
   };
-  const id = await backupDb.snapshots.add(row);
-  await pruneSnapshots();
+  const id = reserved
+    ? await backupDb.transaction('rw', backupDb.snapshots, () => backupDb.snapshots.add(row))
+    : await backupDb.snapshots.add(row);
+  if (prune) await pruneSnapshots();
   return { ...row, id };
+}
+
+async function ownedPendingSnapshot(id: number, token: string): Promise<SnapshotRow> {
+  const row = await backupDb.snapshots.get(id);
+  if (!row?.pending || row.reservationToken !== token) throw new Error('合并快照预留已失效或不属于本页');
+  return row;
+}
+
+/** 合并提交成功后把 pre-merge 快照转为正式撤销点。 */
+export async function markSnapshotCommitted(id: number, token: string): Promise<void> {
+  await backupDb.transaction('rw', backupDb.snapshots, async () => {
+    await ownedPendingSnapshot(id, token);
+    await backupDb.snapshots.update(id, { pending: false, reservationToken: undefined, reservationExpiresAt: undefined });
+  });
+}
+
+/** 合并失败/取消后显式放弃预留，快照可立即回收。 */
+export async function abandonSnapshot(id: number, token: string): Promise<void> {
+  await backupDb.transaction('rw', backupDb.snapshots, async () => {
+    await ownedPendingSnapshot(id, token);
+    await backupDb.snapshots.delete(id);
+  });
 }
 
 /** 最近的在最前 */
@@ -69,30 +102,47 @@ export async function latestSnapshot(): Promise<SnapshotRow | undefined> {
 
 /** 保留最近 3 个不同日期的快照 + 最近 1 份 pre-migrate，其余删除；返回删除条数 */
 export async function pruneSnapshots(): Promise<number> {
-  const all = await listSnapshots();
-  const keep = new Set<number>();
-  const dates = new Set<string>();
-  let latestPreMigrate: SnapshotRow | undefined;
+  const mainOpen = db.isOpen();
+  const pointer = mainOpen ? await db.settings.get(SETTING_KEYS.mergeUndoSnapshotId) : undefined;
+  const pointedId = Number(pointer?.value);
+  return backupDb.transaction('rw', backupDb.snapshots, async () => {
+    const all = await backupDb.snapshots.orderBy('at').reverse().toArray();
+    const keep = new Set<number>();
+    if (mainOpen && Number.isSafeInteger(pointedId) && pointedId > 0) keep.add(pointedId);
+    const now = Date.now();
+    const dates = new Set<string>();
+    let latestPreMigrate: SnapshotRow | undefined;
 
-  for (const row of all) {
-    if (!latestPreMigrate && row.reason === 'pre-migrate') latestPreMigrate = row;
-    if (dates.size >= 3) continue;
-    const date = row.at.slice(0, 10);
-    if (dates.has(date)) continue;
-    dates.add(date);
-    if (row.id != null) keep.add(row.id);
-  }
-  if (latestPreMigrate?.id != null) keep.add(latestPreMigrate.id);
-  // 自增 id 表示真实保存顺序，设备时间回拨也不会误删最新恢复安全快照。
-  const latestRecovery = all.filter((row) => row.reason === 'pre-recovery')
-    .reduce<SnapshotRow | undefined>((latest, row) => !latest || (row.id ?? 0) > (latest.id ?? 0) ? row : latest, undefined);
-  if (latestRecovery?.id != null) keep.add(latestRecovery.id);
+    for (const row of all) {
+      if (row.pending) {
+        // 冷启动无法读取撤销指针；活跃跨标签页预留也必须保留。
+        if (!mainOpen || (row.reservationToken && (row.reservationExpiresAt ?? 0) > now)) {
+          if (row.id != null) keep.add(row.id);
+        }
+        continue;
+      }
+      if (!latestPreMigrate && row.reason === 'pre-migrate') latestPreMigrate = row;
+      if (dates.size >= 3) continue;
+      const date = row.at.slice(0, 10);
+      if (dates.has(date)) continue;
+      dates.add(date);
+      if (row.id != null) keep.add(row.id);
+    }
+    if (latestPreMigrate?.id != null) keep.add(latestPreMigrate.id);
+    // 自增 id 表示真实保存顺序，设备时间回拨也不会误删最新恢复/合并安全快照。
+    const latestRecovery = all.filter((row) => row.reason === 'pre-recovery' && !row.pending)
+      .reduce<SnapshotRow | undefined>((latest, row) => !latest || (row.id ?? 0) > (latest.id ?? 0) ? row : latest, undefined);
+    const latestPreMerge = all.filter((row) => row.reason === 'pre-merge' && !row.pending)
+      .reduce<SnapshotRow | undefined>((latest, row) => !latest || (row.id ?? 0) > (latest.id ?? 0) ? row : latest, undefined);
+    if (latestRecovery?.id != null) keep.add(latestRecovery.id);
+    if (latestPreMerge?.id != null) keep.add(latestPreMerge.id);
 
-  const remove = all
-    .filter((row) => row.id != null && !keep.has(row.id))
-    .map((row) => row.id as number);
-  if (remove.length > 0) await backupDb.snapshots.bulkDelete(remove);
-  return remove.length;
+    const remove = all
+      .filter((row) => row.id != null && !keep.has(row.id))
+      .map((row) => row.id as number);
+    if (remove.length > 0) await backupDb.snapshots.bulkDelete(remove);
+    return remove.length;
+  });
 }
 
 /**
@@ -102,7 +152,14 @@ export async function pruneSnapshots(): Promise<number> {
 export async function restoreSnapshot(id: number): Promise<SnapshotRow> {
   const row = await backupDb.snapshots.get(id);
   if (!row) throw new Error('找不到这份本地备份');
-  await restoreLocalBackup(row.file);
+  const file: BackupFile = {
+    ...row.file,
+    data: {
+      ...row.file.data,
+      settings: row.file.data.settings.filter((setting) => setting.key !== SETTING_KEYS.mergeUndoSnapshotId)
+    }
+  };
+  await restoreLocalBackup(file);
   return row;
 }
 

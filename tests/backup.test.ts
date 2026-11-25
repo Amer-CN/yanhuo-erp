@@ -2,8 +2,10 @@ import 'fake-indexeddb/auto';
 import { beforeEach, describe, expect, it } from 'vitest';
 import {
   backupDb,
+  abandonSnapshot,
   createSnapshot,
   listSnapshots,
+  markSnapshotCommitted,
   pruneSnapshots,
   restoreSnapshot,
   snapshotBeforeOpen
@@ -175,6 +177,105 @@ describe('本地备份', () => {
       '2026-11-04',
       '2026-11-05'
     ]);
+  });
+
+  it('prune retains the newest pre-merge snapshot for persistent undo', async () => {
+    for (const day of ['2099-02-01', '2099-02-02', '2099-02-03', '2099-02-04']) {
+      await backupDb.snapshots.add({ at: `${day}T10:00:00.000Z`, reason: 'manual',
+        schemaVersion: db.verno, deviceId: 'dev-test', file: emptyFile() });
+    }
+    const safe = await createSnapshot('pre-merge', emptyFile());
+    await pruneSnapshots();
+    expect(await backupDb.snapshots.get(safe.id!)).toBeTruthy();
+  });
+
+  it('retains the newest pre-merge by save order even when the device clock moves backwards', async () => {
+    for (const day of ['2099-03-01', '2099-03-02', '2099-03-03']) {
+      await backupDb.snapshots.add({ at: `${day}T10:00:00.000Z`, reason: 'manual',
+        schemaVersion: db.verno, deviceId: 'dev-test', file: emptyFile() });
+    }
+    const older = await backupDb.snapshots.add({ at: '2099-04-01T10:00:00.000Z', reason: 'pre-merge',
+      schemaVersion: db.verno, deviceId: 'dev-test', file: emptyFile() });
+    const newer = await backupDb.snapshots.add({ at: '2026-01-01T10:00:00.000Z', reason: 'pre-merge',
+      schemaVersion: db.verno, deviceId: 'dev-test', file: emptyFile() });
+    await pruneSnapshots();
+    expect(await backupDb.snapshots.get(newer)).toBeTruthy();
+    expect(newer).toBeGreaterThan(older);
+  });
+
+  it('can create a pre-merge snapshot without pruning the previous undo point', async () => {
+    const previous = await createSnapshot('pre-merge', emptyFile());
+    for (const day of ['2099-05-01', '2099-05-02', '2099-05-03']) {
+      await backupDb.snapshots.add({ at: `${day}T10:00:00.000Z`, reason: 'manual',
+        schemaVersion: db.verno, deviceId: 'dev-test', file: emptyFile() });
+    }
+    await createSnapshot('pre-merge', emptyFile(), false);
+    expect(await backupDb.snapshots.get(previous.id!)).toBeTruthy();
+  });
+
+  it('prune retains the snapshot referenced by the local undo pointer', async () => {
+    const pointed = await createSnapshot('pre-merge', emptyFile());
+    await db.settings.put({ key: 'mergeUndoSnapshotId', value: String(pointed.id) });
+    for (const day of ['2099-06-01', '2099-06-02', '2099-06-03']) {
+      await backupDb.snapshots.add({ at: `${day}T10:00:00.000Z`, reason: 'manual',
+        schemaVersion: db.verno, deviceId: 'dev-test', file: emptyFile() });
+    }
+    await createSnapshot('pre-merge', emptyFile(), false);
+    await pruneSnapshots();
+    expect(await backupDb.snapshots.get(pointed.id!)).toBeTruthy();
+  });
+
+  it('prune retains an actively reserved pending snapshot before the merge commits', async () => {
+    const pending = await createSnapshot('pre-merge', emptyFile(), false);
+    await pruneSnapshots();
+    expect(await backupDb.snapshots.get(pending.id!)).toMatchObject({ pending: true });
+  });
+
+  it('prune removes a pending snapshot only after it is explicitly abandoned', async () => {
+    const pending = await createSnapshot('pre-merge', emptyFile(), false);
+    await abandonSnapshot(pending.id!, pending.reservationToken!);
+    await pruneSnapshots();
+    expect(await backupDb.snapshots.get(pending.id!)).toBeUndefined();
+  });
+
+  it('prune removes a pending snapshot after its reservation expires', async () => {
+    const pending = await createSnapshot('pre-merge', emptyFile(), false);
+    await backupDb.snapshots.update(pending.id!, { reservationExpiresAt: Date.now() - 1 });
+    await pruneSnapshots();
+    expect(await backupDb.snapshots.get(pending.id!)).toBeUndefined();
+  });
+
+  it('prune conservatively retains pending snapshots while the main database is closed', async () => {
+    const pending = await createSnapshot('pre-merge', emptyFile(), false);
+    await db.close();
+    try {
+      await pruneSnapshots();
+      expect(await backupDb.snapshots.get(pending.id!)).toBeTruthy();
+    } finally {
+      await db.open();
+    }
+  });
+
+  it('committing a reserved snapshot clears its pending state and survives pruning', async () => {
+    const pending = await createSnapshot('pre-merge', emptyFile(), false);
+    await markSnapshotCommitted(pending.id!, pending.reservationToken!);
+    await pruneSnapshots();
+    expect(await backupDb.snapshots.get(pending.id!)).toMatchObject({ pending: false });
+  });
+
+  it('rejects committing or abandoning a reservation owned by another tab', async () => {
+    const pending = await createSnapshot('pre-merge', emptyFile(), false);
+    await expect(markSnapshotCommitted(pending.id!, 'wrong-token')).rejects.toThrow(/预留|不属于/);
+    await expect(abandonSnapshot(pending.id!, 'wrong-token')).rejects.toThrow(/预留|不属于/);
+    expect(await backupDb.snapshots.get(pending.id!)).toMatchObject({ pending: true });
+  });
+
+  it('restoring a snapshot clears the local merge undo pointer atomically', async () => {
+    await db.settings.put({ key: 'mergeUndoSnapshotId', value: '99' });
+    const snapshot = await createSnapshot('manual');
+    await db.settings.put({ key: 'mergeUndoSnapshotId', value: '100' });
+    await restoreSnapshot(snapshot.id as number);
+    expect(await db.settings.get('mergeUndoSnapshotId')).toBeUndefined();
   });
 
   it('v2 数据（无 sessions）：首次打开前生成 pre-migrate 快照', async () => {

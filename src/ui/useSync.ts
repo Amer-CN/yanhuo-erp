@@ -143,7 +143,7 @@ async function applyUndo(change: RemoteChange): Promise<{ sessionSummaryUpdated?
         ...(typeof p.priceList === 'number' ? { priceList: p.priceList } : {}),
         ...(typeof p.negotiable === 'boolean' ? { negotiable: p.negotiable } : {}),
         ...(typeof p.archived === 'boolean' ? { archived: p.archived } : {})
-      });
+      }, change.dataGeneration, change.currentFingerprint);
       return;
     }
     if (change.kind === 'order') {
@@ -151,7 +151,7 @@ async function applyUndo(change: RemoteChange): Promise<{ sessionSummaryUpdated?
       const wasVoided = change.local?.voided === true;
       const nowVoided = change.remote?.voided === true;
       if (!wasVoided && nowVoided) {
-        await restoreOrder(change.recordId);
+        await restoreOrder(change.recordId, change.dataGeneration, change.currentFingerprint);
         return;
       }
     }
@@ -165,10 +165,10 @@ async function applyUndo(change: RemoteChange): Promise<{ sessionSummaryUpdated?
   }
   // restored：撤销复活 = 让它重新不计入账。订单沿用现有 voidOrder（可再「撤销作废」）。
   if (change.kind === 'order') {
-    await voidOrder(change.recordId);
+    await voidOrder(change.recordId, change.dataGeneration, change.currentFingerprint);
     return;
   }
-  await dropLocalRecord(change.kind as Kind, change.recordId);
+  await dropLocalRecord(change.kind as Kind, change.recordId, change.dataGeneration, change.currentFingerprint);
 }
 
 export function useSync(showToast?: Done): SyncApi {
@@ -377,6 +377,7 @@ export function useSync(showToast?: Done): SyncApi {
     const onConfig = () => {
       if (retryTimer.current) window.clearTimeout(retryTimer.current);
       retryTimer.current = undefined;
+      clearRemoteChanges();
       initialPending.current = initialSyncPending();
       downloadedOrders.current = 0;
       void refresh();
@@ -407,7 +408,7 @@ export function useSync(showToast?: Done): SyncApi {
       if (retryTimer.current) window.clearTimeout(retryTimer.current);
       if (debounce) window.clearTimeout(debounce);
     };
-  }, [refresh, syncNow]);
+  }, [clearRemoteChanges, refresh, syncNow]);
 
   return useMemo(
     () => ({

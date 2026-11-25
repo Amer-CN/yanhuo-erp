@@ -15,7 +15,7 @@ import { DEFAULT_SYNC } from './syncDefaults';
 import { mergeSessionPair } from './sessionLogic';
 import { businessTime, resolveRemote } from './syncResolve';
 import { canonicalJson } from './canonical';
-import { assertLeaseCurrent, assertWritable, pauseSync, readSyncControl, resumeSync, runMaintenance, runSyncExclusive } from './syncControl';
+import { assertLeaseCurrent, assertWritable, assertWriteGeneration, pauseSync, readSyncControl, resumeSync, runMaintenance, runSyncExclusive } from './syncControl';
 import { clearLedgerRpc, finishClearOperation, pendingClear, protocolScope, readProtocol, storeProtocol, type ClearReceipt, type SyncProtocol } from './syncProtocol';
 import { clearLocalSafely, completeRecoveryCleanup } from './dataRecovery';
 import { pushReconnectBaseline } from './syncReconcile';
@@ -63,6 +63,10 @@ export interface RemoteChange {
   type: RemoteChangeType;
   kind: Kind;
   recordId: string;
+  /** 产生这条撤销意图时的数据代际；恢复/清空后必须拒绝旧意图。 */
+  dataGeneration?: number;
+  /** 远端应用后、用户再次修改前的本机记录指纹；订单完整组另用 afterFingerprint。 */
+  currentFingerprint?: string;
   /** 人能看懂的名字（商品名 / 订单时间+金额 / 场次时间）；取不到退回类型名 */
   label: string;
   /** 覆盖 / 删除前的本地快照（撤销用） */
@@ -1287,6 +1291,11 @@ function changeLabel(kind: Kind, value: unknown): string {
   return kindLabel;
 }
 
+function recordFingerprint(kind: Kind, value: unknown): string {
+  if (kind === 'setting') return canonicalJson(value ?? null);
+  return canonicalJson(value && typeof value === 'object' ? { ...value, id: (value as { id?: string }).id } : value ?? null);
+}
+
 /**
  * 判定一次 `take-remote` 是否要告诉用户。调用点已经确认「本地没有待推送改动」
  * （pending 行在 applyRemoteBatch 之前就被跳过了），所以这里看到的就是「对方赢」。
@@ -1312,12 +1321,14 @@ function collectTakeRemote(
   if (!local) {
     // 本地没有：只有「以前见过」才算复活，否则就是对方正常新记的单/初次拉取
     if (!knownIds.has(`${kind}:${recordId}`)) return;
-    impact.restored.push({ type: 'restored', kind, recordId, label, remote });
+    impact.restored.push({ type: 'restored', kind, recordId, label, remote,
+      currentFingerprint: recordFingerprint(kind, remote) });
     return;
   }
   // 本地是作废态、远端是活行 = 对方撤销了作废/删除
   if (isDeletedState(kind, local) && !isDeletedState(kind, remote)) {
-    impact.restored.push({ type: 'restored', kind, recordId, label, local, remote });
+    impact.restored.push({ type: 'restored', kind, recordId, label, local, remote,
+      currentFingerprint: recordFingerprint(kind, remote) });
     return;
   }
   // 内容相同：重叠窗口/重放把同一行重复应用了一遍，不是「对方改了」
@@ -1327,7 +1338,8 @@ function collectTakeRemote(
       ? local.value === remote?.value
       : sameContentAsRemote(local, remote, recordId);
   if (same) return;
-  impact.overwritten.push({ type: 'overwritten', kind, recordId, label, local, remote });
+  impact.overwritten.push({ type: 'overwritten', kind, recordId, label, local, remote,
+    currentFingerprint: recordFingerprint(kind, remote) });
 }
 
 /** 判定一次远端墓碑是否要告诉用户：只有「本地原本有」才算被对方删掉 */
@@ -1346,7 +1358,8 @@ function collectRemoved(
     kind,
     recordId,
     label: changeLabel(kind, local),
-    local
+    local,
+    currentFingerprint: recordFingerprint(kind, null)
   });
 }
 
@@ -1366,6 +1379,7 @@ export async function restoreLocalSnapshot(change: RemoteChange): Promise<{ sess
     const restoreSessionId = typeof snapshot.sessionId === 'string' ? snapshot.sessionId : undefined;
     await db.transaction('rw', [db.orders, db.lines, db.outbox, db.remoteOrderUndo, db.remotePendingLines, db.syncMeta], async () => {
     await assertWritable();
+    if (change.dataGeneration !== undefined) await assertWriteGeneration(change.dataGeneration);
     if (change.canUndo !== true || !change.undoVersionKey) {
       throw new Error(change.undoDisabledReason ?? '订单缺少完整明细清单，无法整单撤销');
     }
@@ -1428,6 +1442,13 @@ export async function restoreLocalSnapshot(change: RemoteChange): Promise<{ sess
   if (change.kind === 'order' && lines.length > 0) tables.push(db.lines);
   await db.transaction('rw', [...tables, db.outbox, db.syncMeta], async () => {
     await assertWritable();
+    if (change.dataGeneration !== undefined) await assertWriteGeneration(change.dataGeneration);
+    if (change.currentFingerprint !== undefined) {
+      const current = await TABLE_BY_KIND[change.kind].get(change.recordId);
+      if (recordFingerprint(change.kind, current ?? null) !== change.currentFingerprint) {
+        throw new Error('本机记录在撤销前已修改，请重新核对');
+      }
+    }
     await TABLE_BY_KIND[change.kind].put(row);
     if (change.kind === 'order' && lines.length > 0) await db.lines.bulkPut(lines as unknown as SaleLine[]);
     await enqueueInTx([
@@ -1440,10 +1461,17 @@ export async function restoreLocalSnapshot(change: RemoteChange): Promise<{ sess
 }
 
 /** 撤销「被对方复活」时，把本地重新删掉（其它类型用；订单走 `voidOrder`，见 useSync） */
-export async function dropLocalRecord(kind: Kind, recordId: string): Promise<void> {
+export async function dropLocalRecord(kind: Kind, recordId: string, dataGeneration?: number, currentFingerprint?: string): Promise<void> {
   const table = TABLE_BY_KIND[kind];
   await db.transaction('rw', [table, db.outbox, db.syncMeta], async () => {
     await assertWritable();
+    if (dataGeneration !== undefined) await assertWriteGeneration(dataGeneration);
+    if (currentFingerprint !== undefined) {
+      const current = await table.get(recordId);
+      if (recordFingerprint(kind, current ?? null) !== currentFingerprint) {
+        throw new Error('本机记录在撤销前已修改，请重新核对');
+      }
+    }
     await table.delete(recordId);
     await enqueueInTx([{ kind, recordId, op: 'delete' }]);
   });
@@ -1786,16 +1814,18 @@ async function saveConflicts(rows: SyncConflictRow[]): Promise<void> {
   await db.transaction('rw', db.conflicts, async () => {
     const keys = rows.map((r) => [r.kind, r.recordId] as [string, string]);
     const existing = await db.conflicts.where('[kind+recordId]').anyOf(keys).toArray();
+    const queued = await db.outbox.bulkGet(rows.map((row) => `${row.kind}:${row.recordId}`));
     const idOf = new Map<string, number>();
     for (const row of existing) {
       if (typeof row.id === 'number') idOf.set(`${row.kind}:${row.recordId}`, row.id);
     }
 
     const byKey = new Map<string, SyncConflictRow>();
-    for (const row of rows) {
+    for (const [index, row] of rows.entries()) {
       const key = `${row.kind}:${row.recordId}`;
       const id = idOf.get(key);
-      byKey.set(key, id === undefined ? row : { ...row, id });
+      byKey.set(key, id === undefined ? { ...row, localRevision: queued[index]?.revision ?? null }
+        : { ...row, id, localRevision: queued[index]?.revision ?? null });
     }
     await db.conflicts.bulkPut([...byKey.values()]);
   });
@@ -1899,6 +1929,9 @@ async function applyRemoteBatch(
       }
       const original = new Map(current);
       const planned = planRemoteChanges(knownRows, current, knownIds);
+      const control = await readSyncControl();
+      for (const change of remoteChangeList(planned.impact)) change.dataGeneration = control.dataGeneration;
+      for (const conflict of planned.conflicts) conflict.dataGeneration = control.dataGeneration;
       const changedOrders = new Set<string>();
       for (const [id, value] of planned.puts.get('order') ?? []) {
         if (canonicalJson(original.get(`order:${id}`)) !== canonicalJson(value)) changedOrders.add(id);
@@ -2629,9 +2662,27 @@ export async function adoptRemoteConflict(id: number): Promise<void> {
   const parsed = parseRemoteRecord(kind, remote);
   if (!parsed) throw new Error('云端快照没通过校验，没有采用');
 
-  await db.transaction('rw', [TABLE_BY_KIND[kind], db.conflicts, db.syncMeta], async () => {
+  await db.transaction('rw', [TABLE_BY_KIND[kind], db.lines, db.outbox, db.conflicts, db.syncMeta], async () => {
     await assertWritable();
+    await assertWriteGeneration(row.dataGeneration ?? 0);
     if (canonicalJson(await db.conflicts.get(id)) !== canonicalJson(row)) throw new Error('冲突快照已变化，请重新核对');
+    const local = safeParse(row.local) as Record<string, unknown> | null;
+    const current = await TABLE_BY_KIND[kind].get(row.recordId);
+    const comparableLocal = kind === 'setting' ? local : local ? { ...local, id: row.recordId } : local;
+    if (canonicalJson(current ?? null) !== canonicalJson(comparableLocal ?? null)) {
+      throw new Error('本机记录在冲突后已修改，请重新核对');
+    }
+    if (kind === 'order' && local && typeof local === 'object' && Array.isArray(local.lineIds)) {
+      const currentLines = await db.lines.where('orderId').equals(row.recordId).toArray();
+      if (!compareLineSetAndTotal(current as SalesOrder | undefined, currentLines,
+        local.lineIds as string[], typeof local.totalFen === 'number' ? local.totalFen : undefined)) {
+        throw new Error('本机订单明细在冲突后已修改，请重新核对');
+      }
+    }
+    const queued = await db.outbox.get(`${kind}:${row.recordId}`);
+    if ((queued?.revision ?? null) !== (row.localRevision ?? null)) {
+      throw new Error('本机记录在冲突后已有新修改，请重新核对');
+    }
     if (kind === 'setting') {
       const value = parsed.value;
       if (typeof value !== 'string') throw new Error('云端设置值不合法，没有采用');

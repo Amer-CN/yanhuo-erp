@@ -1,17 +1,19 @@
 // B05：真实 fake-indexeddb；恢复与撤销合并都不能访问远端。
-import Dexie, { type Transaction } from 'dexie';
+import Dexie, { type Transaction, type WhereClause } from 'dexie';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { AppDB, db } from '../src/db/db';
 import { clearLocalSafely, completeRecoveryCleanup, RECOVERY_PENDING_KEY, restoreLocalBackup } from '../src/db/dataRecovery';
 import { backupDb, createSnapshot, restoreSnapshot } from '../src/db/backup';
 import { importMerge, parseBackup, replaceAll, type BackupFile } from '../src/db/merge';
 import { UNKNOWN_KINDS_KEY } from '../src/db/outbox';
+import { updateRecord, createAdjustment, updateProduct, voidOrder, restoreOrder, deleteRecord, type RecordInput } from '../src/db/repo';
 import {
   SyncCoordinator, SyncLeaseLostError, SyncMaintenanceError,
-  __setSyncControlForTest, readSyncControl, runSyncExclusive
+  __setSyncControlForTest, captureWriteGeneration, pauseSync, readSyncControl, runMaintenance, runSyncExclusive
 } from '../src/db/syncControl';
 import type { SyncControlRow, SyncLease } from '../src/db/syncTypes';
-import { EMPTY_DATA } from '../src/db/types';
+import { EMPTY_DATA, type SaleLine } from '../src/db/types';
+import { seedIfEmpty } from '../src/db/seed';
 import { DEVICE, T0, makeAdjustment, makeBatch, makeLine, makeOrder, makeProduct, makeSession, resetDb } from './helpers';
 
 const CLEANUP_KEYS = [
@@ -93,6 +95,161 @@ afterEach(async () => {
   __setSyncControlForTest(undefined);
 });
 
+describe('recovery/write-generation race', () => {
+  it('allows a fenced local write to commit across an ordinary sync pause', async () => {
+    await db.products.put(makeProduct('paused-product'));
+    const generation = await captureWriteGeneration();
+    await pauseSync('user');
+
+    await updateProduct('paused-product', { priceList: 2500 }, generation);
+
+    expect((await db.products.get('paused-product'))?.priceList).toBe(2500);
+    expect(await db.outbox.get('product:paused-product')).toMatchObject({ op: 'upsert' });
+    expect(await readSyncControl()).toMatchObject({ paused: true, maintenance: false });
+  });
+
+  it('rejects stale product and order commands when recovery removed their targets', async () => {
+    await db.products.put(makeProduct('stale-product'));
+    await db.orders.put(makeOrder('stale-order', 100));
+    const generation = await captureWriteGeneration();
+    await restoreLocalBackup(file());
+
+    await expect(updateProduct('stale-product', { priceList: 200 }, generation))
+      .rejects.toMatchObject({ code: 'SYNC_GENERATION_MISMATCH' });
+    await expect(voidOrder('stale-order', generation))
+      .rejects.toMatchObject({ code: 'SYNC_GENERATION_MISMATCH' });
+    await expect(restoreOrder('stale-order', generation))
+      .rejects.toMatchObject({ code: 'SYNC_GENERATION_MISMATCH' });
+    await expect(deleteRecord('stale-order', generation))
+      .rejects.toMatchObject({ code: 'SYNC_GENERATION_MISMATCH' });
+  });
+
+  it('continues accepting new offline writes after recovery leaves sync persistently paused', async () => {
+    await restoreLocalBackup(file());
+    const adjustment = await createAdjustment({ productId: 'restored-product', qtyBase: 2, type: 'correction' }, DEVICE);
+    expect(await readSyncControl()).toMatchObject({ paused: true, maintenance: false });
+    expect(await db.adjustments.get(adjustment.id)).toMatchObject({ qtyBase: 2 });
+    expect(await db.outbox.get(`adjustment:${adjustment.id}`)).toMatchObject({ op: 'upsert' });
+  });
+
+  it('serializes recovery behind an already fenced business write and snapshots the committed write', async () => {
+    const entered = gate();
+    const release = gate();
+    const originalTransaction = db.transaction.bind(db);
+    let held = false;
+    vi.spyOn(db, 'transaction').mockImplementation(((...args: unknown[]) => {
+      const [mode, tables, scope] = args;
+      if (!held && mode === 'rw' && Array.isArray(tables) && tables.includes(db.adjustments)) {
+        held = true;
+        return Reflect.apply(originalTransaction, db, [mode, tables, async () => {
+          entered.resolve();
+          await Dexie.waitFor(release.promise);
+          return (scope as () => Promise<unknown>)();
+        }]);
+      }
+      return Reflect.apply(originalTransaction, db, args);
+    }) as typeof db.transaction);
+
+    const writing = createAdjustment({ productId: 'committed-before-recovery', qtyBase: 3, type: 'correction' }, DEVICE);
+    void writing.catch(() => {});
+    try {
+      await entered.promise;
+      const restoring = restoreLocalBackup(file());
+      void restoring.catch(() => {});
+      release.resolve();
+      const adjustment = await writing;
+      const result = await restoring;
+      expect(result.snapshot.file.data.adjustments).toContainEqual(adjustment);
+      expect(await db.adjustments.count()).toBe(0);
+    } finally {
+      release.resolve();
+    }
+  });
+
+  it('checks generation inside the commit transaction even when recovery starts after the preflight check', async () => {
+    const entered = gate();
+    const release = gate();
+    const originalTransaction = db.transaction.bind(db);
+    let held = false;
+    vi.spyOn(db, 'transaction').mockImplementation(((...args: unknown[]) => {
+      const [mode, tables] = args;
+      if (!held && mode === 'rw' && Array.isArray(tables) && tables.length === 3 && tables.includes(db.adjustments)) {
+        held = true;
+        entered.resolve();
+        return release.promise.then(() => Reflect.apply(originalTransaction, db, args));
+      }
+      return Reflect.apply(originalTransaction, db, args);
+    }) as typeof db.transaction);
+    const writing = createAdjustment({ productId: 'old-product', qtyBase: 2, type: 'correction' }, DEVICE);
+    void writing.catch(() => {});
+    try {
+      await entered.promise;
+      await restoreLocalBackup(file());
+      release.resolve();
+      await expect(writing).rejects.toMatchObject({ code: 'SYNC_GENERATION_MISMATCH' });
+    } finally { release.resolve(); }
+    expect(await db.adjustments.count()).toBe(0);
+    expect(await db.outbox.count()).toBe(0);
+  });
+
+  it('rejects an order edit that read the old ledger before recovery and reaches commit afterwards', async () => {
+    const session = makeSession('session-stale');
+    const order = makeOrder('order-stale', 100, session.id);
+    await db.sessions.put(session);
+    await db.orders.put(order);
+    await db.lines.put(makeLine('line-stale', order.id, 'product-stale', 1, 100));
+
+    const readComplete = gate();
+    const releaseUpdate = gate();
+    let paused = false;
+    const originalWhere = db.lines.where.bind(db.lines) as (index: string) => WhereClause<SaleLine, string>;
+    vi.spyOn(db.lines, 'where').mockImplementation(((index: string) => {
+      const query = originalWhere(index);
+      if (index !== 'orderId') return query;
+      const originalEquals = query.equals.bind(query);
+      vi.spyOn(query, 'equals').mockImplementation((value) => {
+        const collection = originalEquals(value);
+        const originalToArray = collection.toArray.bind(collection);
+        vi.spyOn(collection, 'toArray').mockImplementation(() => Dexie.Promise.resolve(originalToArray()).then(async (rows) => {
+          if (!paused) {
+            paused = true;
+            readComplete.resolve();
+            await releaseUpdate.promise;
+          }
+          return rows;
+        }));
+        return collection;
+      });
+      return query;
+    }) as typeof db.lines.where);
+
+    const input: RecordInput = {
+      deviceId: DEVICE,
+      operator: '我',
+      payMethod: 'cash',
+      lines: [{
+        productId: 'product-stale', qtyBase: 2, unit: 'base', qty: 2,
+        listUnitPriceFen: 100, unitPriceFen: 100, amountFen: 200
+      }]
+    };
+    const update = updateRecord(order.id, input);
+    void update.catch(() => {});
+    try {
+      await readComplete.promise;
+      await restoreLocalBackup(file());
+      releaseUpdate.resolve();
+      await expect(update).rejects.toMatchObject({ code: 'SYNC_GENERATION_MISMATCH' });
+    } finally {
+      releaseUpdate.resolve();
+    }
+
+    expect(await db.orders.get(order.id)).toBeUndefined();
+    expect(await db.lines.where('orderId').equals(order.id).count()).toBe(0);
+    expect(await db.outbox.count()).toBe(0);
+  });
+});
+
+
 describe('local recovery boundary', () => {
   it('replaceAll clears the stale outbox, pending lines, conflicts and remote undo with business replacement', async () => {
     await seedOldState();
@@ -144,6 +301,12 @@ describe('local recovery boundary', () => {
     await expect(replaceAll(file({ products: [makeProduct('new-product')] }))).rejects.toThrow('snapshot quota failed');
     expect(await localState()).toEqual(before);
     expect(await readSyncControl()).toMatchObject({ generation: 1, paused: true, maintenance: false });
+  });
+
+  it('blocks startup seed writes while recovery maintenance is active', async () => {
+    await expect(runMaintenance('seed-test', () => seedIfEmpty())).rejects.toBeInstanceOf(SyncMaintenanceError);
+    expect(await db.products.count()).toBe(0);
+    expect(await db.outbox.count()).toBe(0);
   });
 
   it('creates the safety snapshot during maintenance and blocks a business writer on another connection', async () => {
@@ -268,6 +431,13 @@ describe('local recovery boundary', () => {
     expect(await readSyncControl()).toMatchObject({ generation: result.generation, paused: true, reason: 'clear-local' });
   });
 
+  it('clears the local merge undo pointer when clearing business data', async () => {
+    await seedOldState();
+    await db.settings.put({ key: 'mergeUndoSnapshotId', value: '42' });
+    await clearLocalSafely();
+    expect(await db.settings.get('mergeUndoSnapshotId')).toBeUndefined();
+  });
+
   it('restores parsed v1 backups without sessions and snapshot restore reuses the same boundary', async () => {
     const legacy = parseBackup(JSON.stringify({ app: 'yanhuo-erp', version: 1,
       data: { products: [makeProduct('legacy')], orders: [makeOrder('legacy-order', 50)] } }));
@@ -311,7 +481,7 @@ describe('importMerge outbox atomicity', () => {
     }));
     expect((await db.outbox.toArray()).map((row) => row.id).sort()).toEqual([
       'product:update', 'product:new-product', 'batch:new-batch', 'order:new-order', 'line:new-line',
-      'adjustment:new-adjustment', 'session:new-session', 'setting:changed'
+      'adjustment:new-adjustment', 'session:new-session', 'setting:changed', 'setting:lastImportAt'
     ].sort());
     expect(result.sessionsUpdated).toBe(0);
     expect(result.settingsImported).toBe(1);

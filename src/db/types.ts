@@ -167,6 +167,8 @@ export const SETTING_KEYS = {
   expiryWarnDays: 'expiryWarnDays',
   lastExportAt: 'lastExportAt',
   lastImportAt: 'lastImportAt',
+  /** 本机最近一次合并前快照 id；不参与云同步。 */
+  mergeUndoSnapshotId: 'mergeUndoSnapshotId',
   sampleNoticeDismissed: 'sampleNoticeDismissed',
   seeded: 'seeded',
   /** 历史订单已聚合出场次 */

@@ -6,6 +6,7 @@ import { enqueueInTx, syncWanted } from './outbox';
 import type { Category, Product } from './types';
 import { SETTING_KEYS } from './types';
 import { nowIso } from './util';
+import { assertWritable } from './syncControl';
 
 interface SeedProduct {
   name: string;
@@ -52,8 +53,10 @@ export async function seedIfEmpty(): Promise<boolean> {
   }));
 
   let planted = false;
-  // 事务内再检查一次：StrictMode 会把 effect 跑两遍，避免重复种入
+  await assertWritable();
+  // 事务内再检查一次：StrictMode 会把 effect 跑两遍，避免重复种入；维护窗口不得写入。
   await db.transaction('rw', [db.products, db.settings, db.outbox, db.syncMeta], async () => {
+    await assertWritable();
     const seeded = await db.settings.get(SETTING_KEYS.seeded);
     if (seeded?.value === 'yes') return;
     const count = await db.products.count();

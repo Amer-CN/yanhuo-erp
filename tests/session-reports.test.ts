@@ -55,11 +55,36 @@ describe('sessionReports 批量汇总', () => {
   const fifo = fifoAllocate(batches, orders, lines);
   const ids = sessions.map((s) => s.id);
 
-  it('每个场次的每个字段都与逐场实现一致', () => {
-    const batch = sessionReports(ids, orders, lines, fifo);
+  it('每个场次的每个字段都与逐场实现一致，旧明细缺少 discountFen 时按 0', () => {
+    const legacyLines = lines.map((line) => {
+      if (line.id !== 'l2') return line;
+      const legacyLine = { ...line } as Partial<SaleLine>;
+      delete legacyLine.discountFen;
+      return legacyLine as SaleLine;
+    });
+    const batch = sessionReports(ids, orders, legacyLines, fifo);
     for (const id of ids) {
-      expect(batch.get(id)).toEqual(sessionReport(id, orders, lines, fifo));
+      expect(batch.get(id)).toEqual(sessionReport(id, orders, legacyLines, fifo));
     }
+    expect(Number.isFinite(batch.get('s1')?.discountFen)).toBe(true);
+    expect(batch.get('s1')?.discountFen).toBe(0);
+  });
+
+  it('混合旧字段、赠品、作废和缺批次时每个场次仍与逐场实现逐字段一致', () => {
+    const legacyLines = lines.map((line) => {
+      const legacyLine = { ...line } as Partial<SaleLine>;
+      if (line.id === 'l1' || line.id === 'l2') delete legacyLine.discountFen;
+      if (line.id === 'l4') legacyLine.discountFen = 999;
+      return legacyLine as SaleLine;
+    });
+    const batch = sessionReports(ids, orders, legacyLines, fifo);
+    for (const id of ids) {
+      const report = batch.get(id)!;
+      expect(report).toEqual(sessionReport(id, orders, legacyLines, fifo));
+      expect(Object.values(report).every(Number.isFinite)).toBe(true);
+    }
+    expect(batch.get('s1')?.discountFen).toBe(0);
+    expect(batch.get('s2')?.discountFen).toBe(0);
   });
 
   it('只返回传入的场次，且重复 id 不重复计数', () => {

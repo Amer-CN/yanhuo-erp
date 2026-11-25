@@ -1,21 +1,22 @@
-"""两台设备自动云同步端到端验证（v2 场次记账，不需要真的 Supabase）。
+"""两台设备自动云同步端到端验证（v2 场次记账；默认使用本地假 Supabase）。
 
 用法（先 pnpm dev）：
     python scripts/e2e-sync.py
 
 断言面使用「更多 → 销售记录」：它按本机收到的全部订单聚合，不受场次归属设备限制。
 
-⚠️ 本脚本是**全仓唯一不设 `yh-sync-disabled=1` 的脚本**：它就是要真的发同步请求。
-- 默认（不设 SYNC_*）跑本地 v2 协议假 Supabase（scripts/mock-supabase.mjs），不会碰真实账本；
-- 真实模式（设 SYNC_URL / SYNC_KEY / SYNC_LEDGER 并显式 SYNC_TEST_ONLY=1）必须使用**测试专用账本**：
-  `cleanup_cloud()` 会把整个账本 PATCH 成 `deleted=true`，那是对账本的破坏性操作。
-  若 SYNC_LEDGER 等于内置生产账本码（src/db/syncDefaults.ts），脚本会直接退出。
+此脚本是全仓唯一不设 `yh-sync-disabled=1` 的脚本，因为它要验证真实同步：
+- 默认（不设 SYNC_*）运行本地 v2 协议假 Supabase，不访问云端；
+- 真实模式必须显式配置 SYNC_URL / SYNC_KEY / SYNC_LEDGER 和 SYNC_TEST_ONLY=1。
+  配置账本只作为测试 namespace，每次运行派生独立 ledger，收尾使用 operationId 清空 RPC；
+  内置账本仍由启动护栏拒绝。
 """
 
 import json
 import os
 import subprocess
 import sys
+import tempfile
 import time
 
 sys.stdout.reconfigure(encoding="utf-8", errors="replace", line_buffering=True)
@@ -23,6 +24,7 @@ sys.stdout.reconfigure(encoding="utf-8", errors="replace", line_buffering=True)
 from playwright.sync_api import sync_playwright
 
 from e2e_sync_guard import UnsafeSyncConfiguration, validate_sync_run_config
+from e2e_sync_cleanup import clear_run, load_or_create_run, remove_run_if_matches, run_file_lock, run_with_cleanup
 from e2e_util import wait_for_save_receipt
 
 ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
@@ -50,7 +52,8 @@ except UnsafeSyncConfiguration as exc:
 USE_MOCK = RUN_CONFIG.use_mock
 REAL_URL = RUN_CONFIG.url
 REAL_KEY = RUN_CONFIG.key
-REAL_LEDGER = RUN_CONFIG.ledger
+RUN_FILE = os.environ.get("SYNC_TEST_RUN_FILE") or os.path.join(tempfile.gettempdir(), "yanhuo-e2e-sync-run.json")
+REAL_RUN = None
 
 errors: list[str] = []
 
@@ -58,7 +61,9 @@ errors: list[str] = []
 def config():
     if USE_MOCK:
         return (f"http://127.0.0.1:{PORT}", "test-anon-key", "test-ledger-2026")
-    return (REAL_URL, REAL_KEY, REAL_LEDGER)
+    if REAL_RUN is None:
+        raise RuntimeError("真实 E2E 运行身份尚未初始化")
+    return (REAL_URL, REAL_KEY, REAL_RUN["ledger"])
 
 
 def init_script():
@@ -68,36 +73,14 @@ def init_script():
 
 
 def cleanup_cloud():
-    """清理真实测试账本。
-
-    v2 策略撤销了 anon 的 DELETE，这里只能做软删除（deleted=true）。
-    行会保留在表里；要物理清需要 service_role 在控制台操作。
-    """
+    """清理当前运行专属的真实测试账本；失败时保留运行文件供同号续办。"""
     if USE_MOCK:
         return
-    import json
-    import time
-    import urllib.parse
-    import urllib.request
-
-    target = f"{REAL_URL}/rest/v1/yh_records?ledger=eq." + urllib.parse.quote(REAL_LEDGER)
-    body = json.dumps({"deleted": True, "updated_at": int(time.time() * 1000)}).encode()
-    req = urllib.request.Request(
-        target,
-        data=body,
-        method="PATCH",
-        headers={
-            "apikey": REAL_KEY,
-            "x-ledger-key": REAL_LEDGER,
-            "Prefer": "return=minimal",
-            "Content-Type": "application/json",
-        },
-    )
-    try:
-        with urllib.request.urlopen(req, timeout=20) as r:
-            print("[cleanup] 云端测试账本已软删除", r.status)
-    except Exception as e:  # noqa: BLE001
-        print("[cleanup] 清理失败：", e)
+    if REAL_RUN is None:
+        raise RuntimeError("真实 E2E 运行身份尚未初始化")
+    payload = clear_run(RUN_FILE, REAL_RUN, REAL_URL, REAL_KEY)
+    print("[cleanup] 当前 E2E 运行账本已确认清空：", payload["operationId"])
+    remove_run_if_matches(RUN_FILE, REAL_RUN)
 
 
 def new_page(browser, tag):
@@ -187,6 +170,14 @@ def wait_history(page, want: str, timeout: int = 35) -> bool:
 
 
 def main() -> int:
+    if USE_MOCK:
+        return main_unlocked()
+    with run_file_lock(RUN_FILE):
+        return main_unlocked()
+
+
+def main_unlocked() -> int:
+    global REAL_RUN
     # 配置已在模块入口 fail closed，启动浏览器/假后端之前完成验证。
     mock = None
     if USE_MOCK:
@@ -203,9 +194,26 @@ def main() -> int:
             print("mock server failed:", mock.stdout.read() if mock.stdout else "")
             return 1
     else:
+        if os.path.exists(RUN_FILE):
+            previous = load_or_create_run(RUN_FILE, RUN_CONFIG.ledger, REAL_URL)
+            print("[sync] 先确认上一轮测试账本清理：", previous["ledger"])
+            clear_run(RUN_FILE, previous, REAL_URL, REAL_KEY)
+            remove_run_if_matches(RUN_FILE, previous)
+        REAL_RUN = load_or_create_run(RUN_FILE, RUN_CONFIG.ledger, REAL_URL)
         print("[sync] 使用真实 Supabase：", REAL_URL)
+        print("[sync] 本轮测试账本：", REAL_RUN["ledger"])
+        print("[sync] 运行记录文件：", RUN_FILE)
 
-    try:
+    def stop_mock():
+        if mock is None:
+            return
+        mock.terminate()
+        try:
+            mock.wait(timeout=5)
+        except subprocess.TimeoutExpired:
+            mock.kill()
+
+    def browser_test():
         with sync_playwright() as p:
             browser = p.chromium.launch()
             ctx_a, a = new_page(browser, "A")
@@ -250,14 +258,11 @@ def main() -> int:
             ctx_a.close()
             ctx_b.close()
             browser.close()
-    finally:
-        cleanup_cloud()
-        if mock is not None:
-            mock.terminate()
-            try:
-                mock.wait(timeout=5)
-            except subprocess.TimeoutExpired:
-                mock.kill()
+
+    def cleanup_all():
+        run_with_cleanup(cleanup_cloud, stop_mock)
+
+    run_with_cleanup(browser_test, cleanup_all)
 
     if errors:
         print("\n!! 问题：")

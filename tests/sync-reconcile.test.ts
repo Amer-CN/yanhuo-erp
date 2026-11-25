@@ -262,6 +262,40 @@ describe('confirmed reconnect atomic baseline upload', () => {
     expect(store.get('yh-sync-disabled')).toBe('1');
   });
 
+  it('rejects adopting a stale conflict after a newer local edit', async () => {
+    await putLocal();
+    const conflict = await db.conflicts.add({ at: T0, kind: 'product', recordId: 'p1',
+      local: JSON.stringify(makeProduct('p1')), remote: JSON.stringify(makeProduct('p1', { priceList: 500 })) });
+    await editLocal(300);
+
+    await expect(adoptRemoteConflict(conflict)).rejects.toThrow(/本机|修改|变化|新/);
+
+    expect((await db.products.get('p1'))?.priceList).toBe(300);
+    expect(await db.outbox.get('product:p1')).toBeTruthy();
+    expect(await db.conflicts.get(conflict)).toBeTruthy();
+  });
+
+  it('rejects dropping a record after a newer same-generation local edit', async () => {
+    await putLocal();
+    const current = makeProduct('p1');
+    await db.products.update('p1', { priceList: 300, updatedAt: new Date(NOW + 100).toISOString() });
+    await expect(dropLocalRecord('product', 'p1', undefined, canonicalJson(current)))
+      .rejects.toThrow(/修改|变化|新/);
+    expect((await db.products.get('p1'))?.priceList).toBe(300);
+  });
+
+  it('rejects conflict adoption when content matches but the outbox revision is newer', async () => {
+    await putLocal();
+    const local = await db.products.get('p1');
+    const conflict = await db.conflicts.add({ at: T0, kind: 'product', recordId: 'p1',
+      local: JSON.stringify(local), remote: JSON.stringify(makeProduct('p1', { priceList: 500 })),
+      localRevision: null });
+    await db.transaction('rw', [db.outbox, db.syncMeta], () => enqueueInTx([{ kind: 'product', recordId: 'p1' }]));
+    await expect(adoptRemoteConflict(conflict)).rejects.toThrow(/新修改|修改|变化/);
+    expect((await db.products.get('p1'))?.priceList).toBe(100);
+    expect(await db.conflicts.get(conflict)).toBeTruthy();
+  });
+
   it('snapshot undo, conflict adoption, and record dropping reject writes during maintenance', async () => {
     await putLocal();
     const conflict = await db.conflicts.add({ at: T0, kind: 'product', recordId: 'p1',

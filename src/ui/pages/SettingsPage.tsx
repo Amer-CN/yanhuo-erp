@@ -3,18 +3,24 @@ import { useLiveQuery } from 'dexie-react-hooks';
 import { Download, Upload, Smartphone, Trash2, TriangleAlert, RotateCcw, Save, Moon, Sun } from 'lucide-react';
 import { db } from '../../db/db';
 import { loadAll, setSetting } from '../../db/repo';
-import { clearLocalSafely, restoreLocalBackup } from '../../db/dataRecovery';
+import { clearLocalSafely } from '../../db/dataRecovery';
 import { pendingClear, type SyncClearOperationRow } from '../../db/syncProtocol';
 import {
   exportBackup,
   importMerge,
   parseBackup,
+  planOrderMerge,
+  localDataFingerprint,
   type BackupFile,
-  type MergeResult
+  type MergeResult,
+  type OrderMergeChange
 } from '../../db/merge';
 import {
+  abandonSnapshot,
   createSnapshot,
   listSnapshots,
+  markSnapshotCommitted,
+  pruneSnapshots,
   restoreSnapshot,
   type SnapshotReason,
   type SnapshotRow
@@ -35,6 +41,7 @@ import type { Theme } from '../AppShell';
 import { fenToStr } from '../../db/util';
 import { Btn, Card, ConfirmSheet, Field, Sheet, type Done } from '../kit';
 import { useAppUpdate } from '../useAppUpdate';
+import { chooseOrder, initialOrderChoices, type OrderChoices } from '../mergePreview';
 
 interface SettingsOperation {
   busy: boolean;
@@ -54,6 +61,9 @@ interface PendingMerge {
   };
   productDiffs: string[];
   settingsDiffs: string[];
+  orderChanges: OrderMergeChange[];
+  orderChoices: OrderChoices;
+  localFingerprint: string;
 }
 
 /** 商品的可见变化（新增 / 调价 / 改名），顺序与备份里的商品顺序一致 */
@@ -101,6 +111,7 @@ function diffSettings(current: Setting[], incoming: Setting[]): string[] {
 
 const SNAPSHOT_REASON: Record<SnapshotReason, string> = {
   'pre-recovery': '恢复前安全备份',
+  'pre-merge': '合并前安全备份',
   close: '收摊自动',
   manual: '手动',
   'pre-migrate': '迁移前'
@@ -681,7 +692,7 @@ function DangerSection({
 }) {
   const [backupFirst, setBackupFirst] = useState(true);
   const [result, setResult] = useState<MergeResult | null>(null);
-  const [preMerge, setPreMerge] = useState<string | null>(null);
+  const [preMerge, setPreMerge] = useState<number | null>(null);
   const [undoConfirm, setUndoConfirm] = useState(false);
   const [clearStep, setClearStep] = useState<0 | 1 | 2 | 3>(0);
   const [pendingCfg, setPendingCfg] = useState<SyncConfig | null>(null);
@@ -703,6 +714,13 @@ function DangerSection({
     return () => window.removeEventListener('yh-sync-config', refresh);
   }, [refreshClear]);
 
+  useEffect(() => {
+    void db.settings.get(SETTING_KEYS.mergeUndoSnapshotId).then((row) => {
+      const id = Number(row?.value);
+      if (Number.isSafeInteger(id) && id > 0) setPreMerge(id);
+    });
+  }, []);
+
   // 每次导入新备份时重置「合并前先备份」勾选（与原来 pickFile 里的重置一致）
   useEffect(() => {
     if (pending) setBackupFirst(true);
@@ -712,23 +730,45 @@ function DangerSection({
     if (!pending) return;
     const incoming = pending.backup;
     await operation.run(async () => {
+      let snapshot: SnapshotRow | undefined;
+      let committed = false;
       try {
-        // 撤销快照始终保留在内存，勾选仅决定是否另外导出文件。
+        // 破坏性合并始终先落一份独立备份库快照；勾选只决定是否额外导出文件。
         const pre = await exportBackup(deviceId);
-        const snapshot = JSON.stringify(pre);
+        snapshot = await createSnapshot('pre-merge', pre, false);
         if (backupFirst) {
           const preName = `烟花账-合并前备份-${new Date().toISOString().slice(0, 10)}.json`;
-          const file = new File([snapshot], preName, { type: 'application/json' });
+          const file = new File([JSON.stringify(pre)], preName, { type: 'application/json' });
           await shareOrDownload(file, pre, '合并前本机备份');
         }
-        const r = await importMerge(incoming);
-        setPreMerge(snapshot);
+        const r = await importMerge(incoming, {
+          orderChoices: pending.orderChoices,
+          undoSnapshotId: snapshot.id,
+          expectedLocalFingerprint: pending.localFingerprint
+        });
+        committed = true;
+        if (snapshot.id !== undefined && snapshot.reservationToken) {
+          setPreMerge(snapshot.id);
+          try {
+            await markSnapshotCommitted(snapshot.id, snapshot.reservationToken);
+          } catch (error) {
+            console.warn('[merge] 合并已提交，但快照状态更新失败；撤销指针仍保留该快照', error);
+          }
+        }
         setPending(null);
         setResult(r);
-        // importMerge 已把实际变更与发件箱同事务提交。
-        await setSetting(SETTING_KEYS.lastImportAt, new Date().toISOString());
+        try {
+          await pruneSnapshots();
+        } catch (error) {
+          console.warn('[merge] 合并已提交，但旧快照清理失败', error);
+        }
         onDone('合并完成，请核对下面的数字');
       } catch (e) {
+        if (snapshot?.id !== undefined && snapshot.reservationToken && !committed) {
+          await abandonSnapshot(snapshot.id, snapshot.reservationToken).catch((error) => {
+            console.warn('[merge] 合并失败，快照预留清理失败；将在过期后回收', error);
+          });
+        }
         onDone('合并失败：' + (e instanceof Error ? e.message : String(e)), 'error');
       }
     });
@@ -736,10 +776,10 @@ function DangerSection({
 
   const undoMerge = async () => {
     if (!preMerge) return;
-    const snapshot = preMerge;
+    const snapshotId = preMerge;
     await operation.run(async () => {
       try {
-        await restoreLocalBackup(JSON.parse(snapshot) as BackupFile, 'undo-merge');
+        await restoreSnapshot(snapshotId);
         setUndoConfirm(false);
         setPreMerge(null);
         setResult(null);
@@ -836,6 +876,16 @@ function DangerSection({
             </span>
           </Btn>
         </div>
+        {preMerge ? (
+          <div className="stack-sm" style={{ marginTop: 12 }}>
+            <p className="muted-text" style={{ margin: 0 }}>
+              上次合并前快照仍保留。撤销只恢复本机，云端不会回滚。
+            </p>
+            <Btn block variant="tertiary" disabled={busy} onClick={() => { if (!operation.isBusy()) setUndoConfirm(true); }}>
+              <span className="icon-text"><RotateCcw size={16} aria-hidden="true" /> 撤销上次合并</span>
+            </Btn>
+          </div>
+        ) : null}
         {clearOperation ? (
           <div className="stack-sm" role="status" style={{ marginTop: 12 }}>
             <p className="muted-text" style={{ margin: 0 }}>
@@ -908,6 +958,56 @@ function DangerSection({
                 </ul>
               </div>
             ) : null}
+            {pending.orderChanges.some((change) => change.action === 'conflict') ? (
+              <div>
+                <div className="tiny-text" style={{ fontWeight: 'var(--yh-weight-semibold)' }}>
+                  同编号订单分歧
+                </div>
+                <div className="merge-order-choices">
+                  {pending.orderChanges.filter((change) => change.action === 'conflict').map((change) => (
+                    <div className="merge-order-choice" key={change.orderId}>
+                      <div className="merge-order-choice__summary">
+                        <strong>{change.label}</strong>
+                        <span>
+                          本机 {change.localTotalFen === undefined ? '无此单' : `¥${fenToStr(change.localTotalFen)}`}
+                          {' · '}
+                          备份 ¥{fenToStr(change.incomingTotalFen ?? 0)}
+                        </span>
+                        <span>{change.reason}</span>
+                      </div>
+                      {change.canChooseIncoming ? (
+                        <div className="row" style={{ gap: 8 }}>
+                          <Btn
+                            block={false}
+                            size="sm"
+                            variant={pending.orderChoices[change.orderId] === 'local' ? 'secondary' : 'tertiary'}
+                            disabled={busy}
+                            onClick={() => setPending({
+                              ...pending,
+                              orderChoices: chooseOrder(pending.orderChoices, change.orderId, 'local')
+                            })}
+                          >
+                            保留本机
+                          </Btn>
+                          <Btn
+                            block={false}
+                            size="sm"
+                            variant={pending.orderChoices[change.orderId] === 'incoming' ? 'secondary' : 'tertiary'}
+                            disabled={busy}
+                            onClick={() => setPending({
+                              ...pending,
+                              orderChoices: chooseOrder(pending.orderChoices, change.orderId, 'incoming')
+                            })}
+                          >
+                            采用备份
+                          </Btn>
+                        </div>
+                      ) : <span className="tiny-text">缺少完整明细清单，只能保留本机</span>}
+                    </div>
+                  ))}
+                </div>
+              </div>
+            ) : null}
             <label className="check-row">
               <input
                 type="checkbox"
@@ -916,11 +1016,11 @@ function DangerSection({
                 disabled={busy}
                 onChange={(e) => setBackupFirst(e.target.checked)}
               />
-              合并前先导出本机备份（推荐）
+              合并前额外导出本机备份（推荐）
             </label>
             <div className="glass-status">
               <TriangleAlert size={20} aria-hidden="true" />
-              <p>合并只增不减，同一条记录不会重复。设置里的操作人按设备保留。</p>
+              <p>商品按更新时间合并；订单按完整明细组处理。同编号订单内容不同时默认保留本机，点“采用备份”会整单覆盖并把变更同步到云端。系统总会先保存本机合并前快照；其他流水只增不改，操作人按设备保留。</p>
             </div>
           </div>
         </Sheet>
@@ -950,9 +1050,11 @@ function DangerSection({
             <div className="merge-counts">
               <span>商品 +{result.productsAdded} / 改 {result.productsUpdated}</span>
               <span>进货 +{result.batchesAdded}</span>
-              <span>销售 +{result.ordersAdded} 单</span>
-              <span>明细 +{result.linesAdded}</span>
+              <span>销售 +{result.ordersAdded} / 更新 {result.ordersUpdated} / 保留 {result.ordersKept} / 冲突 {result.ordersConflicted}</span>
+              <span>明细 +{result.linesAdded} / 改 {result.linesUpdated} / 删除 {result.linesRemoved}</span>
               <span>调整 +{result.adjustmentsAdded}</span>
+              {result.summariesUpdated > 0 ? <span>场次汇总重算 {result.summariesUpdated}</span> : null}
+              {result.pendingLinesRemoved > 0 ? <span>清理待决明细 {result.pendingLinesRemoved}</span> : null}
             </div>
             <p className="tiny-text" style={{ margin: 0 }}>
               同一条记录只算一次。建议现在去「报表」对一下当日销售额。
@@ -1050,6 +1152,13 @@ export default function SettingsPage({
         const current = await loadAll();
         const productDiffs = diffProducts(current.products, backup.data.products);
         const settingsDiffs = diffSettings(current.settings, backup.data.settings);
+        const validProductIds = new Set([
+          ...current.products.map((product) => product.id),
+          ...backup.data.products.map((product) => product.id)
+        ]);
+        const orderPlan = planOrderMerge(
+          current.orders, current.lines, backup.data.orders, backup.data.lines, { validProductIds }
+        );
 
         setPending({
           backup,
@@ -1062,7 +1171,10 @@ export default function SettingsPage({
             settings: backup.data.settings.length
           },
           productDiffs: productDiffs.slice(0, 8),
-          settingsDiffs
+          settingsDiffs,
+          orderChanges: orderPlan.changes,
+          orderChoices: initialOrderChoices(orderPlan.changes),
+          localFingerprint: localDataFingerprint(current)
         });
       } catch (e) {
         onDone('导入失败：' + (e instanceof Error ? e.message : String(e)), 'error');
