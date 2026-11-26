@@ -1,6 +1,7 @@
 import type { AlbumCard } from '../../db/album';
 import { fenToStr } from '../../db/util';
 import CategoryArt from './CategoryArt';
+import { albumCardGapText, albumCardLabel } from './cardText';
 
 /** 卡册网格里的单张商品卡：整卡是一个按钮，触控目标 ≥ 44px */
 export default function AlbumCardTile({
@@ -26,7 +27,7 @@ export default function AlbumCardTile({
     <button
       type="button"
       className={cls}
-      aria-label={`${card.name}，${card.rarity} 卡，本赛季毛利 ¥${fenToStr(card.grossFen)}`}
+      aria-label={albumCardLabel(card)}
       onClick={() => onOpen(card.productId)}
     >
       <span className="album-card__frame">
@@ -38,6 +39,7 @@ export default function AlbumCardTile({
       </span>
       <span className="album-card__name">{card.name}</span>
       <span className="album-card__gross">¥{fenToStr(card.grossFen)}</span>
+      <span className="album-card__next">{albumCardGapText(card)}</span>
       {card.stopped ? <span className="album-card__stopped">已停售</span> : null}
     </button>
   );

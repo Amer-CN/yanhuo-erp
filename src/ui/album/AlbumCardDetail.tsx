@@ -7,7 +7,7 @@ import {
 } from 'react';
 import { animate, motion, useMotionValue, useReducedMotion, useSpring } from 'motion/react';
 import type { AlbumCard } from '../../db/album';
-import { fenToStr } from '../../db/util';
+import { fenToStr, isoToLocalDate, isoToTime } from '../../db/util';
 import { Btn, Sheet } from '../kit';
 import CategoryArt from './CategoryArt';
 import { useDeviceTilt } from './useDeviceTilt';
@@ -34,9 +34,12 @@ const faceClass = (card: AlbumCard) =>
 
 export default function AlbumCardDetail({
   card,
+  updatedAt,
   onClose
 }: {
   card: AlbumCard;
+  /** 本赛季数据最近更新时间；没有计入明细时为 null */
+  updatedAt?: string | null;
   onClose: () => void;
 }) {
   const reduce = useReducedMotion();
@@ -187,6 +190,11 @@ export default function AlbumCardDetail({
             ? '已经是最高品质 UR。'
             : `距离下一档还差 ¥${fenToStr(card.nextFen - card.grossFen)}。`}
         </p>
+        {updatedAt ? (
+          <p className="tiny-text" style={{ margin: 0 }}>
+            数据更新于 {isoToLocalDate(updatedAt).slice(5)} {isoToTime(updatedAt)}
+          </p>
+        ) : null}
       </div>
     </Sheet>
   );

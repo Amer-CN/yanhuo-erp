@@ -225,7 +225,13 @@ export default function AlbumPage({
         </div>
       ) : null}
 
-      {selected ? <AlbumCardDetail card={selected} onClose={() => setOpenId(null)} /> : null}
+      {selected ? (
+        <AlbumCardDetail
+          card={selected}
+          updatedAt={album?.lastUpdatedAt ?? null}
+          onClose={() => setOpenId(null)}
+        />
+      ) : null}
     </div>
   );
 }

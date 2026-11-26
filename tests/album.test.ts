@@ -318,3 +318,27 @@ describe('稳定性与撤销作废', () => {
     expect([...(first?.byProductFen ?? [])]).toEqual([...(second?.byProductFen ?? [])]);
   });
 });
+
+describe('数据更新时间', () => {
+  it('记录本赛季最近一次明细/订单更新时间', () => {
+    const batches = [batch('b1', 'p1', 5, 100, '2026-12-01')];
+    const orders = [
+      { ...order('o1', isoAt(2026, 12, 26)), updatedAt: isoAt(2026, 12, 26) },
+      { ...order('o2', isoAt(2026, 12, 27)), updatedAt: isoAt(2026, 12, 28) }
+    ];
+    const lines = [line('l1', 'o1', 'p1', 1, 1000), line('l2', 'o2', 'p1', 1, 2000)];
+    expect(ledgerOf(batches, orders, lines).get(2026)?.lastUpdatedAt).toBe(isoAt(2026, 12, 28));
+  });
+
+  it('没有计入明细时没有更新时间', () => {
+    expect(ledgerOf([], [], []).size).toBe(0);
+  });
+
+  it('卡册视图透传更新时间', () => {
+    const ledger = new Map([
+      [2026, { grossFen: 0, byProductFen: new Map(), countedLines: 0, skippedLines: 0, lastUpdatedAt: isoAt(2027, 1, 2) }]
+    ]);
+    const album = computeSeasonAlbum({ season: seasonRange(2026), products: [product('p1')], ledger });
+    expect(album.lastUpdatedAt).toBe(isoAt(2027, 1, 2));
+  });
+});

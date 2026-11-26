@@ -99,6 +99,8 @@ export interface SeasonLedgerEntry {
   countedLines: number;
   /** 因成本待补跳过的明细数 */
   skippedLines: number;
+  /** 计入明细里最近一次业务更新时间（ISO）；没有计入明细时为 null */
+  lastUpdatedAt?: string | null;
 }
 
 /**
@@ -119,11 +121,13 @@ export function buildSeasonLedger(args: {
   for (const s of sessions) sessionById.set(s.id, s);
 
   const orderSeasonYear = new Map<string, number | null>();
+  const orderUpdatedAt = new Map<string, string>();
   for (const o of orders) {
     if (o.voided) continue;
     const s = o.sessionId ? sessionById.get(o.sessionId) : undefined;
     const date = isoToLocalDate(s?.startedAt ?? o.createdAt);
     orderSeasonYear.set(o.id, seasonForDate(date)?.startYear ?? null);
+    orderUpdatedAt.set(o.id, o.updatedAt ?? o.createdAt);
   }
 
   const ledger = new Map<number, SeasonLedgerEntry>();
@@ -134,7 +138,8 @@ export function buildSeasonLedger(args: {
       grossFen: 0,
       byProductFen: new Map(),
       countedLines: 0,
-      skippedLines: 0
+      skippedLines: 0,
+      lastUpdatedAt: null
     };
     ledger.set(year, fresh);
     return fresh;
@@ -156,6 +161,12 @@ export function buildSeasonLedger(args: {
     entry.grossFen += gross;
     entry.byProductFen.set(line.productId, (entry.byProductFen.get(line.productId) ?? 0) + gross);
     entry.countedLines += 1;
+
+    // ISO 字符串字典序即时间序；取明细或所属订单里较新的那一个
+    const at = line.updatedAt ?? orderUpdatedAt.get(line.orderId) ?? null;
+    if (at && (entry.lastUpdatedAt === null || at > (entry.lastUpdatedAt ?? ''))) {
+      entry.lastUpdatedAt = at;
+    }
   }
 
   return ledger;
@@ -181,6 +192,8 @@ export interface AlbumSeasonResult {
   cards: AlbumCard[];
   countedLines: number;
   skippedLines: number;
+  /** 本赛季数据最近更新时间（ISO）；没有计入明细时为 null */
+  lastUpdatedAt: string | null;
 }
 
 /** 单个赛季的卡册视图：每张商品卡都出卡，没有销售也显示 R */
@@ -216,7 +229,8 @@ export function computeSeasonAlbum(args: {
     level: albumLevelInfo(grossFen),
     cards,
     countedLines: entry?.countedLines ?? 0,
-    skippedLines: entry?.skippedLines ?? 0
+    skippedLines: entry?.skippedLines ?? 0,
+    lastUpdatedAt: entry?.lastUpdatedAt ?? null
   };
 }
 

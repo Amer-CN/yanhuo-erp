@@ -2185,3 +2185,12 @@ select {
     transition-duration: 0.01ms;
   }
 }
+
+.album-card__next {
+  font-size: var(--yh-text-2xs);
+  color: var(--yh-ink-4);
+  font-variant-numeric: tabular-nums;
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
