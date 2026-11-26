@@ -198,7 +198,7 @@ def main() -> int:
 
         # 合并结果卡：A 的那 1 单只加了一次（订单不重复）
         try:
-            expect(b.get_by_text("销售 +1 单", exact=False)).to_be_visible(timeout=10000)
+            expect(b.get_by_text(re.compile(r"^销售 \+1(?: /|$)"))).to_be_visible(timeout=10000)
         except AssertionError:
             errors.append("合并结果里订单数不是 +1，A 端订单可能重复或丢失")
 
@@ -230,7 +230,7 @@ def main() -> int:
         merge_btn.wait_for(timeout=15000)
         drain_toast(b)
         merge_btn.click()
-        expect(b.get_by_text("销售 +0 单", exact=False)).to_be_visible(timeout=10000)
+        expect(b.get_by_text(re.compile(r"^销售 \+0(?: /|$)"))).to_be_visible(timeout=10000)
         result_note.wait_for(timeout=10000)
         b.get_by_role("button", name="完成", exact=True).click()
         expect(result_note).to_have_count(0, timeout=10000)
