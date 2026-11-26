@@ -373,3 +373,37 @@ describe('卡册展示赛季', () => {
     expect(pickAlbumSeason('2027-01-10', ledger).status).toBe('active');
   });
 });
+
+describe('卡面徽章与卡号', () => {
+  it('按毛利排名，只有正毛利参与', () => {
+    const ledger = new Map([
+      [2026, { grossFen: 900, byProductFen: new Map([['p1', 500], ['p2', 300], ['p3', 100], ['p4', -50]]), countedLines: 4, skippedLines: 0 }]
+    ]);
+    const album = computeSeasonAlbum({
+      season: seasonRange(2026),
+      products: [product('p1'), product('p2'), product('p3'), product('p4')],
+      ledger
+    });
+    const rank = Object.fromEntries(album.cards.map((c) => [c.productId, c.rank ?? null]));
+    expect(rank.p1).toBe(1);
+    expect(rank.p2).toBe(2);
+    expect(rank.p3).toBe(3);
+    expect(rank.p4).toBeNull();
+  });
+
+  it('赛季内新建的商品标为新品', () => {
+    const inside = { ...product('p1'), createdAt: isoAt(2027, 1, 5) };
+    const outside = { ...product('p2'), createdAt: isoAt(2026, 6, 1) };
+    const album = computeSeasonAlbum({ season: seasonRange(2026), products: [inside, outside], ledger: new Map() });
+    const byId = Object.fromEntries(album.cards.map((c) => [c.productId, c.isNew]));
+    expect(byId.p1).toBe(true);
+    expect(byId.p2).toBe(false);
+  });
+
+  it('每张卡有稳定的三位卡号，同一商品两次计算一致', () => {
+    const a = computeSeasonAlbum({ season: seasonRange(2026), products: [product('p1')], ledger: new Map() });
+    const b = computeSeasonAlbum({ season: seasonRange(2026), products: [product('p1')], ledger: new Map() });
+    expect(a.cards[0].no).toMatch(/^#\d{3}$/);
+    expect(a.cards[0].no).toBe(b.cards[0].no);
+  });
+});

@@ -10,6 +10,9 @@ const card = (patch: Partial<AlbumCard>): AlbumCard => ({
   grossFen: 0,
   rarity: 'R',
   nextFen: 5000,
+  no: '#001',
+  rank: null,
+  isNew: false,
   ...patch
 });
 

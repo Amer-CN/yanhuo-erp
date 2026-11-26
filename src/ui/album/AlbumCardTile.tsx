@@ -35,10 +35,18 @@ export default function AlbumCardTile({
           <FireworkArt name={card.name} category={card.category} className="album-card__svg" />
         </span>
         <span className="album-card__rarity">{card.rarity}</span>
+        {card.rank !== null && card.rank <= 3 ? (
+          <span className="album-card__rank">本季 No.{card.rank}</span>
+        ) : card.isNew ? (
+          <span className="album-card__rank">新品</span>
+        ) : null}
         <span className="album-card__sheen" aria-hidden="true" />
       </span>
       <span className="album-card__name">{card.name}</span>
-      <span className="album-card__gross">¥{fenToStr(card.grossFen)}</span>
+      <span className="album-card__foot">
+        <span className="album-card__gross">¥{fenToStr(card.grossFen)}</span>
+        <span className="album-card__no">{card.no}</span>
+      </span>
       <span className="album-card__next">{albumCardGapText(card)}</span>
       {card.stopped ? <span className="album-card__stopped">已停售</span> : null}
     </button>

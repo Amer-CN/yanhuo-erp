@@ -183,6 +183,19 @@ export interface AlbumCard {
   rarity: Rarity;
   /** 下一档品质门槛（分）；UR 为 null */
   nextFen: number | null;
+  /** 稳定卡号，如 #042 */
+  no: string;
+  /** 本赛季毛利排名（只算正毛利）；没有毛利为 null */
+  rank: number | null;
+  /** 本赛季内新建的商品 */
+  isNew: boolean;
+}
+
+/** 由商品 id 推出稳定卡号：同一商品永远同一号，不随增删商品漂移 */
+function cardNo(id: string): string {
+  let h = 0;
+  for (let i = 0; i < id.length; i++) h = (h * 31 + id.charCodeAt(i)) % 997;
+  return `#${String(h + 1).padStart(3, '0')}`;
 }
 
 export interface AlbumSeasonResult {
@@ -208,6 +221,7 @@ export function computeSeasonAlbum(args: {
 
   const cards: AlbumCard[] = products.map((p) => {
     const gross = entry?.byProductFen.get(p.id) ?? 0;
+    const created = isoToLocalDate(p.createdAt);
     return {
       productId: p.id,
       name: p.name,
@@ -215,9 +229,20 @@ export function computeSeasonAlbum(args: {
       stopped: p.archived,
       grossFen: gross,
       rarity: rarityForGross(gross),
-      nextFen: nextRarityThresholdFen(gross)
+      nextFen: nextRarityThresholdFen(gross),
+      no: cardNo(p.id),
+      rank: null,
+      isNew: created >= season.startDate && created <= season.endDate
     };
   });
+
+  // 排名只算正毛利，同额度按名字定序，保证两台手机算出来一样
+  const ranked = cards
+    .filter((c) => c.grossFen > 0)
+    .sort((a, b) => b.grossFen - a.grossFen || a.name.localeCompare(b.name, 'zh'));
+  const rankById = new Map(ranked.map((c, i) => [c.productId, i + 1]));
+  for (const c of cards) c.rank = rankById.get(c.productId) ?? null;
+
   cards.sort((a, b) => {
     if (a.stopped !== b.stopped) return a.stopped ? 1 : -1;
     if (a.grossFen !== b.grossFen) return b.grossFen - a.grossFen;

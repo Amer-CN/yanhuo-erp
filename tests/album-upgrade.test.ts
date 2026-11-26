@@ -9,7 +9,10 @@ const card = (productId: string, rarity: Rarity): AlbumCard => ({
   stopped: false,
   grossFen: 0,
   rarity,
-  nextFen: null
+  nextFen: null,
+  no: '#001',
+  rank: null,
+  isNew: false
 });
 
 describe('升级检测', () => {

@@ -2214,3 +2214,30 @@ select {
   white-space: nowrap;
   text-overflow: ellipsis;
 }
+
+.album-card__rank {
+  position: absolute;
+  top: 4px;
+  left: 4px;
+  padding: 1px 5px;
+  border-radius: var(--yh-radius-pill);
+  background: color-mix(in srgb, var(--yh-accent) 22%, transparent);
+  color: var(--yh-ink-price);
+  font-size: var(--yh-text-2xs);
+  font-weight: var(--yh-weight-semibold);
+  line-height: 1.2;
+}
+
+.album-card__foot {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: var(--yh-space-1);
+}
+
+.album-card__no {
+  font-family: var(--yh-font-mono);
+  font-size: var(--yh-text-2xs);
+  color: var(--yh-ink-4);
+  font-variant-numeric: tabular-nums;
+}
