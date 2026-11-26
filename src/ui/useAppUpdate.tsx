@@ -154,14 +154,29 @@ export function AppUpdateProvider({ children }: { children: ReactNode }) {
         return;
       }
 
-      // 插件负责发 SKIP_WAITING，并在 controllerchange 后重载页面。
-      // 这里故意不结算：万一没接管，上面的 giveUp 会兜底提示并解锁按钮。
+      // 插件负责发 SKIP_WAITING；它自己依赖 workbox 的 controlling 事件重载，
+      // 实测在「先 update 再激活」的路径上不一定触发。所以发完消息后等一小段：
+      // 插件重载了页面就已经卸载，这段代码根本不会执行；没重载才由我们兜底重载。
       await updateServiceWorker(true);
       awaitingReload = true;
+      // 插件的 reload 与我们的兜底不能同时发生：一旦页面开始卸载就不要再 reload 第二次
+      let unloading = false;
+      const markUnloading = () => {
+        unloading = true;
+      };
+      window.addEventListener('beforeunload', markUnloading);
+      await new Promise<void>((resolve) => {
+        window.setTimeout(resolve, 800);
+      });
+      window.removeEventListener('beforeunload', markUnloading);
+      if (!unloading) window.location.reload();
     } catch (cause) {
       if (!settled) {
         settled = true;
         window.clearTimeout(giveUp);
+        busy.current = false;
+        setChecking(false);
+        setUpdating(false);
         setError(`更新失败：${errorMessage(cause)}。当前版本可继续使用。`);
       }
     } finally {

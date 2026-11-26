@@ -178,7 +178,7 @@ def pending_later(browser, fixture, out):
         # This assertion is the old-version RED: later used to remove the only entry.
         expect(page.get_by_role("heading", name="应用更新", exact=True)).to_be_visible(timeout=4000)
         section = update_section(page)
-        expect(section).to_contain_text("有新版本待更新")
+        expect(section).to_contain_text("有新版本")
         expect(section).to_contain_text("当前构建：")
         expect(section.get_by_role("button", name="更新并重新打开", exact=True)).to_be_enabled()
         assert len(navigations) == before_later, "稍后/打开设置不应自动刷新"
@@ -253,17 +253,17 @@ def check_failure(browser, fixture, out):
         open_settings(page, fixture.url)
         sw_ready(page)
         section = update_section(page)
-        check = section.get_by_role("button", name="检查更新", exact=True)
+        check = section.get_by_role("button", name="检查并更新", exact=True)
         expect(check).to_be_enabled()
         with fixture.lock:
             fixture.fail_sw = True
             fixture.hold_sw = True
         check.click()
-        expect(section.get_by_role("button", name="检查中…", exact=True)).to_be_disabled()
+        expect(section.get_by_role("button", name="更新中…", exact=True)).to_be_disabled()
         fixture.release_sw.set()
-        expect(section.get_by_role("alert")).to_contain_text("检查更新失败", timeout=10000)
+        expect(section.get_by_role("alert")).to_contain_text("更新失败", timeout=10000)
         expect(section).not_to_contain_text("已是最新版本")
-        expect(section.get_by_role("button", name="检查更新", exact=True)).to_be_enabled()
+        expect(section.get_by_role("button", name="检查并更新", exact=True)).to_be_enabled()
         assert any(item.get("fail") for item in fixture.requests), fixture.requests
         assert not errors, errors
         page.screenshot(path=str(out / "check-failure.png"))
@@ -272,7 +272,7 @@ def check_failure(browser, fixture, out):
             fixture.fail_sw = False
             fixture.hold_sw = False
         check.click()
-        expect(section).to_contain_text("检查完成", timeout=10000)
+        expect(section).to_contain_text("已是最新版本", timeout=10000)
         expect(section.get_by_role("alert")).to_have_count(0)
         return {"scenario": "checking/failure/retry", "result": "PASS", "requests": list(fixture.requests)}
     finally:
@@ -292,7 +292,7 @@ def no_service_worker(browser, fixture, out):
         expect(page.get_by_role("heading", name="应用更新", exact=True)).to_be_visible()
         expect(section).to_contain_text("当前环境不支持应用更新")
         expect(section).to_contain_text("当前构建：")
-        expect(section.get_by_role("button", name="检查更新", exact=True)).to_be_disabled()
+        expect(section.get_by_role("button", name="检查并更新", exact=True)).to_be_disabled()
         assert not errors, errors
         assert not fixture.requests, fixture.requests
         page.screenshot(path=str(out / "no-service-worker.png"))
