@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { Sparkles } from 'lucide-react';
 import {
   buildSeasonLedger,
@@ -11,8 +11,10 @@ import type { FifoResult } from '../../db/calc';
 import { currentSeason, nextSeasonAfter } from '../../db/season';
 import { CATEGORIES, type Category, type Product, type SaleLine, type SalesOrder, type Session } from '../../db/types';
 import { fenToStr, localDate } from '../../db/util';
-import { Card, Empty, Sheet } from '../kit';
+import { Card, Empty } from '../kit';
+import AlbumCardDetail from '../album/AlbumCardDetail';
 import AlbumCardTile from '../album/AlbumCardTile';
+import { detectUpgradedIds } from '../album/upgrade';
 
 type CategoryFilter = 'all' | Category;
 type RarityFilter = 'all' | Rarity;
@@ -68,6 +70,22 @@ export default function AlbumPage({
   }, [album, cat, rarity]);
 
   const selected = album?.cards.find((c) => c.productId === openId);
+
+  /*
+   * 升级只闪一次：品质是派生值，没有持久化，所以自己在组件里记住上一帧。
+   * 首次打开 prev 为空，detectUpgradedIds 返回空，不会补播历史升级。
+   */
+  const prevRarities = useRef<Map<string, Rarity>>(new Map());
+  const [flashId, setFlashId] = useState<string | null>(null);
+  useEffect(() => {
+    if (!album) return;
+    const upgraded = detectUpgradedIds(prevRarities.current, album.cards);
+    prevRarities.current = new Map(album.cards.map((c) => [c.productId, c.rarity]));
+    if (upgraded.length === 0) return;
+    setFlashId(upgraded[0]);
+    const timer = window.setTimeout(() => setFlashId(null), 1400);
+    return () => window.clearTimeout(timer);
+  }, [album]);
 
   return (
     <div className="page-stack">
@@ -157,7 +175,12 @@ export default function AlbumPage({
           ) : (
             <div className="album-grid">
               {cards.map((card) => (
-                <AlbumCardTile key={card.productId} card={card} onOpen={setOpenId} />
+                <AlbumCardTile
+                  key={card.productId}
+                  card={card}
+                  flash={flashId === card.productId}
+                  onOpen={setOpenId}
+                />
               ))}
             </div>
           )}
@@ -202,19 +225,7 @@ export default function AlbumPage({
         </div>
       ) : null}
 
-      {selected ? (
-        <Sheet
-          title={selected.name}
-          subtitle={`${selected.rarity} · 本赛季毛利 ¥${fenToStr(selected.grossFen)}`}
-          onClose={() => setOpenId(null)}
-        >
-          <p className="muted-text">
-            {selected.nextFen === null
-              ? '已经是最高品质 UR。'
-              : `距离下一档还差 ¥${fenToStr(selected.nextFen - selected.grossFen)}。`}
-          </p>
-        </Sheet>
-      ) : null}
+      {selected ? <AlbumCardDetail card={selected} onClose={() => setOpenId(null)} /> : null}
     </div>
   );
 }
