@@ -10,6 +10,7 @@ import type { AlbumCard } from '../../db/album';
 import { fenToStr, isoToLocalDate, isoToTime } from '../../db/util';
 import { Btn, Sheet } from '../kit';
 import CategoryArt from './CategoryArt';
+import { tiltAngles } from './orientation';
 import { useDeviceTilt } from './useDeviceTilt';
 
 /**
@@ -20,8 +21,6 @@ import { useDeviceTilt } from './useDeviceTilt';
 const DEG_PER_PX = 1.2;
 /** 位移小于这个值当成点击（翻面） */
 const CLICK_SLOP = 3;
-/** 体感跟随的最大角度 */
-const TILT_RANGE_DEG = 10;
 
 interface DragState {
   startX: number;
@@ -52,8 +51,9 @@ export default function AlbumCardDetail({
   const reduce = useReducedMotion();
   const rotate = useMotionValue(0);
   const tiltX = useSpring(0, { stiffness: 120, damping: 20 });
-  const tiltY = useSpring(0, { stiffness: 120, damping: 20 });
+  const tiltZ = useSpring(0, { stiffness: 120, damping: 20 });
   const [dragging, setDragging] = useState(false);
+  const [spinning, setSpinning] = useState(false);
   const [denied, setDenied] = useState(false);
   const drag = useRef<DragState | null>(null);
   /** 惯性/翻面动画：再次按下时必须先停，否则会和手指抢同一根 motion value */
@@ -63,13 +63,33 @@ export default function AlbumCardDetail({
 
   const onLean = useCallback(
     (lean: { x: number; y: number }) => {
-      tiltY.set(lean.x * TILT_RANGE_DEG);
-      tiltX.set(-lean.y * TILT_RANGE_DEG);
+      const angles = tiltAngles(lean);
+      tiltX.set(angles.x);
+      tiltZ.set(angles.z);
     },
-    [tiltX, tiltY]
+    [tiltX, tiltZ]
   );
 
-  const tilt = useDeviceTilt({ enabled: !dragging, onLean });
+  // 手指按住或惯性还在跑时，体感先让位并回正：避免两股力量抢同一张卡
+  const tiltEnabled = !dragging && !spinning;
+  const tilt = useDeviceTilt({ enabled: tiltEnabled, onLean });
+
+  useEffect(() => {
+    if (tiltEnabled) return;
+    tiltX.set(0);
+    tiltZ.set(0);
+  }, [tiltEnabled, tiltX, tiltZ]);
+
+  const trackSpin = useCallback((controls: ReturnType<typeof animate>) => {
+    spin.current = controls;
+    setSpinning(true);
+    const done = () => {
+      if (spin.current !== controls) return;
+      spin.current = null;
+      setSpinning(false);
+    };
+    controls.then(done, done);
+  }, []);
 
   const flip = useCallback(() => {
     const current = rotate.get();
@@ -81,8 +101,8 @@ export default function AlbumCardDetail({
       rotate.jump(target);
       return;
     }
-    spin.current = animate(rotate, target, { type: 'spring', stiffness: 240, damping: 30 });
-  }, [reduce, rotate]);
+    trackSpin(animate(rotate, target, { type: 'spring', stiffness: 240, damping: 30 }));
+  }, [reduce, rotate, trackSpin]);
 
   const onPointerDown = (e: ReactPointerEvent<HTMLDivElement>) => {
     // iOS 只允许在用户手势里申请体感权限：第一次摸卡就自动申请，不再单独放按钮
@@ -92,6 +112,7 @@ export default function AlbumCardDetail({
       });
     }
     spin.current?.stop();
+    setSpinning(false);
     e.currentTarget.setPointerCapture(e.pointerId);
     drag.current = {
       startX: e.clientX,
@@ -134,11 +155,13 @@ export default function AlbumCardDetail({
     }
     // 松手后接着转：按最后一段速度继续，自然减到停。
     // 不做「吸附到正反面」——那会让惯性刚起就被拉回近处，看起来根本没转。
-    spin.current = animate(rotate, rotate.get(), {
-      type: 'inertia',
-      velocity: d.velocity,
-      restDelta: 0.1
-    });
+    trackSpin(
+      animate(rotate, rotate.get(), {
+        type: 'inertia',
+        velocity: d.velocity,
+        restDelta: 0.1
+      })
+    );
   };
 
   return (
@@ -160,7 +183,7 @@ export default function AlbumCardDetail({
         ) : null}
 
         <div className="album-detail__stage">
-          <motion.div style={{ rotateX: tiltX, rotateY: tiltY, transformStyle: 'preserve-3d' }}>
+          <motion.div style={{ rotateX: tiltX, rotateZ: tiltZ, transformStyle: 'preserve-3d' }}>
             <motion.div
               className="album-detail__card"
               style={{ rotateY: rotate }}

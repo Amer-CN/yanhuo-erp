@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { normalizeDeg, tiltDelta } from '../src/ui/album/orientation';
+import { normalizeDeg, tiltAngles, tiltDelta } from '../src/ui/album/orientation';
 
 describe('角度归一', () => {
   it('把差值折回 (-180, 180]', () => {
@@ -35,5 +35,16 @@ describe('相对基准的倾斜差', () => {
   it('平放和竖直握持都能给出差值，不依赖绝对姿态', () => {
     expect(tiltDelta({ beta: 0, gamma: 0 }, { beta: 0, gamma: 10 }).x).toBeCloseTo(10, 5);
     expect(tiltDelta({ beta: 90, gamma: 0 }, { beta: 90, gamma: 10 }).x).toBeCloseTo(10, 5);
+  });
+});
+
+describe('体感映射到卡面角度', () => {
+  it('左右倾斜只做横滚，前后倾斜只做俯仰', () => {
+    expect(tiltAngles({ x: 1, y: 0 })).toEqual({ x: 0, z: 7 });
+    expect(tiltAngles({ x: 0, y: 1 })).toEqual({ x: -9, z: 0 });
+  });
+
+  it('中间值按比例收窄', () => {
+    expect(tiltAngles({ x: 0.5, y: -0.5 })).toEqual({ x: 4.5, z: 3.5 });
   });
 });

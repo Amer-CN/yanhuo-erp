@@ -30,3 +30,19 @@ export function tiltDelta(base: Orientation, current: Orientation): TiltDelta {
     y: normalizeDeg(current.beta - base.beta)
   };
 }
+
+/** 体感最大俯仰 / 横滚角度 */
+const PITCH_DEG = 9;
+const ROLL_DEG = 7;
+
+/**
+ * 归一化倾斜（-1..1）→ 卡面角度。
+ *
+ * 关键：**不要映射到 rotateY**。卡片的 360° 甩动用的就是 Y 轴，
+ * 体感再去转 Y 就变成两股力量抢同一根轴，看起来像在打架。
+ * 这里只给俯仰（X）和横滚（Z），旋转始终只由手指控制。
+ */
+export function tiltAngles(lean: { x: number; y: number }): { x: number; z: number } {
+  // `|| 0` 把 -0 归一成 0：-0 会让 UI 显示成 "-0deg"
+  return { x: -lean.y * PITCH_DEG || 0, z: lean.x * ROLL_DEG || 0 };
+}
