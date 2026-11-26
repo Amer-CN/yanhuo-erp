@@ -12,12 +12,15 @@ export default function FireworkArt({
   name,
   category,
   family = null,
+  compact = false,
   className = ''
 }: {
   name: string;
   category: Category;
   /** 商品手动指定的家族；空 = 按名字自动匹配 */
   family?: ArtFamily | null;
+  /** 网格缩略图用：省掉整层模糊，低端机滚动更稳 */
+  compact?: boolean;
   className?: string;
 }) {
   const rawId = useId();
@@ -36,8 +39,9 @@ export default function FireworkArt({
   const markup =
     defsMarkup(palette, uid) +
     `<rect width="320" height="448" fill="url(#${uid}-halo)"/>` +
-    // 先铺一层大模糊的暖光，再压上清晰线稿：玻璃里的余烬，而不是印刷海报
-    `<g filter="url(#${uid}-soft)" opacity="0.7">${body}</g>` +
+    // 先铺一层大模糊的暖光，再压上清晰线稿：玻璃里的余烬，而不是印刷海报。
+    // 网格缩略图（compact）省掉这层模糊，滚动时不必为每张卡做一次高斯模糊。
+    (compact ? '' : `<g filter="url(#${uid}-soft)" opacity="0.7">${body}</g>`) +
     body;
 
   return (

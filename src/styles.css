@@ -2294,3 +2294,9 @@ select {
   grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: var(--yh-space-3);
 }
+
+/* 网格卡滚动性能：屏幕外的卡先不渲染；缩略图也不跑整层模糊 */
+.album-card {
+  content-visibility: auto;
+  contain-intrinsic-size: 120px 210px;
+}

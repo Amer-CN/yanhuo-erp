@@ -36,6 +36,7 @@ export default function AlbumCardTile({
             name={card.name}
             category={card.category}
             family={card.artFamily}
+            compact
             className="album-card__svg"
           />
         </span>
