@@ -1,9 +1,10 @@
 import { useState } from 'react';
-import type { AlbumSeasonStatus, SeasonReportData } from '../../db/album';
+import { seasonReportText, type AlbumSeasonStatus, type SeasonReportData } from '../../db/album';
 import { fenToStr } from '../../db/util';
 import { Btn, Sheet, Stat } from '../kit';
+import { renderSeasonReportImage } from './reportImage';
 
-/** 赛季战报：一页能截图、也能复制成文字发微信 */
+/** 赛季战报：一页能截图、能导出图片，也能复制成文字发微信 */
 export default function SeasonReportSheet({
   report,
   status,
@@ -14,22 +15,15 @@ export default function SeasonReportSheet({
   onClose: () => void;
 }) {
   const [copied, setCopied] = useState<string | null>(null);
+  const [saving, setSaving] = useState(false);
+  const [saveMsg, setSaveMsg] = useState<string | null>(null);
 
   const delta =
     report.grossDeltaRatio === null
       ? null
       : `${report.grossDeltaRatio >= 0 ? '+' : ''}${Math.round(report.grossDeltaRatio * 100)}%`;
 
-  const text = [
-    `${report.season.label}（${report.season.startDate} → ${report.season.endDate}）`,
-    `毛利 ¥${fenToStr(report.grossFen)} · ${report.orderCount} 单 · 售出 ${report.qtyBase} 件`,
-    `平均每单 ¥${fenToStr(report.avgGrossFen)}`,
-    `品质 R ${report.rarityCounts.R} / SR ${report.rarityCounts.SR} / SSR ${report.rarityCounts.SSR} / UR ${report.rarityCounts.UR}`,
-    report.topProducts.length
-      ? `最赚：${report.topProducts.map((p) => `${p.name} ¥${fenToStr(p.grossFen)}`).join('、')}`
-      : '本赛季还没有正毛利商品',
-    delta ? `较上季 ${delta}` : '没有上一季可对比'
-  ].join('\n');
+  const text = seasonReportText(report);
 
   const copy = async () => {
     try {
@@ -37,6 +31,36 @@ export default function SeasonReportSheet({
       setCopied('已复制，可以直接发微信');
     } catch {
       setCopied('复制失败，可以截图代替');
+    }
+  };
+
+  const save = async () => {
+    if (saving) return;
+    setSaving(true);
+    setSaveMsg(null);
+    try {
+      const blob = await renderSeasonReportImage(report);
+      const file = new File([blob], `${report.season.label}-战报.png`, { type: 'image/png' });
+      if (navigator.canShare?.({ files: [file] })) {
+        try {
+          await navigator.share({ files: [file], title: `${report.season.label} 战报` });
+          setSaveMsg('已打开分享');
+          return;
+        } catch {
+          // 用户取消分享时继续走下载
+        }
+      }
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = file.name;
+      a.click();
+      window.setTimeout(() => URL.revokeObjectURL(url), 1000);
+      setSaveMsg('图片已保存到下载');
+    } catch (cause) {
+      setSaveMsg(cause instanceof Error ? cause.message : '导出失败');
+    } finally {
+      setSaving(false);
     }
   };
 
@@ -95,7 +119,12 @@ export default function SeasonReportSheet({
           </p>
         ) : null}
 
-        <Btn block onClick={() => void copy()}>
+        <Btn block onClick={() => void save()} disabled={saving}>
+          {saving ? '生成中…' : '保存战报图片'}
+        </Btn>
+        {saveMsg ? <p className="tiny-text" style={{ margin: 0 }}>{saveMsg}</p> : null}
+
+        <Btn block variant="secondary" onClick={() => void copy()}>
           {copied ?? '复制文字战报'}
         </Btn>
       </div>

@@ -8,7 +8,7 @@ import type { FifoResult } from './calc';
 import { currentSeason, nextSeasonAfter, seasonForDate, seasonRange, type SeasonRange } from './season';
 import type { ArtFamily } from './cardArt';
 import type { Category, Product, SaleLine, SalesOrder, Session } from './types';
-import { isoToLocalDate } from './util';
+import { fenToStr, isoToLocalDate } from './util';
 
 /** 品质从低到高；下标即高低比较 */
 export const RARITY_ORDER = ['R', 'SR', 'SSR', 'UR'] as const;
@@ -425,4 +425,22 @@ export function buildSeasonReport(args: {
     previous,
     grossDeltaRatio
   };
+}
+
+/** 战报的可复制文本：卡片和图片共用同一份口径 */
+export function seasonReportText(report: SeasonReportData): string {
+  const delta =
+    report.grossDeltaRatio === null
+      ? null
+      : `${report.grossDeltaRatio >= 0 ? '+' : ''}${Math.round(report.grossDeltaRatio * 100)}%`;
+  return [
+    `${report.season.label}（${report.season.startDate} → ${report.season.endDate}）`,
+    `毛利 ¥${fenToStr(report.grossFen)} · ${report.orderCount} 单 · 售出 ${report.qtyBase} 件`,
+    `平均每单 ¥${fenToStr(report.avgGrossFen)}`,
+    `品质 R ${report.rarityCounts.R} / SR ${report.rarityCounts.SR} / SSR ${report.rarityCounts.SSR} / UR ${report.rarityCounts.UR}`,
+    report.topProducts.length
+      ? `最赚：${report.topProducts.map((p) => `${p.name} ¥${fenToStr(p.grossFen)}`).join('、')}`
+      : '本赛季还没有正毛利商品',
+    delta ? `较上季 ${delta}` : '没有上一季可对比'
+  ].join('\n');
 }

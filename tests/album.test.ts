@@ -8,6 +8,7 @@ import {
   computeSeasonSummaries,
   albumProgress,
   buildSeasonReport,
+  seasonReportText,
   nextRarityThresholdFen,
   pickAlbumSeason,
   rarityForGross
@@ -478,5 +479,20 @@ describe('手动卡面', () => {
   it('没自选时保持为空，交给名字自动匹配', () => {
     const album = computeSeasonAlbum({ season: seasonRange(2026), products: [product('p1')], ledger: new Map() });
     expect(album.cards[0].artFamily).toBeNull();
+  });
+});
+
+describe('战报文字', () => {
+  it('包含赛季、明细与 Top 商品，可直接发微信', () => {
+    const ledger = new Map([
+      [2026, { grossFen: 76000, byProductFen: new Map([['p1', 50000], ['p2', 26000]]), countedLines: 2, skippedLines: 0, orderCount: 3, qtyBase: 12 }]
+    ]);
+    const report = buildSeasonReport({ season: seasonRange(2026), products: [product('p1'), product('p2')], ledger });
+    const text = seasonReportText(report);
+    expect(text).toContain('2026 赛季');
+    expect(text).toContain('毛利 ¥760.00');
+    expect(text).toContain('3 单');
+    expect(text).toContain('12 件');
+    expect(text).toContain('p1 ¥500.00');
   });
 });
