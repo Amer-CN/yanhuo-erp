@@ -642,16 +642,21 @@ function SnapshotSection({
 
 /** 更新入口独立于横幅；「稍后」后仍能在这里完成更新。 */
 function UpdateSection() {
-  const { needRefresh, checking, updating, checked, registration, unavailable, error, check, update } =
+  const { needRefresh, checking, updating, checked, registration, unavailable, error, update } =
     useAppUpdate();
-  const status = unavailable
-    ?? (needRefresh
-      ? '有新版本待更新。收摊后点下面的按钮，更新并重新打开应用。'
-      : registration
-        ? checked
-          ? '检查完成，暂未发现待更新版本。'
-          : '收摊后可检查更新；发现新版本后由你决定何时重新打开。'
-        : error ? '应用更新暂不可用。' : '正在准备应用更新…');
+  const status =
+    unavailable ??
+    (updating
+      ? '正在检查并更新，拿到新版本后会自动重新打开。'
+      : needRefresh
+        ? '有新版本，点下面的按钮完成更新并重新打开。'
+        : registration
+          ? checked
+            ? '已是最新版本。'
+            : '点一下即可检查并更新（会顺手绕开 sw.js 的十分钟缓存）。'
+          : error
+            ? '应用更新暂不可用。'
+            : '正在准备应用更新…');
 
   return (
     <section aria-labelledby="app-update-title">
@@ -666,10 +671,10 @@ function UpdateSection() {
           block
           variant={needRefresh ? 'primary' : 'secondary'}
           disabled={Boolean(unavailable) || !registration || checking || updating}
-          onClick={() => void (needRefresh ? update() : check())}
+          onClick={() => void update()}
           style={{ marginTop: 10 }}
         >
-          {updating ? '更新中…' : checking ? '检查中…' : needRefresh ? '更新并重新打开' : '检查更新'}
+          {updating ? '更新中…' : checking ? '检查中…' : needRefresh ? '更新并重新打开' : '检查并更新'}
         </Btn>
       </Card>
     </section>

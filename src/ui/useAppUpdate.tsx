@@ -2,6 +2,10 @@ import { createContext, useContext, useRef, useState, type ReactNode } from 'rea
 import { useRegisterSW } from 'virtual:pwa-register/react';
 
 const LATER_KEY = 'yh-update-later';
+/** 等新 worker 装好的上限：刚部署完 sw.js 可能要几秒 */
+const INSTALL_WAIT_MS = 8000;
+/** 点了更新后等页面接管的兜底：超时提示手动重开，不把按钮永远卡在「更新中」 */
+const RELOAD_WAIT_MS = 12000;
 
 interface AppUpdate {
   needRefresh: boolean;
@@ -13,7 +17,7 @@ interface AppUpdate {
   unavailable: string | null;
   error: string | null;
   dismiss: () => void;
-  check: () => Promise<void>;
+  /** 检查并更新：一次点击走完「查→装→接管→重载」 */
   update: () => Promise<void>;
 }
 
@@ -31,6 +35,47 @@ function errorMessage(error: unknown) {
   return error instanceof Error ? error.message : String(error);
 }
 
+/**
+ * 浏览器会用 HTTP 缓存拿 sw.js（GitHub Pages 上是 max-age=600）。
+ * 刚部署完就点检查，很容易拿到旧文件而判定「没有更新」，所以先用
+ * `cache: 'reload'` 把 sw.js 拉一份新的进缓存，再让 registration.update() 去比。
+ */
+async function refreshServiceWorkerScript(reg: ServiceWorkerRegistration) {
+  const url = reg.active?.scriptURL ?? new URL('sw.js', window.location.href).href;
+  try {
+    await fetch(url, { cache: 'reload' });
+  } catch {
+    // 离线时照常走 registration.update()，失败由它报错
+  }
+}
+
+/** 等 installing 变成 installed；已经过了安装阶段就直接看 waiting */
+function waitForInstalled(reg: ServiceWorkerRegistration): Promise<ServiceWorker | null> {
+  if (reg.waiting) return Promise.resolve(reg.waiting);
+  const installing = reg.installing;
+  if (!installing) return Promise.resolve(null);
+  return new Promise((resolve) => {
+    const timer = window.setTimeout(() => {
+      cleanup();
+      resolve(reg.waiting ?? null);
+    }, INSTALL_WAIT_MS);
+    const onChange = () => {
+      if (installing.state === 'installed') {
+        cleanup();
+        resolve(installing);
+      } else if (installing.state === 'redundant') {
+        cleanup();
+        resolve(null);
+      }
+    };
+    const cleanup = () => {
+      window.clearTimeout(timer);
+      installing.removeEventListener('statechange', onChange);
+    };
+    installing.addEventListener('statechange', onChange);
+  });
+}
+
 /** 根节点唯一注册；设置页离开/返回、横幅隐藏均保留这份更新状态。 */
 export function AppUpdateProvider({ children }: { children: ReactNode }) {
   const [registration, setRegistration] = useState<ServiceWorkerRegistration>();
@@ -45,7 +90,6 @@ export function AppUpdateProvider({ children }: { children: ReactNode }) {
     : !('serviceWorker' in navigator)
       ? '当前环境不支持应用更新，请在支持离线应用的浏览器中打开正式版本。'
       : null;
-  const initialController = useRef(unavailable ? null : navigator.serviceWorker.controller);
   const {
     needRefresh: [needRefresh],
     updateServiceWorker
@@ -67,60 +111,65 @@ export function AppUpdateProvider({ children }: { children: ReactNode }) {
     }
   };
 
-  const check = async () => {
-    if (busy.current || unavailable || !registration) return;
-    busy.current = true;
-    setChecking(true);
-    setError(null);
-    setChecked(false);
-    try {
-      await registration.update();
-      setChecked(true);
-    } catch (cause) {
-      setError(`检查更新失败：${errorMessage(cause)}。请确认联网后重试。`);
-    } finally {
-      busy.current = false;
-      setChecking(false);
-    }
-  };
-
   const update = async () => {
     if (busy.current || unavailable) return;
     busy.current = true;
+    setChecking(true);
     setUpdating(true);
     setError(null);
-    let cleanup = () => {};
-    try {
-      const waiting = registration?.waiting;
-      if (!waiting) throw new Error('待更新版本尚未就绪，请检查更新后再试');
-      // 消息发送成功不等于更新成功，等新 worker 接管后才结束等待。
-      await new Promise<void>((resolve, reject) => {
-        const changed = () => {
-          if (navigator.serviceWorker.controller !== waiting) return;
-          cleanup();
-          // 插件只为注册时已有 controller 的页面自动重载；首次安装后在同页
-          // 检查到更新时补这一条。两个分支都只在用户点击后触发。
-          if (!initialController.current) window.location.reload();
-          resolve();
-        };
-        const timeout = window.setTimeout(() => {
-          cleanup();
-          reject(new Error('新版本未能接管，请稍后重试'));
-        }, 15000);
-        cleanup = () => {
-          window.clearTimeout(timeout);
-          navigator.serviceWorker.removeEventListener('controllerchange', changed);
-        };
-        navigator.serviceWorker.addEventListener('controllerchange', changed);
-        // 唯一发送 SKIP_WAITING 的路径，只响应用户点击。
-        void updateServiceWorker(true).catch(reject);
-      });
-    } catch (cause) {
-      setError(`更新失败：${errorMessage(cause)}。当前版本可继续使用。`);
-    } finally {
-      cleanup();
+    setChecked(false);
+
+    // 兜底计时器：新 worker 没接管时别让按钮永远转圈
+    let settled = false;
+    /** 已经交给插件去激活新版本：等它重载，失败由 giveUp 兜底 */
+    let awaitingReload = false;
+    const giveUp = window.setTimeout(() => {
+      if (settled) return;
+      settled = true;
       busy.current = false;
+      setChecking(false);
       setUpdating(false);
+      setError('新版本已下载但还没接管页面：请完全关闭应用后重新打开。');
+    }, RELOAD_WAIT_MS);
+
+    try {
+      const reg =
+        registration ??
+        (await navigator.serviceWorker.getRegistration()) ??
+        undefined;
+      if (!reg) throw new Error('应用更新尚未就绪，请关闭后重新打开应用再试');
+
+      await refreshServiceWorkerScript(reg);
+      await reg.update();
+
+      const waiting = await waitForInstalled(reg);
+      if (!waiting) {
+        // 没有待装版本：这次就是最新，按钮回到可点状态
+        settled = true;
+        window.clearTimeout(giveUp);
+        busy.current = false;
+        setChecking(false);
+        setUpdating(false);
+        setChecked(true);
+        return;
+      }
+
+      // 插件负责发 SKIP_WAITING，并在 controllerchange 后重载页面。
+      // 这里故意不结算：万一没接管，上面的 giveUp 会兜底提示并解锁按钮。
+      await updateServiceWorker(true);
+      awaitingReload = true;
+    } catch (cause) {
+      if (!settled) {
+        settled = true;
+        window.clearTimeout(giveUp);
+        setError(`更新失败：${errorMessage(cause)}。当前版本可继续使用。`);
+      }
+    } finally {
+      if (!settled && !awaitingReload) {
+        busy.current = false;
+        setChecking(false);
+        setUpdating(false);
+      }
     }
   };
 
@@ -136,7 +185,6 @@ export function AppUpdateProvider({ children }: { children: ReactNode }) {
         unavailable,
         error,
         dismiss,
-        check,
         update
       }}
     >
