@@ -296,3 +296,25 @@ describe('往季归档', () => {
     expect(summaries[1].urCount).toBe(0);
   });
 });
+
+describe('稳定性与撤销作废', () => {
+  it('撤销作废后同一笔销售重新计入', () => {
+    const batches = [batch('b1', 'p1', 5, 100, '2026-12-01')];
+    const lines = [line('l1', 'o1', 'p1', 1, 1000)];
+    const voided = [order('o1', isoAt(2026, 12, 26), undefined, true)];
+    expect(ledgerOf(batches, voided, lines).size).toBe(0);
+
+    const active = [order('o1', isoAt(2026, 12, 26))];
+    expect(ledgerOf(batches, active, lines).get(2026)?.grossFen).toBe(900);
+  });
+
+  it('同一账本重复计算结果一致，不依赖设备', () => {
+    const batches = [batch('b1', 'p1', 5, 100, '2026-12-01')];
+    const orders = [order('o1', isoAt(2026, 12, 26)), order('o2', isoAt(2027, 1, 3))];
+    const lines = [line('l1', 'o1', 'p1', 1, 1000), line('l2', 'o2', 'p1', 1, 2000)];
+    const first = ledgerOf(batches, orders, lines).get(2026);
+    const second = ledgerOf(batches, orders, lines).get(2026);
+    expect(first?.grossFen).toBe(second?.grossFen);
+    expect([...(first?.byProductFen ?? [])]).toEqual([...(second?.byProductFen ?? [])]);
+  });
+});
