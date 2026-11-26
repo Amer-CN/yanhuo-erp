@@ -1,6 +1,7 @@
 // 数据读写：商品、进货、开单、调整、设置。全部走 Dexie。
 
 import { db } from './db';
+import type { ArtFamily } from './cardArt';
 import type {
   Adjustment,
   AdjustType,
@@ -141,6 +142,8 @@ export interface ProductInput {
   priceList: number;
   negotiable: boolean;
   sortOrder?: number;
+  /** 手动指定的卡面家族；null = 恢复自动匹配 */
+  artFamily?: ArtFamily | null;
 }
 
 export async function createProduct(input: ProductInput): Promise<Product> {
@@ -154,6 +157,7 @@ export async function createProduct(input: ProductInput): Promise<Product> {
     boxQty: Math.max(0, Math.floor(input.boxQty)),
     priceList: Math.max(0, Math.round(input.priceList)),
     negotiable: input.negotiable,
+    ...(input.artFamily ? { artFamily: input.artFamily } : {}),
     archived: false,
     sortOrder: input.sortOrder ?? Date.now(),
     createdAt: t,

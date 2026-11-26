@@ -14,6 +14,7 @@ import {
 import { X, Search, CheckCircle2, TriangleAlert } from 'lucide-react';
 import type { Category, Product } from '../db/types';
 import { CATEGORIES } from '../db/types';
+import { ART_FAMILIES, ART_FAMILY_LABELS, type ArtFamily } from '../db/cardArt';
 import { fenToStr, strToFen } from '../db/util';
 import type { ProductInput } from '../db/repo';
 
@@ -773,10 +774,12 @@ export function ProductFormModal({
   const [boxQty, setBoxQty] = useState(String(initial?.boxQty ?? 0));
   const [price, setPrice] = useState(initial ? fenToStr(initial.priceList) : '');
   const [negotiable, setNegotiable] = useState(initial?.negotiable ?? true);
+  const [artFamily, setArtFamily] = useState<ArtFamily | null>(initial?.artFamily ?? null);
   const [err, setErr] = useState('');
   const [saving, setSaving] = useState(false);
   // 分类是「一组按钮」而不是表单控件，不能用 Field 的 label for
   const catLabelId = useId();
+  const artLabelId = useId();
 
   const submit = async () => {
     if (saving) return;
@@ -803,7 +806,8 @@ export function ProductFormModal({
         unitBase: unitBase.trim() || '个',
         boxQty: bq,
         priceList: priceFen,
-        negotiable
+        negotiable,
+        artFamily
       });
     } catch (e) {
       // 失败就留在表单里显示原因：关掉框再说「没存上」用户会以为存过了
@@ -855,6 +859,33 @@ export function ProductFormModal({
                 onClick={() => setCategory(c)}
               >
                 {c}
+              </button>
+            ))}
+          </div>
+        </div>
+
+        <div role="group" aria-labelledby={artLabelId} className="glass-input-group">
+          <div className="glass-label" id={artLabelId}>
+            卡面（默认按名字自动匹配）
+          </div>
+          <div className="chip-row">
+            <button
+              type="button"
+              className={`glass-badge glass-badge--md glass-badge--interactive ${artFamily === null ? 'glass-badge--selected' : ''}`}
+              aria-pressed={artFamily === null}
+              onClick={() => setArtFamily(null)}
+            >
+              自动
+            </button>
+            {ART_FAMILIES.map((f) => (
+              <button
+                key={f}
+                type="button"
+                className={`glass-badge glass-badge--md glass-badge--interactive ${artFamily === f ? 'glass-badge--selected' : ''}`}
+                aria-pressed={artFamily === f}
+                onClick={() => setArtFamily(f)}
+              >
+                {ART_FAMILY_LABELS[f]}
               </button>
             ))}
           </div>

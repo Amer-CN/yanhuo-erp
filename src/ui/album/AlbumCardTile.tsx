@@ -32,7 +32,12 @@ export default function AlbumCardTile({
     >
       <span className="album-card__frame">
         <span className="album-card__art">
-          <FireworkArt name={card.name} category={card.category} className="album-card__svg" />
+          <FireworkArt
+            name={card.name}
+            category={card.category}
+            family={card.artFamily}
+            className="album-card__svg"
+          />
         </span>
         <span className="album-card__rarity">{card.rarity}</span>
         {card.rank !== null && card.rank <= 3 ? (

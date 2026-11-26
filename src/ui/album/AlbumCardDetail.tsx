@@ -143,7 +143,12 @@ export default function AlbumCardDetail({
               }}
             >
               <div className={faceClass(card)}>
-                <FireworkArt name={card.name} category={card.category} className="album-detail__art" />
+                <FireworkArt
+                  name={card.name}
+                  category={card.category}
+                  family={card.artFamily}
+                  className="album-detail__art"
+                />
                 <motion.span
                   className="album-detail__glare"
                   aria-hidden="true"

@@ -1,34 +1,38 @@
 import { useId } from 'react';
-import { matchCardArt } from '../../../db/cardArt';
+import { matchCardArt, type ArtFamily } from '../../../db/cardArt';
 import type { Category } from '../../../db/types';
 import CategoryArt from '../CategoryArt';
 import { defsMarkup, motifMarkup, paletteFor } from './motifs';
 
 /**
- * 按商品名自动选家族插画。
- * 匹配不到就退回原来的分类图，保证任何商品都有卡面。
+ * 按商品名自动选家族插画；商品手动指定了家族时优先用手动值。
+ * 两者都没有就退回原来的分类图，保证任何商品都有卡面。
  */
 export default function FireworkArt({
   name,
   category,
+  family = null,
   className = ''
 }: {
   name: string;
   category: Category;
+  /** 商品手动指定的家族；空 = 按名字自动匹配 */
+  family?: ArtFamily | null;
   className?: string;
 }) {
   const rawId = useId();
   const uid = `art${rawId.replace(/[^a-zA-Z0-9_-]/g, '')}`;
   const match = matchCardArt(name);
+  const resolved = family ?? match.family;
 
-  if (!match.family) {
+  if (!resolved) {
     // 没匹配到家族时退回分类线稿：它是个图标，不能按满版插画放大
     const iconClass = className ? `${className} ${className}--icon` : '';
     return <CategoryArt category={category} className={iconClass} />;
   }
 
   const palette = paletteFor(match.variant);
-  const body = motifMarkup(match.family, palette, uid);
+  const body = motifMarkup(resolved, palette, uid);
   const markup =
     defsMarkup(palette, uid) +
     `<rect width="320" height="448" fill="url(#${uid}-halo)"/>` +

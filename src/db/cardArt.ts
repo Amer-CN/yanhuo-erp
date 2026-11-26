@@ -18,6 +18,24 @@ export const ART_FAMILIES = [
 
 export type ArtFamily = (typeof ART_FAMILIES)[number];
 
+/** 中文名，给商品管理里的「换卡面」用 */
+export const ART_FAMILY_LABELS: Record<ArtFamily, string> = {
+  gatling: '加特林',
+  jellyfish: '水母',
+  windmill: '风车',
+  dragonfly: '蜻蜓',
+  peacock: '孔雀',
+  fountain: '喷泉',
+  sparkler: '仙女棒',
+  doubleBang: '二踢脚',
+  firecracker: '鞭炮',
+  sunflower: '向日葵'
+};
+
+export function isArtFamily(value: unknown): value is ArtFamily {
+  return typeof value === 'string' && (ART_FAMILIES as readonly string[]).includes(value);
+}
+
 export const ART_VARIANTS = ['normal', 'gold', 'silver', 'blue', 'rainbow', 'neon'] as const;
 export type ArtVariant = (typeof ART_VARIANTS)[number];
 

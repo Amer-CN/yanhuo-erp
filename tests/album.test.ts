@@ -467,3 +467,16 @@ describe('赛季战报', () => {
     expect(report.avgGrossFen).toBe(0);
   });
 });
+
+describe('手动卡面', () => {
+  it('商品自选的家族会带到卡册卡上', () => {
+    const p = { ...product('p1'), artFamily: 'windmill' as const };
+    const album = computeSeasonAlbum({ season: seasonRange(2026), products: [p], ledger: new Map() });
+    expect(album.cards[0].artFamily).toBe('windmill');
+  });
+
+  it('没自选时保持为空，交给名字自动匹配', () => {
+    const album = computeSeasonAlbum({ season: seasonRange(2026), products: [product('p1')], ledger: new Map() });
+    expect(album.cards[0].artFamily).toBeNull();
+  });
+});

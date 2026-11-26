@@ -6,6 +6,7 @@
 
 import type { FifoResult } from './calc';
 import { currentSeason, nextSeasonAfter, seasonForDate, seasonRange, type SeasonRange } from './season';
+import type { ArtFamily } from './cardArt';
 import type { Category, Product, SaleLine, SalesOrder, Session } from './types';
 import { isoToLocalDate } from './util';
 
@@ -204,6 +205,8 @@ export interface AlbumCard {
   rank: number | null;
   /** 本赛季内新建的商品 */
   isNew: boolean;
+  /** 手动指定的卡面家族；空 = 按名字自动匹配 */
+  artFamily?: ArtFamily | null;
 }
 
 /** 由商品 id 推出稳定卡号：同一商品永远同一号，不随增删商品漂移 */
@@ -247,6 +250,7 @@ export function computeSeasonAlbum(args: {
       nextFen: nextRarityThresholdFen(gross),
       no: cardNo(p.id),
       rank: null,
+      artFamily: p.artFamily ?? null,
       isNew: created >= season.startDate && created <= season.endDate
     };
   });
