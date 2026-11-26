@@ -207,6 +207,102 @@ const sunflower: Body = (p) => `
     return dot(160 + Math.cos(a - Math.PI / 2) * 104, 200 + Math.sin(a - Math.PI / 2) * 104, 2, p.ember, 0.75);
   }).join('')}`;
 
+const butterfly: Body = (p) => `
+  <g fill="none" stroke="${p.line}" stroke-linecap="round" stroke-linejoin="round">
+    <g transform="translate(160 210)">
+      <path d="M0 -60 C40 -120 96 -104 92 -58 C88 -22 40 -6 4 -18 Z" stroke-width="2.2"/>
+      <path d="M0 -60 C-40 -120 -96 -104 -92 -58 C-88 -22 -40 -6 -4 -18 Z" stroke-width="2.2"/>
+      <path d="M4 -18 C40 4 74 44 52 78 C30 106 -2 62 -4 22 Z" stroke-width="2"/>
+      <path d="M-4 -18 C-40 4 -74 44 -52 78 C-30 106 2 62 4 22 Z" stroke-width="2"/>
+      <rect x="-7" y="-62" width="14" height="128" rx="7" stroke-width="2.2"/>
+      <path d="M-7 -50 C-18 -78 -30 -92 -44 -98" stroke-width="1.8"/>
+      <path d="M7 -50 C18 -78 30 -92 44 -98" stroke-width="1.8"/>
+      <circle cx="-46" cy="-100" r="2.6" fill="${p.ember}" stroke="none"/>
+      <circle cx="46" cy="-100" r="2.6" fill="${p.ember}" stroke="none"/>
+    </g>
+  </g>
+  ${dot(160, 140, 3.2, p.ember, 0.8)}`;
+
+const bee: Body = (p) => `
+  <g fill="none" stroke="${p.line}" stroke-linecap="round" stroke-linejoin="round">
+    <path d="M38 138 C84 108 128 170 172 140 C214 112 246 168 286 148" stroke-width="1.4" opacity="0.45" stroke-dasharray="4 10"/>
+    <g transform="translate(160 226)">
+      <ellipse rx="52" ry="70" stroke-width="2.2"/>
+      <path d="M-52 -18 L52 -18 M-52 12 L52 12 M-50 42 L50 42" stroke-width="1.6" opacity="0.7"/>
+      <ellipse cx="-34" cy="-86" rx="42" ry="26" transform="rotate(-24 -34 -86)" stroke-width="1.8"/>
+      <ellipse cx="34" cy="-86" rx="42" ry="26" transform="rotate(24 34 -86)" stroke-width="1.8"/>
+      <circle cx="-20" cy="-38" r="5" fill="${p.ember}" stroke="none"/>
+      <circle cx="20" cy="-38" r="5" fill="${p.ember}" stroke="none"/>
+    </g>
+  </g>
+  ${dot(160, 120, 3, p.ember, 0.7)}`;
+
+const lotus: Body = (p) => `
+  <g fill="none" stroke="${p.line}" stroke-linecap="round" stroke-linejoin="round">
+    <g transform="translate(160 214)">
+      ${Array.from({ length: 8 }, (_, i) => `<g transform="rotate(${i * 45})"><path d="M0 -26 C24 -56 26 -104 0 -128 C-26 -104 -24 -56 0 -26 Z" stroke-width="1.8"/></g>`).join('')}
+      ${Array.from({ length: 6 }, (_, i) => `<g transform="rotate(${i * 60 + 30})"><path d="M0 -20 C16 -44 18 -78 0 -96 C-18 -78 -16 -44 0 -20 Z" stroke-width="1.6" opacity="0.8"/></g>`).join('')}
+      <circle r="22" stroke-width="2"/>
+      <circle r="10" stroke-width="1.4" opacity="0.7"/>
+    </g>
+  </g>
+  ${Array.from({ length: 8 }, (_, i) => {
+    const a = (i * 45 * Math.PI) / 180;
+    return dot(160 + Math.sin(a) * 124, 214 - Math.cos(a) * 124, 2.2, p.ember, 0.75);
+  }).join('')}`;
+
+const rocket: Body = (p) => `
+  <g fill="none" stroke="${p.line}" stroke-linecap="round" stroke-linejoin="round">
+    <g transform="translate(160 236) rotate(14)">
+      <path d="M-26 78 C-26 40 -18 4 0 -70 C18 4 26 40 26 78 Z" stroke-width="2.2"/>
+      <path d="M0 -70 L0 78" stroke-width="1.2" opacity="0.5"/>
+      <path d="M-26 46 L-52 84 L-24 78 Z" stroke-width="1.8"/>
+      <path d="M26 46 L52 84 L24 78 Z" stroke-width="1.8"/>
+      <circle cx="0" cy="16" r="8" stroke-width="1.6"/>
+      <path d="M-14 84 L-6 120 M14 84 L6 120 M0 84 L0 132" stroke-width="1.6" opacity="0.7"/>
+    </g>
+  </g>
+  ${Array.from({ length: 14 }, (_, i) => {
+    const x = 160 + ((i * 37) % 60) - 30;
+    const y = 360 + ((i * 23) % 44);
+    return dot(x, y, 1.2 + (i % 3) * 0.6, p.ember, 0.55);
+  }).join('')}
+  ${star(160, 96, 9, p.ember)}`;
+
+const bouquet: Body = (p) => `
+  <g fill="none" stroke="${p.line}" stroke-linecap="round" stroke-linejoin="round">
+    <rect x="86" y="300" width="148" height="86" rx="8" stroke-width="2.2"/>
+    <path d="M86 326 L234 326" stroke-width="1.2" opacity="0.5"/>
+    ${Array.from({ length: 5 }, (_, i) => {
+      const x = 104 + i * 28;
+      return `<path d="M${x} 300 L${x} 252" stroke-width="1.8"/>`;
+    }).join('')}
+    ${Array.from({ length: 5 }, (_, i) => {
+      const cx = 104 + i * 28;
+      const len = 60 + (i % 3) * 16;
+      return Array.from({ length: 5 }, (_, k) => {
+        const a = ((-150 + k * 30) * Math.PI) / 180;
+        return `<path d="M${cx} 252 L${(cx + Math.cos(a) * len).toFixed(1)} ${(252 + Math.sin(a) * len).toFixed(1)}" stroke-width="1.4"/>`;
+      }).join('');
+    }).join('')}
+  </g>
+  ${Array.from({ length: 5 }, (_, i) => star(104 + i * 28, 252 - (60 + (i % 3) * 16), 6, p.ember, 0.85)).join('')}`;
+
+const spinner: Body = (p) => `
+  <g fill="none" stroke="${p.line}" stroke-linecap="round">
+    <path d="M92 330 C60 300 64 240 108 224 C156 206 204 240 198 284 C192 322 150 340 118 318 C92 300 96 268 124 258 C150 248 174 264 172 286" stroke-width="2.2"/>
+    <path d="M232 300 C258 280 254 236 218 224" stroke-width="1.2" opacity="0.5" stroke-dasharray="4 9"/>
+    <g transform="translate(172 286)">
+      <rect x="-16" y="-10" width="32" height="22" rx="6" stroke-width="2"/>
+      <path d="M0 -10 L0 -34" stroke-width="1.8"/>
+    </g>
+  </g>
+  ${Array.from({ length: 10 }, (_, i) => {
+    const a = (i * 36 * Math.PI) / 180;
+    return dot(172 + Math.cos(a) * 34, 286 + Math.sin(a) * 34, 1.6, p.ember, 0.5);
+  }).join('')}
+  ${star(172, 252, 8, p.ember)}`;
+
 const BODIES: Record<ArtFamily, Body> = {
   gatling,
   jellyfish,
@@ -217,7 +313,13 @@ const BODIES: Record<ArtFamily, Body> = {
   sparkler,
   doubleBang,
   firecracker,
-  sunflower
+  sunflower,
+  butterfly,
+  bee,
+  lotus,
+  rocket,
+  bouquet,
+  spinner
 };
 
 export function motifMarkup(family: ArtFamily, p: ArtPalette, uid: string): string {

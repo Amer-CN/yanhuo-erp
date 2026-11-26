@@ -37,3 +37,14 @@ describe('卡面名字匹配', () => {
     expect(m.confidence).toBe(0);
   });
 });
+
+describe('新增家族', () => {
+  it('蝴蝶 / 蜜蜂 / 莲花 / 火箭 / 组合礼花 / 旋转类都能识别', () => {
+    expect(matchCardArt('蝴蝶').family).toBe('butterfly');
+    expect(matchCardArt('小蜜蜂').family).toBe('bee');
+    expect(matchCardArt('七彩莲花').family).toBe('lotus');
+    expect(matchCardArt('窜天猴').family).toBe('rocket');
+    expect(matchCardArt('金玉满堂').family).toBe('bouquet');
+    expect(matchCardArt('彩菊').family).toBe('spinner');
+  });
+});

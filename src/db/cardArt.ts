@@ -13,7 +13,13 @@ export const ART_FAMILIES = [
   'sparkler',
   'doubleBang',
   'firecracker',
-  'sunflower'
+  'sunflower',
+  'butterfly',
+  'bee',
+  'lotus',
+  'rocket',
+  'bouquet',
+  'spinner'
 ] as const;
 
 export type ArtFamily = (typeof ART_FAMILIES)[number];
@@ -29,7 +35,13 @@ export const ART_FAMILY_LABELS: Record<ArtFamily, string> = {
   sparkler: '仙女棒',
   doubleBang: '二踢脚',
   firecracker: '鞭炮',
-  sunflower: '向日葵'
+  sunflower: '向日葵',
+  butterfly: '蝴蝶',
+  bee: '蜜蜂',
+  lotus: '莲花',
+  rocket: '火箭',
+  bouquet: '组合礼花',
+  spinner: '旋转类'
 };
 
 export function isArtFamily(value: unknown): value is ArtFamily {
@@ -61,7 +73,13 @@ const FAMILY_ALIASES: Record<ArtFamily, string[]> = {
   sparkler: ['电光花', '仙女棒', '手持烟花', '钢丝棉'],
   doubleBang: ['二踢脚', '双响', '高升'],
   firecracker: ['大地红', '鞭炮', '挂鞭', '摔炮', '擦炮', '划炮'],
-  sunflower: ['向日葵', '向阳花', '太阳花']
+  sunflower: ['向日葵', '向阳花', '太阳花'],
+  butterfly: ['蝴蝶', '彩蝶'],
+  bee: ['蜜蜂', '小蜜蜂', '大黄蜂'],
+  lotus: ['七彩莲花', '莲花', '荷花'],
+  rocket: ['火箭', '冲天炮', '窜天猴', '飞毛腿'],
+  bouquet: ['组合礼花', '礼花', '金玉满堂', '花开富贵', '万紫千红', '百花齐放', '组合烟花'],
+  spinner: ['旋转小陀螺', '彩菊', '陀螺', '地陀螺']
 };
 
 const MARKETING_WORDS = [
