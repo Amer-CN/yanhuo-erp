@@ -7,6 +7,7 @@ import {
   computeSeasonAlbum,
   computeSeasonSummaries,
   nextRarityThresholdFen,
+  pickAlbumSeason,
   rarityForGross
 } from '../src/db/album';
 import { seasonRange } from '../src/db/season';
@@ -340,5 +341,35 @@ describe('数据更新时间', () => {
     ]);
     const album = computeSeasonAlbum({ season: seasonRange(2026), products: [product('p1')], ledger });
     expect(album.lastUpdatedAt).toBe(isoAt(2027, 1, 2));
+  });
+});
+
+describe('卡册展示赛季', () => {
+  it('赛期内显示当季', () => {
+    const picked = pickAlbumSeason('2027-01-10', new Map());
+    expect(picked.status).toBe('active');
+    expect(picked.season.startYear).toBe(2026);
+  });
+
+  it('赛季外显示最近一个已收官赛季，打开就能看卡', () => {
+    const ledger = new Map([
+      [2025, { grossFen: 1000, byProductFen: new Map([['p1', 1000]]), countedLines: 1, skippedLines: 0 }]
+    ]);
+    const picked = pickAlbumSeason('2026-11-26', ledger);
+    expect(picked.status).toBe('archived');
+    expect(picked.season.startYear).toBe(2025);
+  });
+
+  it('没有任何赛季数据时显示下赛季预览', () => {
+    const picked = pickAlbumSeason('2026-11-26', new Map());
+    expect(picked.status).toBe('upcoming');
+    expect(picked.season.startDate).toBe('2026-12-25');
+  });
+
+  it('赛期内即使有更早的赛季，也优先显示当季', () => {
+    const ledger = new Map([
+      [2025, { grossFen: 1000, byProductFen: new Map([['p1', 1000]]), countedLines: 1, skippedLines: 0 }]
+    ]);
+    expect(pickAlbumSeason('2027-01-10', ledger).status).toBe('active');
   });
 });

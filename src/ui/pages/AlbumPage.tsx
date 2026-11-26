@@ -4,11 +4,12 @@ import {
   buildSeasonLedger,
   computeSeasonAlbum,
   computeSeasonSummaries,
+  pickAlbumSeason,
   RARITY_ORDER,
+  type AlbumSeasonStatus,
   type Rarity
 } from '../../db/album';
 import type { FifoResult } from '../../db/calc';
-import { currentSeason, nextSeasonAfter } from '../../db/season';
 import { CATEGORIES, type Category, type Product, type SaleLine, type SalesOrder, type Session } from '../../db/types';
 import { fenToStr, localDate } from '../../db/util';
 import { Card, Empty } from '../kit';
@@ -22,6 +23,16 @@ type RarityFilter = 'all' | Rarity;
 /** 等级超过 5 级时复用第 5 档样式，只把数字往上加 */
 const levelClass = (level: number) => `album--lv${Math.min(level, 5)}`;
 
+const STATUS_TEXT: Record<AlbumSeasonStatus, string> = {
+  active: '进行中',
+  archived: '已收官',
+  upcoming: '即将开始'
+};
+
+/**
+ * 卡册页永远给出一份可看可玩的卡册：
+ * 赛期内看当季；赛季外看最近收官的那一季；一场都没有时看下季预览。
+ */
 export default function AlbumPage({
   products,
   orders,
@@ -36,8 +47,6 @@ export default function AlbumPage({
   fifo: FifoResult;
 }) {
   const today = localDate();
-  const season = currentSeason(today);
-  const upcoming = nextSeasonAfter(today);
   const [cat, setCat] = useState<CategoryFilter>('all');
   const [rarity, setRarity] = useState<RarityFilter>('all');
   const [openId, setOpenId] = useState<string | null>(null);
@@ -47,29 +56,37 @@ export default function AlbumPage({
     [orders, lines, sessions, fifo]
   );
 
-  const album = useMemo(
-    () => (season ? computeSeasonAlbum({ season, products, ledger }) : null),
-    // season 只可能因为跨过 12-25 / 元宵节而变；按开始年份取依赖即可
+  const picked = useMemo(
+    () => pickAlbumSeason(today, ledger),
+    // today 只按天变；跨过 12-25 / 元宵节才会换赛季
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    [season?.startYear, products, ledger]
+    [today, ledger]
+  );
+
+  const album = useMemo(
+    () => computeSeasonAlbum({ season: picked.season, products, ledger }),
+    // season 对象每次新建，按开始年份取依赖即可
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [picked.season.startYear, products, ledger]
   );
 
   const archive = useMemo(
     () =>
       computeSeasonSummaries({ ledger, products }).filter(
-        (s) => s.season.startYear !== season?.startYear
+        (s) => s.season.startYear !== picked.season.startYear
       ),
-    [ledger, products, season?.startYear]
+    [ledger, products, picked.season.startYear]
   );
 
-  const cards = useMemo(() => {
-    if (!album) return [];
-    return album.cards.filter(
-      (c) => (cat === 'all' || c.category === cat) && (rarity === 'all' || c.rarity === rarity)
-    );
-  }, [album, cat, rarity]);
+  const cards = useMemo(
+    () =>
+      album.cards.filter(
+        (c) => (cat === 'all' || c.category === cat) && (rarity === 'all' || c.rarity === rarity)
+      ),
+    [album, cat, rarity]
+  );
 
-  const selected = album?.cards.find((c) => c.productId === openId);
+  const selected = album.cards.find((c) => c.productId === openId);
 
   /*
    * 升级只闪一次：品质是派生值，没有持久化，所以自己在组件里记住上一帧。
@@ -78,7 +95,6 @@ export default function AlbumPage({
   const prevRarities = useRef<Map<string, Rarity>>(new Map());
   const [flashId, setFlashId] = useState<string | null>(null);
   useEffect(() => {
-    if (!album) return;
     const upgraded = detectUpgradedIds(prevRarities.current, album.cards);
     prevRarities.current = new Map(album.cards.map((c) => [c.productId, c.rarity]));
     if (upgraded.length === 0) return;
@@ -87,19 +103,29 @@ export default function AlbumPage({
     return () => window.clearTimeout(timer);
   }, [album]);
 
+  const isActive = picked.status === 'active';
+
   return (
     <div className="page-stack">
-      {album ? (
-        <>
-          <Card className={`album-head ${levelClass(album.level.level)}`}>
-            <div className="tiny-text">
-              {album.season.label} · {album.season.startDate} → {album.season.endDate}
-              {album.season.endDateEstimated ? '（结束日待更新）' : ''}
-            </div>
-            <div className="row-between" style={{ alignItems: 'baseline', marginTop: 4 }}>
-              <span className="album-head__level">Lv.{album.level.level}</span>
-              <span className="album-head__gross">¥{fenToStr(album.level.grossFen)}</span>
-            </div>
+      <Card className={`album-head ${levelClass(album.level.level)}`}>
+        <div className="row-between" style={{ alignItems: 'baseline', gap: 8 }}>
+          <span className="tiny-text">
+            {album.season.label} · {album.season.startDate} → {album.season.endDate}
+            {album.season.endDateEstimated ? '（结束日待更新）' : ''}
+          </span>
+          <span className="glass-badge">{STATUS_TEXT[picked.status]}</span>
+        </div>
+
+        <div className="row-between" style={{ alignItems: 'baseline', marginTop: 4 }}>
+          <span className="album-head__level">
+            Lv.{album.level.level}
+            {picked.status === 'archived' ? ' · 最终' : ''}
+          </span>
+          <span className="album-head__gross">¥{fenToStr(album.level.grossFen)}</span>
+        </div>
+
+        {isActive ? (
+          <>
             <div
               className="album-progress"
               role="progressbar"
@@ -117,86 +143,79 @@ export default function AlbumPage({
               再赚 ¥{fenToStr(album.level.nextFen - album.level.grossFen)} 升到 Lv.
               {album.level.level + 1}
             </div>
-            {album.skippedLines > 0 ? (
-              <div className="tiny-text album-head__hint">
-                有 {album.skippedLines} 笔销售的成本待补，暂不计入卡册
-              </div>
-            ) : null}
-          </Card>
+          </>
+        ) : picked.status === 'archived' ? (
+          <div className="tiny-text">这一季已收官，卡面是最终结果。</div>
+        ) : (
+          <div className="tiny-text">{album.season.startDate} 开赛，届时开始累计。</div>
+        )}
 
-          <div className="glass-segmented" role="group" aria-label="按分类筛选">
-            <button
-              type="button"
-              className="glass-segmented__item"
-              aria-pressed={cat === 'all'}
-              onClick={() => setCat('all')}
-            >
-              全部
-            </button>
-            {CATEGORIES.map((c) => (
-              <button
-                key={c}
-                type="button"
-                className="glass-segmented__item"
-                aria-pressed={cat === c}
-                onClick={() => setCat(c)}
-              >
-                {c}
-              </button>
-            ))}
+        {album.skippedLines > 0 ? (
+          <div className="tiny-text album-head__hint">
+            有 {album.skippedLines} 条明细的成本待补，暂不计入卡册
           </div>
+        ) : null}
+      </Card>
 
-          <div className="glass-segmented" role="group" aria-label="按品质筛选">
-            <button
-              type="button"
-              className="glass-segmented__item"
-              aria-pressed={rarity === 'all'}
-              onClick={() => setRarity('all')}
-            >
-              全部品质
-            </button>
-            {RARITY_ORDER.map((r) => (
-              <button
-                key={r}
-                type="button"
-                className="glass-segmented__item"
-                aria-pressed={rarity === r}
-                onClick={() => setRarity(r)}
-              >
-                {r}
-              </button>
-            ))}
-          </div>
+      <div className="glass-segmented" role="group" aria-label="按分类筛选">
+        <button
+          type="button"
+          className="glass-segmented__item"
+          aria-pressed={cat === 'all'}
+          onClick={() => setCat('all')}
+        >
+          全部
+        </button>
+        {CATEGORIES.map((c) => (
+          <button
+            key={c}
+            type="button"
+            className="glass-segmented__item"
+            aria-pressed={cat === c}
+            onClick={() => setCat(c)}
+          >
+            {c}
+          </button>
+        ))}
+      </div>
 
-          {products.length === 0 ? (
-            <Empty icon={<Sparkles size={24} />} text="还没有商品，先去商品管理建几个" />
-          ) : cards.length === 0 ? (
-            <Empty icon={<Sparkles size={24} />} text="这个筛选下还没有卡" hint="换个分类或品质试试" />
-          ) : (
-            <div className="album-grid">
-              {cards.map((card) => (
-                <AlbumCardTile
-                  key={card.productId}
-                  card={card}
-                  flash={flashId === card.productId}
-                  onOpen={setOpenId}
-                />
-              ))}
-            </div>
-          )}
-        </>
+      <div className="glass-segmented" role="group" aria-label="按品质筛选">
+        <button
+          type="button"
+          className="glass-segmented__item"
+          aria-pressed={rarity === 'all'}
+          onClick={() => setRarity('all')}
+        >
+          全部品质
+        </button>
+        {RARITY_ORDER.map((r) => (
+          <button
+            key={r}
+            type="button"
+            className="glass-segmented__item"
+            aria-pressed={rarity === r}
+            onClick={() => setRarity(r)}
+          >
+            {r}
+          </button>
+        ))}
+      </div>
+
+      {products.length === 0 ? (
+        <Empty icon={<Sparkles size={24} />} text="还没有商品，先去商品管理建几个" />
+      ) : cards.length === 0 ? (
+        <Empty icon={<Sparkles size={24} />} text="这个筛选下还没有卡" hint="换个分类或品质试试" />
       ) : (
-        <>
-          <Card className="album-offseason">
-            <div className="glass-list__title">现在是休赛期</div>
-            <p className="muted-text" style={{ marginTop: 6 }}>
-              休赛期销售不计入卡册。下个赛季 {upcoming.startDate} 开赛，到 {upcoming.endDate} 结束。
-            </p>
-          </Card>
-          {products.length === 0 ? (
-            <Empty icon={<Sparkles size={24} />} text="还没有商品，先去商品管理建几个" />
-          ) : null}
-        </>
+        <div className="album-grid">
+          {cards.map((card) => (
+            <AlbumCardTile
+              key={card.productId}
+              card={card}
+              flash={flashId === card.productId}
+              onOpen={setOpenId}
+            />
+          ))}
+        </div>
       )}
 
       {archive.length > 0 ? (
@@ -228,7 +247,7 @@ export default function AlbumPage({
       {selected ? (
         <AlbumCardDetail
           card={selected}
-          updatedAt={album?.lastUpdatedAt ?? null}
+          updatedAt={album.lastUpdatedAt}
           onClose={() => setOpenId(null)}
         />
       ) : null}

@@ -5,7 +5,7 @@
 // 会把最早的批次算给这一季，毛利虚高。
 
 import type { FifoResult } from './calc';
-import { seasonForDate, seasonRange, type SeasonRange } from './season';
+import { currentSeason, nextSeasonAfter, seasonForDate, seasonRange, type SeasonRange } from './season';
 import type { Category, Product, SaleLine, SalesOrder, Session } from './types';
 import { isoToLocalDate } from './util';
 
@@ -242,8 +242,7 @@ export interface AlbumSeasonSummary {
   urCount: number;
 }
 
-/** 往季归档：只列有有效销售的赛季，按开始年份倒序 */
-export function computeSeasonSummaries(args: {
+/** 往季归档：只列有有效销售的赛季，按开始年份倒序 */export function computeSeasonSummaries(args: {
   ledger: Map<number, SeasonLedgerEntry>;
   products: Product[];
 }): AlbumSeasonSummary[] {
@@ -262,4 +261,33 @@ export function computeSeasonSummaries(args: {
     });
   }
   return out.sort((a, b) => b.season.startYear - a.season.startYear);
+}
+
+export type AlbumSeasonStatus = 'active' | 'archived' | 'upcoming';
+
+export interface AlbumDisplaySeason {
+  season: SeasonRange;
+  status: AlbumSeasonStatus;
+}
+
+/**
+ * 卡册永远有内容可看，不拿「休赛期」拦人：
+ * 1. 赛期内 → 当季；
+ * 2. 赛季外 → 账本里最近一个赛季（已收官，卡面即最终结果）；
+ * 3. 一个赛季都没有 → 下赛季预览（全 R，等开赛）。
+ */
+export function pickAlbumSeason(
+  today: string,
+  ledger: Map<number, SeasonLedgerEntry>
+): AlbumDisplaySeason {
+  const active = currentSeason(today);
+  if (active) return { season: active, status: 'active' };
+
+  let latest: number | null = null;
+  for (const year of ledger.keys()) {
+    if (latest === null || year > latest) latest = year;
+  }
+  if (latest !== null) return { season: seasonRange(latest), status: 'archived' };
+
+  return { season: nextSeasonAfter(today), status: 'upcoming' };
 }
