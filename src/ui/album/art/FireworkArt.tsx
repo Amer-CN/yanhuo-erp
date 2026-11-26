@@ -28,11 +28,13 @@ export default function FireworkArt({
   }
 
   const palette = paletteFor(match.variant);
+  const body = motifMarkup(match.family, palette, uid);
   const markup =
     defsMarkup(palette, uid) +
-    `<rect width="320" height="448" fill="url(#${uid}-bg)"/>` +
-    motifMarkup(match.family, palette, uid) +
-    `<rect width="320" height="448" fill="url(#${uid}-vig)"/>`;
+    `<rect width="320" height="448" fill="url(#${uid}-halo)"/>` +
+    // 先铺一层大模糊的暖光，再压上清晰线稿：玻璃里的余烬，而不是印刷海报
+    `<g filter="url(#${uid}-soft)" opacity="0.7">${body}</g>` +
+    body;
 
   return (
     <svg
