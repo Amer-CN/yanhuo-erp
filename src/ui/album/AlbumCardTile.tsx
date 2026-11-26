@@ -1,6 +1,6 @@
 import type { AlbumCard } from '../../db/album';
 import { fenToStr } from '../../db/util';
-import CategoryArt from './CategoryArt';
+import FireworkArt from './art/FireworkArt';
 import { albumCardGapText, albumCardLabel } from './cardText';
 
 /** 卡册网格里的单张商品卡：整卡是一个按钮，触控目标 ≥ 44px */
@@ -32,7 +32,7 @@ export default function AlbumCardTile({
     >
       <span className="album-card__frame">
         <span className="album-card__art">
-          <CategoryArt category={card.category} className="album-card__svg" />
+          <FireworkArt name={card.name} category={card.category} className="album-card__svg" />
         </span>
         <span className="album-card__rarity">{card.rarity}</span>
         <span className="album-card__sheen" aria-hidden="true" />

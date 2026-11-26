@@ -1986,15 +1986,25 @@ select {
 }
 
 .album-card__art {
+  position: absolute;
+  inset: 0;
   display: grid;
   place-items: center;
-  width: 62%;
   color: color-mix(in srgb, var(--yh-ink-1) 82%, transparent);
 }
 
 .album-card__svg {
   width: 100%;
+  height: 100%;
+}
+
+/* 没匹配到家族时的分类线稿：按图标大小居中，不铺满 */
+.album-card__svg--icon {
+  width: 56%;
   height: auto;
+  position: absolute;
+  inset: 0;
+  margin: auto;
 }
 
 .album-card__rarity {
@@ -2158,8 +2168,18 @@ select {
 }
 
 .album-detail__art {
-  width: 58%;
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
   color: var(--yh-ink-1);
+}
+
+.album-detail__art--icon {
+  width: 58%;
+  height: auto;
+  inset: 0;
+  margin: auto;
 }
 
 .album-detail__glare {

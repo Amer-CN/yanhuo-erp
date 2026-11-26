@@ -9,7 +9,7 @@ import { animate, motion, useMotionValue, useReducedMotion, useSpring } from 'mo
 import type { AlbumCard } from '../../db/album';
 import { fenToStr, isoToLocalDate, isoToTime } from '../../db/util';
 import { Btn, Sheet } from '../kit';
-import CategoryArt from './CategoryArt';
+import FireworkArt from './art/FireworkArt';
 import { tiltAngles } from './orientation';
 import { useDeviceTilt } from './useDeviceTilt';
 
@@ -202,7 +202,7 @@ export default function AlbumCardDetail({
               }}
             >
               <div className={faceClass(card)}>
-                <CategoryArt category={card.category} className="album-detail__art" />
+                <FireworkArt name={card.name} category={card.category} className="album-detail__art" />
                 <span className="album-card__rarity">{card.rarity}</span>
                 <span className="album-detail__glare" aria-hidden="true" />
               </div>
