@@ -2288,3 +2288,9 @@ select {
   background-origin: border-box;
   background-clip: padding-box, border-box;
 }
+
+.stat-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: var(--yh-space-3);
+}

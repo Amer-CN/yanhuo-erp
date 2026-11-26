@@ -7,6 +7,7 @@ import {
   computeSeasonAlbum,
   computeSeasonSummaries,
   albumProgress,
+  buildSeasonReport,
   nextRarityThresholdFen,
   pickAlbumSeason,
   rarityForGross
@@ -420,5 +421,49 @@ describe('卡册完成度', () => {
       ledger
     });
     expect(albumProgress(album.cards)).toEqual({ collected: 3, total: 4, srPlus: 3 });
+  });
+});
+
+describe('赛季战报', () => {
+  it('汇总毛利、订单、件数、品质分布与 Top5', () => {
+    const ledger = new Map([
+      [2026, {
+        grossFen: 76000,
+        byProductFen: new Map([['p1', 50000], ['p2', 20000], ['p3', 6000]]),
+        countedLines: 3,
+        skippedLines: 1,
+        orderCount: 4,
+        qtyBase: 17
+      }],
+      [2025, {
+        grossFen: 38000,
+        byProductFen: new Map([['p1', 38000]]),
+        countedLines: 2,
+        skippedLines: 0,
+        orderCount: 2,
+        qtyBase: 9
+      }]
+    ]);
+    const report = buildSeasonReport({
+      season: seasonRange(2026),
+      products: [product('p1'), product('p2'), product('p3'), product('p4')],
+      ledger
+    });
+    expect(report.grossFen).toBe(76000);
+    expect(report.orderCount).toBe(4);
+    expect(report.qtyBase).toBe(17);
+    expect(report.avgGrossFen).toBe(19000);
+    expect(report.rarityCounts).toEqual({ R: 1, SR: 1, SSR: 1, UR: 1 });
+    expect(report.topProducts.map((p) => p.productId)).toEqual(['p1', 'p2', 'p3']);
+    expect(report.skippedLines).toBe(1);
+    expect(report.previous?.season.startYear).toBe(2025);
+    expect(report.grossDeltaRatio).toBeCloseTo(1, 5);
+  });
+
+  it('没有上一季时对比为空', () => {
+    const report = buildSeasonReport({ season: seasonRange(2026), products: [product('p1')], ledger: new Map() });
+    expect(report.previous).toBeNull();
+    expect(report.grossDeltaRatio).toBeNull();
+    expect(report.avgGrossFen).toBe(0);
   });
 });

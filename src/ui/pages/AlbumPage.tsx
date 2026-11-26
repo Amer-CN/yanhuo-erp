@@ -3,6 +3,7 @@ import { Sparkles } from 'lucide-react';
 import {
   albumProgress,
   buildSeasonLedger,
+  buildSeasonReport,
   computeSeasonAlbum,
   computeSeasonSummaries,
   pickAlbumSeason,
@@ -11,11 +12,13 @@ import {
   type Rarity
 } from '../../db/album';
 import type { FifoResult } from '../../db/calc';
+import { seasonRange } from '../../db/season';
 import { CATEGORIES, type Category, type Product, type SaleLine, type SalesOrder, type Session } from '../../db/types';
 import { fenToStr, localDate } from '../../db/util';
-import { Btn, Card, Empty, Sheet } from '../kit';
+import { Btn, Card, Empty, Sheet, rowProps } from '../kit';
 import AlbumCardDetail from '../album/AlbumCardDetail';
 import QualitySamples from '../album/QualitySamples';
+import SeasonReportSheet from '../album/SeasonReportSheet';
 import AlbumCardTile from '../album/AlbumCardTile';
 import { detectUpgradedIds } from '../album/upgrade';
 
@@ -53,6 +56,7 @@ export default function AlbumPage({
   const [rarity, setRarity] = useState<RarityFilter>('all');
   const [openId, setOpenId] = useState<string | null>(null);
   const [sampleOpen, setSampleOpen] = useState(false);
+  const [reportYear, setReportYear] = useState<number | null>(null);
 
   const ledger = useMemo(
     () => buildSeasonLedger({ orders, lines, sessions, fifo }),
@@ -82,6 +86,12 @@ export default function AlbumPage({
   );
 
   const progress = useMemo(() => albumProgress(album.cards), [album]);
+
+  const report = useMemo(() => {
+    if (reportYear === null) return null;
+    const season = seasonRange(reportYear);
+    return { season, data: buildSeasonReport({ season, products, ledger }) };
+  }, [reportYear, products, ledger]);
 
   const cards = useMemo(
     () =>
@@ -159,9 +169,12 @@ export default function AlbumPage({
           <div className="tiny-text">{album.season.startDate} 开赛，届时开始累计。</div>
         )}
 
-        <div style={{ marginTop: 8 }}>
+        <div style={{ marginTop: 8, display: 'flex', gap: 8, flexWrap: 'wrap' }}>
           <Btn size="sm" variant="secondary" block={false} onClick={() => setSampleOpen(true)}>
             看品质样张
+          </Btn>
+          <Btn size="sm" variant="secondary" block={false} onClick={() => setReportYear(picked.season.startYear)}>
+            赛季战报
           </Btn>
         </div>
 
@@ -241,7 +254,11 @@ export default function AlbumPage({
           </div>
           <ul className="glass-list">
             {archive.map((s) => (
-              <li key={s.season.startYear} className="glass-list__item">
+              <li
+                key={s.season.startYear}
+                className="glass-list__item glass-list__item--interactive list-item"
+                {...rowProps(() => setReportYear(s.season.startYear))}
+              >
                 <span className="glass-list__content">
                   <span className="glass-list__title">{s.season.label}</span>
                   <span className="glass-list__subtitle">
@@ -257,6 +274,14 @@ export default function AlbumPage({
             ))}
           </ul>
         </div>
+      ) : null}
+
+      {report ? (
+        <SeasonReportSheet
+          report={report.data}
+          status={report.season.startYear === picked.season.startYear ? picked.status : 'archived'}
+          onClose={() => setReportYear(null)}
+        />
       ) : null}
 
       {sampleOpen ? (

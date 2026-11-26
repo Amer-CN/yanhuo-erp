@@ -99,6 +99,10 @@ export interface SeasonLedgerEntry {
   countedLines: number;
   /** 因成本待补跳过的明细数 */
   skippedLines: number;
+  /** 本赛季有效订单数（含成本待补的订单） */
+  orderCount?: number;
+  /** 本赛季售出件数（含赠品与成本待补的明细） */
+  qtyBase?: number;
   /** 计入明细里最近一次业务更新时间（ISO）；没有计入明细时为 null */
   lastUpdatedAt?: string | null;
 }
@@ -139,11 +143,21 @@ export function buildSeasonLedger(args: {
       byProductFen: new Map(),
       countedLines: 0,
       skippedLines: 0,
+      orderCount: 0,
+      qtyBase: 0,
       lastUpdatedAt: null
     };
     ledger.set(year, fresh);
     return fresh;
   };
+
+  for (const o of orders) {
+    if (o.voided) continue;
+    const y = orderSeasonYear.get(o.id);
+    if (y === null || y === undefined) continue;
+    const e = entryOf(y);
+    e.orderCount = (e.orderCount ?? 0) + 1;
+  }
 
   for (const line of lines) {
     if (!orderSeasonYear.has(line.orderId)) continue;
@@ -151,6 +165,7 @@ export function buildSeasonLedger(args: {
     if (year === null || year === undefined) continue;
 
     const entry = entryOf(year);
+    entry.qtyBase = (entry.qtyBase ?? 0) + line.qtyBase;
     const cost = fifo.lineCost.get(line.id);
     const uncovered = fifo.uncoveredQtyByLine.get(line.id) ?? 0;
     if (cost === undefined || uncovered > 0) {
@@ -335,4 +350,75 @@ export function albumProgress(cards: AlbumCard[]): AlbumProgress {
     if (RARITY_ORDER.indexOf(c.rarity) >= 1) srPlus += 1;
   }
   return { collected, total: cards.length, srPlus };
+}
+
+export interface SeasonReportTopProduct {
+  productId: string;
+  name: string;
+  grossFen: number;
+  rarity: Rarity;
+}
+
+export interface SeasonReportData {
+  season: SeasonRange;
+  grossFen: number;
+  orderCount: number;
+  qtyBase: number;
+  /** 平均每单毛利（分）；没有订单时为 0 */
+  avgGrossFen: number;
+  rarityCounts: Record<Rarity, number>;
+  /** 正毛利商品前 5，按毛利降序 */
+  topProducts: SeasonReportTopProduct[];
+  skippedLines: number;
+  previous: { season: SeasonRange; grossFen: number } | null;
+  /** 与上一季毛利的变化比例；没有上一季或上一季为 0 时为 null */
+  grossDeltaRatio: number | null;
+}
+
+/** 赛季战报：全部从同一份赛季账本实时算，和卡册、报表同口径 */
+export function buildSeasonReport(args: {
+  season: SeasonRange;
+  products: Product[];
+  ledger: Map<number, SeasonLedgerEntry>;
+}): SeasonReportData {
+  const { season, products, ledger } = args;
+  const entry = ledger.get(season.startYear);
+  const grossFen = entry?.grossFen ?? 0;
+  const orderCount = entry?.orderCount ?? 0;
+  const qtyBase = entry?.qtyBase ?? 0;
+
+  const rarityCounts: Record<Rarity, number> = { R: 0, SR: 0, SSR: 0, UR: 0 };
+  const rows = products.map((p) => {
+    const gross = entry?.byProductFen.get(p.id) ?? 0;
+    const rarity = rarityForGross(gross);
+    rarityCounts[rarity] += 1;
+    return { productId: p.id, name: p.name, grossFen: gross, rarity };
+  });
+
+  const topProducts = rows
+    .filter((r) => r.grossFen > 0)
+    .sort((a, b) => b.grossFen - a.grossFen || a.name.localeCompare(b.name, 'zh'))
+    .slice(0, 5);
+
+  const prevEntry = ledger.get(season.startYear - 1);
+  const previous = prevEntry
+    ? { season: seasonRange(season.startYear - 1), grossFen: prevEntry.grossFen }
+    : null;
+  const grossDeltaRatio =
+    previous && previous.grossFen !== 0
+      ? (grossFen - previous.grossFen) / Math.abs(previous.grossFen)
+      : null;
+
+  return {
+    season,
+    grossFen,
+    orderCount,
+    qtyBase,
+    avgGrossFen: orderCount > 0 ? Math.round(grossFen / orderCount) : 0,
+    rarityCounts,
+    topProducts,
+    skippedLines: entry?.skippedLines ?? 0,
+    previous,
+    grossDeltaRatio
+  };
 }
