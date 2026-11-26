@@ -31,9 +31,9 @@ export function tiltDelta(base: Orientation, current: Orientation): TiltDelta {
   };
 }
 
-/** 体感最大俯仰 / 横滚角度 */
-const PITCH_DEG = 9;
-const ROLL_DEG = 7;
+/** 受控倾斜的最大角度：不再做自由旋转，只做小幅跟手 */
+const PITCH_DEG = 12;
+const ROLL_DEG = 12;
 
 /**
  * 归一化倾斜（-1..1）→ 卡面角度。

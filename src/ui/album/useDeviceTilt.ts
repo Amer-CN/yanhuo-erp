@@ -15,16 +15,13 @@ interface OrientationEventCtor {
 /**
  * 手机姿态 → 归一化倾斜（-1..1）。
  *
- * - 基准取监听开始后的第一次读数，回调的是**变化量**，任何握持姿势都一致。
- * - iOS 13+ 的 `DeviceOrientationEvent.requestPermission()` 必须由用户手势触发，
- *   浏览器不允许自动申请；调用方应在第一次触摸卡片时调用 `requestPermission()`。
- * - `enabled=false`（例如正在手指拖动）时移除监听；重新启用会重新取基准，不会跳变。
+ * 关键约定：**基准只在第一次拿到读数时取一次**，之后不再重置。
+ * 早期版本每次重新启用监听都重取基准，结果手指一碰卡片、卡片就悄悄回正，
+ * 看起来像体感和手势在打架。现在监听从挂载起就常驻，基准固定。
  */
 export function useDeviceTilt({
-  enabled,
   onLean
 }: {
-  enabled: boolean;
   onLean: (lean: { x: number; y: number }) => void;
 }): {
   supported: boolean;
@@ -43,6 +40,8 @@ export function useDeviceTilt({
   const callback = useRef(onLean);
   callback.current = onLean;
   const activeRef = useRef(false);
+  const baseRef = useRef<Orientation | null>(null);
+  const smoothRef = useRef<{ x: number; y: number } | null>(null);
 
   const requestPermission = useCallback(async () => {
     if (!needsPermission) return false;
@@ -58,21 +57,19 @@ export function useDeviceTilt({
   }, [ctor, needsPermission]);
 
   useEffect(() => {
-    if (!supported || !enabled || !permitted) return;
-    let base: Orientation | null = null;
-    let smooth: { x: number; y: number } | null = null;
+    if (!supported || !permitted) return;
 
     const onOrient = (e: DeviceOrientationEvent) => {
       if (e.beta === null || e.gamma === null) return;
       const current: Orientation = { beta: e.beta, gamma: e.gamma };
-      if (!base) base = current;
-      const delta = tiltDelta(base, current);
-      smooth = smooth
-        ? {
-            x: smooth.x + (delta.x - smooth.x) * SMOOTHING,
-            y: smooth.y + (delta.y - smooth.y) * SMOOTHING
-          }
+      // 基准只取一次：用户在什么姿势下打开卡片就以那个姿势为「平」
+      if (!baseRef.current) baseRef.current = current;
+      const delta = tiltDelta(baseRef.current, current);
+      const prev = smoothRef.current;
+      const smooth = prev
+        ? { x: prev.x + (delta.x - prev.x) * SMOOTHING, y: prev.y + (delta.y - prev.y) * SMOOTHING }
         : delta;
+      smoothRef.current = smooth;
       callback.current({
         x: clampUnit(smooth.x / RANGE_DEG),
         y: clampUnit(smooth.y / RANGE_DEG)
@@ -85,7 +82,7 @@ export function useDeviceTilt({
 
     window.addEventListener('deviceorientation', onOrient);
     return () => window.removeEventListener('deviceorientation', onOrient);
-  }, [supported, enabled, permitted]);
+  }, [supported, permitted]);
 
   return { supported, needsPermission, requestPermission, active };
 }

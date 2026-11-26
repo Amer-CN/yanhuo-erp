@@ -40,11 +40,11 @@ describe('相对基准的倾斜差', () => {
 
 describe('体感映射到卡面角度', () => {
   it('左右倾斜只做横滚，前后倾斜只做俯仰', () => {
-    expect(tiltAngles({ x: 1, y: 0 })).toEqual({ x: 0, z: 7 });
-    expect(tiltAngles({ x: 0, y: 1 })).toEqual({ x: -9, z: 0 });
+    expect(tiltAngles({ x: 1, y: 0 })).toEqual({ x: 0, z: 12 });
+    expect(tiltAngles({ x: 0, y: 1 })).toEqual({ x: -12, z: 0 });
   });
 
   it('中间值按比例收窄', () => {
-    expect(tiltAngles({ x: 0.5, y: -0.5 })).toEqual({ x: 4.5, z: 3.5 });
+    expect(tiltAngles({ x: 0.5, y: -0.5 })).toEqual({ x: 6, z: 6 });
   });
 });
