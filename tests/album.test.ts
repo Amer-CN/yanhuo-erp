@@ -6,6 +6,7 @@ import {
   buildSeasonLedger,
   computeSeasonAlbum,
   computeSeasonSummaries,
+  albumProgress,
   nextRarityThresholdFen,
   pickAlbumSeason,
   rarityForGross
@@ -405,5 +406,19 @@ describe('卡面徽章与卡号', () => {
     const b = computeSeasonAlbum({ season: seasonRange(2026), products: [product('p1')], ledger: new Map() });
     expect(a.cards[0].no).toMatch(/^#\d{3}$/);
     expect(a.cards[0].no).toBe(b.cards[0].no);
+  });
+});
+
+describe('卡册完成度', () => {
+  it('统计已收集与 SR 以上张数', () => {
+    const ledger = new Map([
+      [2026, { grossFen: 76000, byProductFen: new Map([['p1', 0], ['p2', 6000], ['p3', 20000], ['p4', 50000]]), countedLines: 3, skippedLines: 0 }]
+    ]);
+    const album = computeSeasonAlbum({
+      season: seasonRange(2026),
+      products: [product('p1'), product('p2'), product('p3'), product('p4')],
+      ledger
+    });
+    expect(albumProgress(album.cards)).toEqual({ collected: 3, total: 4, srPlus: 3 });
   });
 });

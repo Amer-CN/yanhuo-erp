@@ -2241,3 +2241,50 @@ select {
   color: var(--yh-ink-4);
   font-variant-numeric: tabular-nums;
 }
+
+.album-samples {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: var(--yh-space-3);
+}
+
+.album-sample {
+  display: flex;
+  flex-direction: column;
+  gap: var(--yh-space-1);
+}
+
+.album-sample__frame {
+  position: relative;
+  aspect-ratio: 5 / 7;
+  border-radius: var(--yh-radius-md);
+  overflow: hidden;
+  border: 1.5px solid color-mix(in srgb, var(--yh-ink-3) 45%, transparent);
+  background: linear-gradient(160deg, var(--yh-surface-3), var(--yh-surface-1));
+}
+
+.album-sample__art {
+  width: 100%;
+  height: 100%;
+}
+
+.album-sample__label {
+  font-size: var(--yh-text-2xs);
+  color: var(--yh-ink-3);
+}
+
+.album-card--sr .album-sample__frame {
+  border-color: color-mix(in srgb, var(--yh-ink-ok) 70%, transparent);
+}
+
+.album-card--ssr .album-sample__frame {
+  border-color: color-mix(in srgb, var(--yh-ink-price) 80%, transparent);
+}
+
+.album-card--ur .album-sample__frame {
+  border-color: transparent;
+  background-image: linear-gradient(160deg, var(--yh-surface-3), var(--yh-surface-1)),
+    conic-gradient(from 210deg, var(--yh-ink-price), var(--yh-ink-accent), var(--yh-ink-ok), var(--yh-ink-price));
+  background-origin: border-box;
+  background-clip: padding-box, border-box;
+}

@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { Sparkles } from 'lucide-react';
 import {
+  albumProgress,
   buildSeasonLedger,
   computeSeasonAlbum,
   computeSeasonSummaries,
@@ -12,8 +13,9 @@ import {
 import type { FifoResult } from '../../db/calc';
 import { CATEGORIES, type Category, type Product, type SaleLine, type SalesOrder, type Session } from '../../db/types';
 import { fenToStr, localDate } from '../../db/util';
-import { Card, Empty } from '../kit';
+import { Btn, Card, Empty, Sheet } from '../kit';
 import AlbumCardDetail from '../album/AlbumCardDetail';
+import QualitySamples from '../album/QualitySamples';
 import AlbumCardTile from '../album/AlbumCardTile';
 import { detectUpgradedIds } from '../album/upgrade';
 
@@ -50,6 +52,7 @@ export default function AlbumPage({
   const [cat, setCat] = useState<CategoryFilter>('all');
   const [rarity, setRarity] = useState<RarityFilter>('all');
   const [openId, setOpenId] = useState<string | null>(null);
+  const [sampleOpen, setSampleOpen] = useState(false);
 
   const ledger = useMemo(
     () => buildSeasonLedger({ orders, lines, sessions, fifo }),
@@ -77,6 +80,8 @@ export default function AlbumPage({
       ),
     [ledger, products, picked.season.startYear]
   );
+
+  const progress = useMemo(() => albumProgress(album.cards), [album]);
 
   const cards = useMemo(
     () =>
@@ -124,6 +129,10 @@ export default function AlbumPage({
           <span className="album-head__gross">¥{fenToStr(album.level.grossFen)}</span>
         </div>
 
+        <div className="tiny-text">
+          已收集 {progress.collected} / {progress.total} 种 · SR 以上 {progress.srPlus} 种
+        </div>
+
         {isActive ? (
           <>
             <div
@@ -149,6 +158,12 @@ export default function AlbumPage({
         ) : (
           <div className="tiny-text">{album.season.startDate} 开赛，届时开始累计。</div>
         )}
+
+        <div style={{ marginTop: 8 }}>
+          <Btn size="sm" variant="secondary" block={false} onClick={() => setSampleOpen(true)}>
+            看品质样张
+          </Btn>
+        </div>
 
         {album.skippedLines > 0 ? (
           <div className="tiny-text album-head__hint">
@@ -242,6 +257,12 @@ export default function AlbumPage({
             ))}
           </ul>
         </div>
+      ) : null}
+
+      {sampleOpen ? (
+        <Sheet title="品质样张" subtitle="样张不计入收集" onClose={() => setSampleOpen(false)}>
+          <QualitySamples />
+        </Sheet>
       ) : null}
 
       {selected ? (

@@ -316,3 +316,23 @@ export function pickAlbumSeason(
 
   return { season: nextSeasonAfter(today), status: 'upcoming' };
 }
+
+export interface AlbumProgress {
+  /** 本赛季产生过正毛利的商品数 */
+  collected: number;
+  /** 卡册里的商品总数（含停售） */
+  total: number;
+  /** 品质在 SR 及以上的商品数 */
+  srPlus: number;
+}
+
+/** 卡册完成度：头卡那一行「已收集 X / Y 种 · SR 以上 Z 种」 */
+export function albumProgress(cards: AlbumCard[]): AlbumProgress {
+  let collected = 0;
+  let srPlus = 0;
+  for (const c of cards) {
+    if (c.grossFen > 0) collected += 1;
+    if (RARITY_ORDER.indexOf(c.rarity) >= 1) srPlus += 1;
+  }
+  return { collected, total: cards.length, srPlus };
+}
