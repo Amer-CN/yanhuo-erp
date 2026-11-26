@@ -1,10 +1,10 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { leanFromOrientation, type Lean } from './orientation';
+import { tiltDelta, type Orientation } from './orientation';
 
 /** 低通权重：越小越稳、越跟手越差 */
-const SMOOTHING = 0.12;
-/** 把 ±RANGE_DEG 的倾斜归一化到 ±1 */
-const RANGE_DEG = 30;
+const SMOOTHING = 0.18;
+/** 相对倾斜多少度算「倾到底」 */
+const RANGE_DEG = 25;
 
 const clampUnit = (v: number): number => Math.max(-1, Math.min(1, v));
 
@@ -15,9 +15,9 @@ interface OrientationEventCtor {
 /**
  * 手机姿态 → 归一化倾斜（-1..1）。
  *
- * - 首次读数记作基准，回调的是**变化量**；竖直握持时 y 的绝对值约 -90°，不能直接用。
+ * - 基准取监听开始后的第一次读数，回调的是**变化量**，任何握持姿势都一致。
  * - iOS 13+ 的 `DeviceOrientationEvent.requestPermission()` 必须由用户手势触发，
- *   所以只暴露 `requestPermission()` 给按钮调用，组件挂载时不偷偷申请。
+ *   浏览器不允许自动申请；调用方应在第一次触摸卡片时调用 `requestPermission()`。
  * - `enabled=false`（例如正在手指拖动）时移除监听；重新启用会重新取基准，不会跳变。
  */
 export function useDeviceTilt({
@@ -59,22 +59,23 @@ export function useDeviceTilt({
 
   useEffect(() => {
     if (!supported || !enabled || !permitted) return;
-    let base: Lean | null = null;
-    let smooth: Lean | null = null;
+    let base: Orientation | null = null;
+    let smooth: { x: number; y: number } | null = null;
 
     const onOrient = (e: DeviceOrientationEvent) => {
       if (e.beta === null || e.gamma === null) return;
-      const lean = leanFromOrientation(e.beta, e.gamma);
-      if (!base) base = lean;
+      const current: Orientation = { beta: e.beta, gamma: e.gamma };
+      if (!base) base = current;
+      const delta = tiltDelta(base, current);
       smooth = smooth
         ? {
-            x: smooth.x + (lean.x - smooth.x) * SMOOTHING,
-            y: smooth.y + (lean.y - smooth.y) * SMOOTHING
+            x: smooth.x + (delta.x - smooth.x) * SMOOTHING,
+            y: smooth.y + (delta.y - smooth.y) * SMOOTHING
           }
-        : lean;
+        : delta;
       callback.current({
-        x: clampUnit((smooth.x - base.x) / RANGE_DEG),
-        y: clampUnit((smooth.y - base.y) / RANGE_DEG)
+        x: clampUnit(smooth.x / RANGE_DEG),
+        y: clampUnit(smooth.y / RANGE_DEG)
       });
       if (!activeRef.current) {
         activeRef.current = true;

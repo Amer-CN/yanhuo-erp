@@ -12,12 +12,16 @@ import { Btn, Sheet } from '../kit';
 import CategoryArt from './CategoryArt';
 import { useDeviceTilt } from './useDeviceTilt';
 
-/** 横向每拖 1px 转多少度：一整屏约转两圈 */
-const DEG_PER_PX = 0.6;
+/**
+ * 横向每拖 1px 转多少度。
+ * 1.2 意味着在 260px 宽的卡上横扫一屏大约转 310°，够顺手转起来；
+ * 原来 0.6 的设定一次滑动只转半圈不到，看起来就像「转不动」。
+ */
+const DEG_PER_PX = 1.2;
 /** 位移小于这个值当成点击（翻面） */
 const CLICK_SLOP = 3;
 /** 体感跟随的最大角度 */
-const TILT_RANGE_DEG = 8;
+const TILT_RANGE_DEG = 10;
 
 interface DragState {
   startX: number;
@@ -31,6 +35,9 @@ interface DragState {
 /** 品质 → 正反面样式类；UR 额外加全息边框 */
 const faceClass = (card: AlbumCard) =>
   card.rarity === 'UR' ? 'album-detail__face album-detail__face--ur' : 'album-detail__face';
+
+/** 离当前角度最近的正面/反面 */
+const nearestFace = (deg: number) => Math.round(deg / 180) * 180;
 
 export default function AlbumCardDetail({
   card,
@@ -65,16 +72,25 @@ export default function AlbumCardDetail({
   const tilt = useDeviceTilt({ enabled: !dragging, onLean });
 
   const flip = useCallback(() => {
-    const next = Math.round(rotate.get() / 180 + 1) * 180;
+    const current = rotate.get();
+    const nearest = nearestFace(current);
+    // 停歪了就回到最近的一面；正停在某一面时翻到另一面
+    const target = Math.abs(current - nearest) < 1 ? nearest + 180 : nearest;
     spin.current?.stop();
     if (reduce) {
-      rotate.jump(next);
+      rotate.jump(target);
       return;
     }
-    spin.current = animate(rotate, next, { type: 'spring', stiffness: 240, damping: 30 });
+    spin.current = animate(rotate, target, { type: 'spring', stiffness: 240, damping: 30 });
   }, [reduce, rotate]);
 
   const onPointerDown = (e: ReactPointerEvent<HTMLDivElement>) => {
+    // iOS 只允许在用户手势里申请体感权限：第一次摸卡就自动申请，不再单独放按钮
+    if (tilt.needsPermission && !tilt.active) {
+      void tilt.requestPermission().then((ok) => {
+        if (!ok) setDenied(true);
+      });
+    }
     spin.current?.stop();
     e.currentTarget.setPointerCapture(e.pointerId);
     drag.current = {
@@ -112,24 +128,17 @@ export default function AlbumCardDetail({
       flip();
       return;
     }
-    const settle = () => Math.round(rotate.get() / 180) * 180;
     if (reduce) {
-      rotate.jump(settle());
+      rotate.jump(nearestFace(rotate.get()));
       return;
     }
-    // 惯性自然减速；modifyTarget 让最终停靠落在正面或反面，而不是薄薄一条边
+    // 松手后接着转：按最后一段速度继续，自然减到停。
+    // 不做「吸附到正反面」——那会让惯性刚起就被拉回近处，看起来根本没转。
     spin.current = animate(rotate, rotate.get(), {
       type: 'inertia',
       velocity: d.velocity,
-      power: 0.6,
-      restDelta: 0.5,
-      modifyTarget: settle
+      restDelta: 0.1
     });
-  };
-
-  const askTilt = async () => {
-    const ok = await tilt.requestPermission();
-    setDenied(!ok);
   };
 
   return (
@@ -144,13 +153,10 @@ export default function AlbumCardDetail({
       }
     >
       <div className="album-detail">
-        {tilt.needsPermission && !tilt.active ? (
-          <div>
-            <Btn block variant="secondary" onClick={() => void askTilt()}>
-              开启体感倾斜
-            </Btn>
-            {denied ? <p className="tiny-text">没拿到体感权限，仍然可以拖动卡片。</p> : null}
-          </div>
+        {denied ? (
+          <p className="tiny-text" style={{ margin: 0 }}>
+            没拿到体感权限，拖动卡片照常可用。
+          </p>
         ) : null}
 
         <div className="album-detail__stage">
