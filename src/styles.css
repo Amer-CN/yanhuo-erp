@@ -2320,3 +2320,11 @@ select {
   transform: rotateX(var(--rx, 0deg)) rotateY(var(--ry, 0deg));
   transform-style: preserve-3d;
 }
+
+.album-gyro-status {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  min-height: 32px;
+  text-align: center;
+}

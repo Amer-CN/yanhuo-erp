@@ -118,6 +118,20 @@ export default function AlbumCardDetail({
           </Tilt>
         </div>
 
+        <div className="album-gyro-status">
+          {!holo.supported ? (
+            <span className="tiny-text">这台设备或浏览器不支持体感，手指拖动也能倾斜</span>
+          ) : holo.gyroLive ? (
+            <span className="tiny-text">体感已开启，晃动手机看光泽</span>
+          ) : holo.needsPermission ? (
+            <Btn size="sm" variant="secondary" block={false} onClick={() => holo.requestGyro()}>
+              开启体感倾斜
+            </Btn>
+          ) : (
+            <span className="tiny-text">体感已就绪：晃动手机试试</span>
+          )}
+        </div>
+
         <p className="muted-text" style={{ margin: 0 }}>
           {card.nextFen === null
             ? '已经是最高品质 UR。'

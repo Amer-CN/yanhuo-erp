@@ -39,6 +39,7 @@ export function useHoloTilt(maxTiltDeg = 30, gyro = true) {
   const elRef = useRef<HTMLDivElement | null>(null);
   const frame = useRef<number | null>(null);
   const pointing = useRef(false);
+  const supported = typeof window !== 'undefined' && 'DeviceOrientationEvent' in window;
   const [permitted, setPermitted] = useState(false);
   const [gyroLive, setGyroLive] = useState(false);
 
@@ -149,5 +150,13 @@ export function useHoloTilt(maxTiltDeg = 30, gyro = true) {
       });
   }, [gyro, permitted]);
 
-  return { elRef, onPointerMove, onPointerLeave, requestGyro, gyroLive };
+  return {
+    elRef,
+    onPointerMove,
+    onPointerLeave,
+    requestGyro,
+    gyroLive,
+    supported,
+    needsPermission: needsPermission()
+  };
 }
