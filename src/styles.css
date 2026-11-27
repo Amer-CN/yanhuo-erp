@@ -2219,9 +2219,13 @@ select {
   opacity: calc(0.06 + var(--distance, 0) * 0.12);
 }
 
-/* R 卡不铺镭射，SR 起才有；品质越高越明显 */
+/* R 卡只留极轻的一层，保证任何卡都能摸到反馈；SR 起才明显 */
 .album-detail__face[data-rarity='R'] .album-detail__sparkle {
-  display: none;
+  filter: brightness(0.9) contrast(1) saturate(0.6);
+}
+
+.album-detail__holo[data-holo-active] .album-detail__face[data-rarity='R'] .album-detail__sparkle {
+  opacity: calc(0.015 + var(--distance, 0) * 0.04);
 }
 
 .album-detail__face[data-rarity='SR'] .album-detail__sparkle {
