@@ -1,4 +1,4 @@
-import { ChevronRight, Package, Receipt, Settings, Sparkles } from 'lucide-react';
+import { ChevronRight, Package, Receipt, Settings } from 'lucide-react';
 import type { Session } from '../db/types';
 import { fenToStr, isoToTime } from '../db/util';
 import { Btn, Card, Empty, rowProps } from './kit';
@@ -120,22 +120,6 @@ export default function MorePage({
           <div className="glass-list__content">
             <div className="glass-list__title">销售记录</div>
             <div className="glass-list__subtitle">共 {orders} 单，按场次看明细</div>
-          </div>
-          <div className="glass-list__trailing">
-            <ChevronRight size={18} aria-hidden="true" />
-          </div>
-        </li>
-
-        <li
-          className="glass-list__item glass-list__item--interactive list-item"
-          {...rowProps(() => onOpen('album'))}
-        >
-          <span className="glass-list__leading">
-            <Sparkles size={22} aria-hidden="true" />
-          </span>
-          <div className="glass-list__content">
-            <div className="glass-list__title">我们的卡册</div>
-            <div className="glass-list__subtitle">按春节赛季收集商品卡</div>
           </div>
           <div className="glass-list__trailing">
             <ChevronRight size={18} aria-hidden="true" />

@@ -840,7 +840,6 @@ const REMOTE_SCHEMAS: Record<Kind, KindSchema> = {
       sample: 'bool',
       archived: 'bool',
       sortOrder: 'num',
-      artFamily: 'str',
       createdAt: 'str',
       updatedAt: 'str'
     }

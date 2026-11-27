@@ -1,7 +1,5 @@
 // 数据模型：钱一律用整数「分」，数量一律用整数「基本单位」（个/挂/支）。
 
-import type { ArtFamily } from './cardArt';
-
 export type Category = '炮' | '烟花' | '儿童' | '组合';
 
 export const CATEGORIES: Category[] = ['炮', '烟花', '儿童', '组合'];
@@ -29,8 +27,6 @@ export interface Product {
   priceList: number;
   /** 是否允许临时改价 */
   negotiable: boolean;
-  /** 手动指定的卡面家族；空 = 按名字自动匹配 */
-  artFamily?: ArtFamily | null;
   /** 种子示例商品（用户改过任意字段后自动清除） */
   sample?: boolean;
   archived: boolean;

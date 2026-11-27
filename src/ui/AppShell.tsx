@@ -43,7 +43,7 @@ import type { SyncApi } from './useSync';
 import { describeRemoteChanges } from './useSync';
 
 export type Tab = 'record' | 'purchase' | 'stock' | 'report' | 'more';
-export type SubPage = 'products' | 'history' | 'album' | 'settings' | null;
+export type SubPage = 'products' | 'history' | 'settings' | null;
 export type Theme = 'dark' | 'light';
 
 export interface EditorState {
@@ -75,7 +75,6 @@ const TAB_TITLE: Record<Tab, string> = {
 const SUB_TITLE: Record<Exclude<SubPage, null>, string> = {
   products: '商品管理',
   history: '销售记录',
-  album: '我们的卡册',
   settings: '设置与同步'
 };
 
@@ -504,7 +503,6 @@ const StockPage = lazy(() => import('./pages/StockPage'));
 const ReportPage = lazy(() => import('./pages/ReportPage'));
 const ProductsPage = lazy(() => import('./pages/ProductsPage'));
 const HistoryPage = lazy(() => import('./pages/HistoryPage'));
-const AlbumPage = lazy(() => import('./pages/AlbumPage'));
 const SettingsPage = lazy(() => import('./pages/SettingsPage'));
 const RecordEditor = lazy(() => import('./RecordEditor'));
 
@@ -525,7 +523,6 @@ const preloadOtherPages = () => {
   void import('./pages/ReportPage');
   void import('./pages/ProductsPage');
   void import('./pages/HistoryPage');
-  void import('./pages/AlbumPage');
   void import('./pages/SettingsPage');
 };
 
@@ -672,7 +669,7 @@ export function AppMain({ tab, sub, editor, pendingProductId, theme, onToggleThe
   const TabPage = TAB_PAGES[tab];
   // settings 要传主题开关，走下面的单独分支；其余子页查表
   const SubPageView =
-    sub === 'products' || sub === 'history' || sub === 'album' ? SUB_PAGES[sub] : null;
+    sub === 'products' || sub === 'history' ? SUB_PAGES[sub] : null;
 
   // 页面级错误边界：单个 chunk 加载失败只坏这一页，开单页不被连坐
   // resetKey 跟着路由变，切页时自动清掉错误态，别让坏掉的一页拖住整壳
@@ -865,20 +862,6 @@ function HistorySubPage() {
   );
 }
 
-/** 卡册：赛季账本与卡册都在页面内用纯函数算，适配层只传账本快照 */
-function AlbumSubPage() {
-  const { data, fifo } = useAppData();
-  return (
-    <AlbumPage
-      products={data.products}
-      orders={data.orders}
-      lines={data.lines}
-      sessions={data.sessions}
-      fifo={fifo}
-    />
-  );
-}
-
 /** 设置页需要主题开关（诉求 6），所以单独接 props；其余子页依旧无 props */
 function SettingsSubPage({ theme, onToggleTheme }: { theme: Theme; onToggleTheme: () => void }) {
   const { settings, deviceId, sync, showToast } = useAppData();
@@ -903,10 +886,9 @@ const TAB_PAGES: Record<Tab, ComponentType> = {
   more: MoreTabPage
 };
 
-const SUB_PAGES: Record<'products' | 'history' | 'album', ComponentType> = {
+const SUB_PAGES: Record<'products' | 'history', ComponentType> = {
   products: ProductsSubPage,
-  history: HistorySubPage,
-  album: AlbumSubPage
+  history: HistorySubPage
 };
 
 /* ------------------------------------------------------------------ 壳层 */
