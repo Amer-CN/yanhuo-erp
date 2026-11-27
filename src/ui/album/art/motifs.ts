@@ -7,25 +7,39 @@
 import type { ArtFamily } from '../../../db/cardArt';
 
 export interface ArtPalette {
-  /** 主线条：接近界面的 ink-2 */
+  /** 主线条：深色主题是亮墨，浅色主题是深墨 */
   line: string;
   /** 余烬暖光：只用于火口、火星、极少量填充 */
   ember: string;
+  /** 背景暖光强度 */
+  haloStrong: number;
+  haloSoft: number;
 }
 
-const PALETTES: Record<string, ArtPalette> = {
-  normal: { line: '#e8f1f3', ember: '#ffc07a' },
-  gold: { line: '#f8ecd2', ember: '#ffd98f' },
-  silver: { line: '#f2f8fb', ember: '#d8ecf5' },
-  blue: { line: '#e3efff', ember: '#a8d3ff' },
-  rainbow: { line: '#eafaf5', ember: '#f5c9e3' },
-  neon: { line: '#e6fbeb', ember: '#b3ffc4' }
+export type ArtMode = 'dark' | 'light';
+
+const DARK: Record<string, ArtPalette> = {
+  normal: { line: '#e8f1f3', ember: '#ffc07a', haloStrong: 0.2, haloSoft: 0.05 },
+  gold: { line: '#f8ecd2', ember: '#ffd98f', haloStrong: 0.2, haloSoft: 0.05 },
+  silver: { line: '#f2f8fb', ember: '#d8ecf5', haloStrong: 0.18, haloSoft: 0.04 },
+  blue: { line: '#e3efff', ember: '#a8d3ff', haloStrong: 0.18, haloSoft: 0.04 },
+  rainbow: { line: '#eafaf5', ember: '#f5c9e3', haloStrong: 0.18, haloSoft: 0.04 },
+  neon: { line: '#e6fbeb', ember: '#b3ffc4', haloStrong: 0.18, haloSoft: 0.04 }
 };
 
-export function paletteFor(variant: string): ArtPalette {
-  return PALETTES[variant] ?? PALETTES.normal;
-}
+const LIGHT: Record<string, ArtPalette> = {
+  normal: { line: '#22323b', ember: '#b85a00', haloStrong: 0.05, haloSoft: 0.015 },
+  gold: { line: '#5a4a24', ember: '#9a5a00', haloStrong: 0.05, haloSoft: 0.015 },
+  silver: { line: '#33474f', ember: '#5f7a84', haloStrong: 0.08, haloSoft: 0.02 },
+  blue: { line: '#1f3a5c', ember: '#2a5fa8', haloStrong: 0.08, haloSoft: 0.02 },
+  rainbow: { line: '#2c4038', ember: '#8a4a6b', haloStrong: 0.08, haloSoft: 0.02 },
+  neon: { line: '#22402a', ember: '#2f7a45', haloStrong: 0.08, haloSoft: 0.02 }
+};
 
+export function paletteFor(variant: string, mode: ArtMode = 'dark'): ArtPalette {
+  const map = mode === 'light' ? LIGHT : DARK;
+  return map[variant] ?? map.normal;
+}
 type Body = (p: ArtPalette, uid: string) => string;
 
 const dot = (x: number, y: number, r: number, c: string, op = 0.9) =>
@@ -330,8 +344,8 @@ export function motifMarkup(family: ArtFamily, p: ArtPalette, uid: string): stri
 export function defsMarkup(p: ArtPalette, uid: string): string {
   return `<defs>
     <radialGradient id="${uid}-halo" cx=".5" cy=".42" r=".65">
-      <stop offset="0" stop-color="${p.ember}" stop-opacity=".2"/>
-      <stop offset=".55" stop-color="${p.ember}" stop-opacity=".05"/>
+      <stop offset="0" stop-color="${p.ember}" stop-opacity="${p.haloStrong}"/>
+      <stop offset=".55" stop-color="${p.ember}" stop-opacity="${p.haloSoft}"/>
       <stop offset="1" stop-color="${p.ember}" stop-opacity="0"/>
     </radialGradient>
     <filter id="${uid}-glow" x="-40%" y="-40%" width="180%" height="180%"><feGaussianBlur stdDeviation="4"/></filter>

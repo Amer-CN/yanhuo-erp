@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { normalizeDeg, tiltAngles, tiltDelta } from '../src/ui/album/orientation';
+import { deadZone, normalizeDeg, tiltAngles, tiltDelta } from '../src/ui/album/orientation';
 
 describe('角度归一', () => {
   it('把差值折回 (-180, 180]', () => {
@@ -46,5 +46,23 @@ describe('体感映射到卡面角度', () => {
 
   it('中间值按比例收窄', () => {
     expect(tiltAngles({ x: 0.5, y: -0.5 })).toEqual({ x: 6, z: 6 });
+  });
+});
+
+describe('体感微动死区', () => {
+  it('小于死区的抖动直接归零', () => {
+    expect(deadZone(0.03)).toBe(0);
+    expect(deadZone(-0.05)).toBe(0);
+  });
+
+  it('死区外按剩余量程线性放大', () => {
+    expect(deadZone(0.06)).toBeCloseTo(0, 5);
+    expect(deadZone(0.53)).toBeCloseTo(0.5, 5);
+    expect(deadZone(-0.53)).toBeCloseTo(-0.5, 5);
+  });
+
+  it('满量程与负满量程仍为 ±1', () => {
+    expect(deadZone(1)).toBeCloseTo(1, 5);
+    expect(deadZone(-1)).toBeCloseTo(-1, 5);
   });
 });

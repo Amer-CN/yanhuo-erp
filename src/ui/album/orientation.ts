@@ -46,3 +46,17 @@ export function tiltAngles(lean: { x: number; y: number }): { x: number; z: numb
   // `|| 0` 把 -0 归一成 0：-0 会让 UI 显示成 "-0deg"
   return { x: -lean.y * PITCH_DEG || 0, z: lean.x * ROLL_DEG || 0 };
 }
+
+/**
+ * 倾斜死区：手抖 1-2 度不该让卡片跟着抖。
+ * 输入输出都是 -1..1；死区内的抖动归零，死区外按剩余量程放大，满量程仍然是 ±1。
+ */
+export const TILT_DEAD_ZONE = 0.06;
+
+export function deadZone(value: number, dead = TILT_DEAD_ZONE): number {
+  const v = Math.max(-1, Math.min(1, value));
+  const a = Math.abs(v);
+  if (a <= dead) return 0;
+  const scaled = (a - dead) / (1 - dead);
+  return Math.sign(v) * Math.min(1, scaled);
+}

@@ -1,10 +1,12 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { tiltDelta, type Orientation } from './orientation';
+import { deadZone, tiltDelta, type Orientation } from './orientation';
 
-/** 低通权重：越小越稳、越跟手越差 */
-const SMOOTHING = 0.18;
+/** 低通权重：越小越稳；配合死区，手抖基本不动 */
+const SMOOTHING = 0.1;
 /** 相对倾斜多少度算「倾到底」 */
-const RANGE_DEG = 25;
+const RANGE_DEG = 28;
+/** 打开卡片后先等手拿稳，再取基准，避免一开卡就自己歪 */
+const SETTLE_MS = 220;
 
 const clampUnit = (v: number): number => Math.max(-1, Math.min(1, v));
 
@@ -15,9 +17,10 @@ interface OrientationEventCtor {
 /**
  * 手机姿态 → 归一化倾斜（-1..1）。
  *
- * 关键约定：**基准只在第一次拿到读数时取一次**，之后不再重置。
- * 早期版本每次重新启用监听都重取基准，结果手指一碰卡片、卡片就悄悄回正，
- * 看起来像体感和手势在打架。现在监听从挂载起就常驻，基准固定。
+ * 体感微动的处理：
+ * - 打开卡片后先等 220ms 再取基准（刚抬手时读数最不稳）；
+ * - 基准取该时刻的读数，之后整张卡不再重取；
+ * - 归一化后过一道死区（约 1.8°）再做低通，手抖不会让卡片跟着抖。
  */
 export function useDeviceTilt({
   onLean
@@ -40,8 +43,6 @@ export function useDeviceTilt({
   const callback = useRef(onLean);
   callback.current = onLean;
   const activeRef = useRef(false);
-  const baseRef = useRef<Orientation | null>(null);
-  const smoothRef = useRef<{ x: number; y: number } | null>(null);
 
   const requestPermission = useCallback(async () => {
     if (!needsPermission) return false;
@@ -58,22 +59,31 @@ export function useDeviceTilt({
 
   useEffect(() => {
     if (!supported || !permitted) return;
+    let base: Orientation | null = null;
+    let settleAt = 0;
+    let smooth: { x: number; y: number } = { x: 0, y: 0 };
 
     const onOrient = (e: DeviceOrientationEvent) => {
       if (e.beta === null || e.gamma === null) return;
       const current: Orientation = { beta: e.beta, gamma: e.gamma };
-      // 基准只取一次：用户在什么姿势下打开卡片就以那个姿势为「平」
-      if (!baseRef.current) baseRef.current = current;
-      const delta = tiltDelta(baseRef.current, current);
-      const prev = smoothRef.current;
-      const smooth = prev
-        ? { x: prev.x + (delta.x - prev.x) * SMOOTHING, y: prev.y + (delta.y - prev.y) * SMOOTHING }
-        : delta;
-      smoothRef.current = smooth;
-      callback.current({
-        x: clampUnit(smooth.x / RANGE_DEG),
-        y: clampUnit(smooth.y / RANGE_DEG)
-      });
+
+      if (!base) {
+        if (!settleAt) settleAt = performance.now();
+        if (performance.now() - settleAt < SETTLE_MS) return;
+        base = current;
+        return;
+      }
+
+      const delta = tiltDelta(base, current);
+      const target = {
+        x: deadZone(clampUnit(delta.x / RANGE_DEG)),
+        y: deadZone(clampUnit(delta.y / RANGE_DEG))
+      };
+      smooth = {
+        x: smooth.x + (target.x - smooth.x) * SMOOTHING,
+        y: smooth.y + (target.y - smooth.y) * SMOOTHING
+      };
+      callback.current({ x: smooth.x, y: smooth.y });
       if (!activeRef.current) {
         activeRef.current = true;
         setActive(true);

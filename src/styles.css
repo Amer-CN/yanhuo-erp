@@ -2300,3 +2300,12 @@ select {
   content-visibility: auto;
   contain-intrinsic-size: 120px 210px;
 }
+
+/* 浅色主题：玻璃面是亮的，柔光和眩光要收敛，否则一片发白 */
+[data-theme='light'] .album-detail__glare {
+  opacity: 0.22;
+}
+
+[data-theme='light'] .album-card__sheen {
+  opacity: 0;
+}

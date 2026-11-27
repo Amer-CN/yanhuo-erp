@@ -2,6 +2,7 @@ import { useId } from 'react';
 import { matchCardArt, type ArtFamily } from '../../../db/cardArt';
 import type { Category } from '../../../db/types';
 import CategoryArt from '../CategoryArt';
+import { useThemeMode } from '../useThemeMode';
 import { defsMarkup, motifMarkup, paletteFor } from './motifs';
 
 /**
@@ -23,6 +24,7 @@ export default function FireworkArt({
   compact?: boolean;
   className?: string;
 }) {
+  const mode = useThemeMode();
   const rawId = useId();
   const uid = `art${rawId.replace(/[^a-zA-Z0-9_-]/g, '')}`;
   const match = matchCardArt(name);
@@ -34,7 +36,7 @@ export default function FireworkArt({
     return <CategoryArt category={category} className={iconClass} />;
   }
 
-  const palette = paletteFor(match.variant);
+  const palette = paletteFor(match.variant, mode);
   const body = motifMarkup(resolved, palette, uid);
   const markup =
     defsMarkup(palette, uid) +
