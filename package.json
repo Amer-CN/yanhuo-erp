@@ -20,7 +20,8 @@
     "lucide-react": "^1.70.0",
     "motion": "^14.14.0",
     "react": "^18.3.1",
-    "react-dom": "^18.3.1"
+    "react-dom": "^18.3.1",
+    "react-parallax-tilt": "^1.7.361"
   },
   "devDependencies": {
     "@eslint/js": "^9.39.5",

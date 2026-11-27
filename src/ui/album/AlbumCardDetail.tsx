@@ -1,30 +1,14 @@
-import {
-  useCallback,
-  useRef,
-  useState,
-  type PointerEvent as ReactPointerEvent
-} from 'react';
-import {
-  animate,
-  motion,
-  useMotionValue,
-  useReducedMotion,
-  useSpring,
-  useTransform
-} from 'motion/react';
+import { useCallback, useRef, useState, type PointerEvent as ReactPointerEvent } from 'react';
+import { animate, motion, useMotionValue, useReducedMotion } from 'motion/react';
+import Tilt from 'react-parallax-tilt';
 import type { AlbumCard } from '../../db/album';
 import { fenToStr, isoToLocalDate, isoToTime } from '../../db/util';
 import { Btn, Sheet } from '../kit';
 import FireworkArt from './art/FireworkArt';
-import { tiltAngles } from './orientation';
-import { useDeviceTilt } from './useDeviceTilt';
+import { useGyroPermission } from './useGyroPermission';
 
-/** 触摸倾斜：每拖 1px 转多少度（±12° 满量程） */
-const DEG_PER_PX = 0.14;
 /** 位移小于这个值当成点击（翻面） */
 const CLICK_SLOP = 4;
-/** 触摸倾斜回中的弹簧 */
-const RETURN = { type: 'spring' as const, stiffness: 220, damping: 26 };
 
 const faceClass = (card: AlbumCard) =>
   card.rarity === 'UR' ? 'album-detail__face album-detail__face--ur' : 'album-detail__face';
@@ -40,21 +24,9 @@ export default function AlbumCardDetail({
 }) {
   const reduce = useReducedMotion();
   const rotate = useMotionValue(0);
-  const tiltX = useSpring(0, { stiffness: 140, damping: 22 });
-  const tiltZ = useSpring(0, { stiffness: 140, damping: 22 });
   const [denied, setDenied] = useState(false);
   const drag = useRef<{ x: number; y: number; moved: number } | null>(null);
-
-  const onLean = useCallback(
-    (lean: { x: number; y: number }) => {
-      const a = tiltAngles(lean);
-      tiltX.set(a.x);
-      tiltZ.set(a.z);
-    },
-    [tiltX, tiltZ]
-  );
-
-  const tilt = useDeviceTilt({ onLean });
+  const gyro = useGyroPermission();
 
   const flip = useCallback(() => {
     const target = rotate.get() > 90 ? 0 : 180;
@@ -66,44 +38,25 @@ export default function AlbumCardDetail({
   }, [reduce, rotate]);
 
   const onPointerDown = (e: ReactPointerEvent<HTMLDivElement>) => {
-    // iOS 只允许在用户手势里申请体感权限：第一次摸卡就自动申请
-    if (tilt.needsPermission && !tilt.active) {
-      void tilt.requestPermission().then((ok) => {
+    if (gyro.needsPermission && !gyro.granted) {
+      void gyro.requestPermission().then((ok) => {
         if (!ok) setDenied(true);
       });
     }
-    e.currentTarget.setPointerCapture(e.pointerId);
     drag.current = { x: e.clientX, y: e.clientY, moved: 0 };
   };
 
   const onPointerMove = (e: ReactPointerEvent<HTMLDivElement>) => {
     const d = drag.current;
     if (!d) return;
-    const dx = e.clientX - d.x;
-    const dy = e.clientY - d.y;
-    d.moved = Math.max(d.moved, Math.abs(dx) + Math.abs(dy));
-    // 有体感就不再用手指改倾斜：两种输入二选一，避免抢同一张卡
-    if (tilt.active) return;
-    tiltZ.set(Math.max(-12, Math.min(12, dx * DEG_PER_PX)));
-    tiltX.set(Math.max(-12, Math.min(12, -dy * DEG_PER_PX)));
+    d.moved = Math.max(d.moved, Math.abs(e.clientX - d.x) + Math.abs(e.clientY - d.y));
   };
 
   const endDrag = () => {
     const d = drag.current;
     drag.current = null;
-    if (!d) return;
-    if (d.moved < CLICK_SLOP) {
-      flip();
-      return;
-    }
-    if (!tilt.active && !reduce) {
-      animate(tiltX, 0, RETURN);
-      animate(tiltZ, 0, RETURN);
-    }
+    if (d && d.moved < CLICK_SLOP) flip();
   };
-
-  const glareX = useTransform(tiltZ, (v) => `${v * 1.6}px`);
-  const glareY = useTransform(tiltX, (v) => `${-v * 1.6}px`);
 
   return (
     <Sheet
@@ -119,12 +72,23 @@ export default function AlbumCardDetail({
       <div className="album-detail">
         {denied ? (
           <p className="tiny-text" style={{ margin: 0 }}>
-            没拿到体感权限，拖动卡片也能倾斜查看。
+            没拿到体感权限，手指拖动也能倾斜查看。
           </p>
         ) : null}
 
         <div className="album-detail__stage">
-          <motion.div style={{ rotateX: tiltX, rotateZ: tiltZ, transformStyle: 'preserve-3d' }}>
+          <Tilt
+            className="album-detail__tilt"
+            gyroscope
+            tiltMaxAngleX={10}
+            tiltMaxAngleY={10}
+            perspective={1200}
+            transitionSpeed={450}
+            glareEnable
+            glareMaxOpacity={0.14}
+            glareColor="#ffffff"
+            glareBorderRadius="24px"
+          >
             <motion.div
               className="album-detail__card"
               style={{ rotateY: rotate }}
@@ -143,17 +107,7 @@ export default function AlbumCardDetail({
               }}
             >
               <div className={faceClass(card)}>
-                <FireworkArt
-                  name={card.name}
-                  category={card.category}
-                  family={card.artFamily}
-                  className="album-detail__art"
-                />
-                <motion.span
-                  className="album-detail__glare"
-                  aria-hidden="true"
-                  style={{ x: glareX, y: glareY }}
-                />
+                <FireworkArt name={card.name} category={card.category} className="album-detail__art" />
                 <span className="album-card__rarity">{card.rarity}</span>
               </div>
               <div className={`${faceClass(card)} album-detail__face--back`}>
@@ -161,7 +115,7 @@ export default function AlbumCardDetail({
                 <span className="album-detail__mark-sub">{card.category} · 烟花卡册</span>
               </div>
             </motion.div>
-          </motion.div>
+          </Tilt>
         </div>
 
         <p className="muted-text" style={{ margin: 0 }}>

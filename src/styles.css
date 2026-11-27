@@ -2122,7 +2122,6 @@ select {
 }
 
 .album-detail__stage {
-  perspective: 1200px;
   display: grid;
   place-items: center;
   padding: var(--yh-space-4) 0;
@@ -2308,4 +2307,11 @@ select {
 
 [data-theme='light'] .album-card__sheen {
   opacity: 0;
+}
+
+/* react-parallax-tilt 的外层：保留 3D 上下文，翻面才有纵深 */
+.album-detail__tilt {
+  display: grid;
+  place-items: center;
+  transform-style: preserve-3d;
 }
