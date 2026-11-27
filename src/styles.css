@@ -2151,6 +2151,7 @@ select {
   place-items: center;
   background: linear-gradient(160deg, var(--yh-surface-4), var(--yh-surface-2));
   box-shadow: var(--yh-shadow-2);
+  isolation: isolate;
 }
 
 .album-detail__face--back {
@@ -2181,12 +2182,76 @@ select {
   margin: auto;
 }
 
+/* 镭射膜：复刻 react-holo-card 的 sparkle 层（MIT），和它共用 --mx/--my/--distance */
+.album-detail__sparkle {
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  pointer-events: none;
+  background-image:
+    repeating-linear-gradient(
+      100deg,
+      rgba(255, 255, 255, 0) 0%,
+      rgba(255, 255, 255, 0.09) 1.2%,
+      rgba(255, 255, 255, 0) 2.6%
+    ),
+    linear-gradient(
+      115deg,
+      rgba(255, 110, 150, 0.5) 8%,
+      rgba(255, 220, 120, 0.5) 24%,
+      rgba(120, 255, 190, 0.5) 40%,
+      rgba(120, 190, 255, 0.5) 56%,
+      rgba(200, 130, 255, 0.5) 72%,
+      rgba(255, 110, 150, 0.5) 88%
+    );
+  background-size: 160% 160%, 260% 260%;
+  background-position:
+    var(--mx, 50%) var(--my, 50%),
+    calc(100% - var(--mx, 50%)) calc(100% - var(--my, 50%));
+  background-blend-mode: overlay;
+  filter: brightness(1.05) contrast(1.3) saturate(1.7);
+  mix-blend-mode: screen;
+  opacity: 0;
+  transition: opacity 0.4s ease;
+}
+
+.album-detail__holo[data-holo-active] .album-detail__sparkle {
+  opacity: calc(0.06 + var(--distance, 0) * 0.12);
+}
+
+/* R 卡不铺镭射，SR 起才有；品质越高越明显 */
+.album-detail__face[data-rarity='R'] .album-detail__sparkle {
+  display: none;
+}
+
+.album-detail__face[data-rarity='SR'] .album-detail__sparkle {
+  filter: brightness(1) contrast(1.1) saturate(1.2);
+}
+
+.album-detail__face[data-rarity='UR'] .album-detail__sparkle {
+  filter: brightness(1.05) contrast(1.2) saturate(1.5);
+}
+
+/* 指下高光：跟手，不扫光 */
 .album-detail__glare {
   position: absolute;
   inset: 0;
+  border-radius: inherit;
   pointer-events: none;
-  background: radial-gradient(circle at 30% 20%, rgba(255, 255, 255, 0.32), transparent 55%);
-  opacity: 0.5;
+  background-image: radial-gradient(
+    circle at var(--mx, 50%) var(--my, 50%),
+    rgba(255, 255, 255, 0.55) 0%,
+    rgba(255, 255, 255, 0.18) 16%,
+    rgba(255, 255, 255, 0) 38%
+  );
+  mix-blend-mode: screen;
+  opacity: 0;
+  transition: opacity 0.4s ease;
+}
+
+.album-detail__holo[data-holo-active] .album-detail__glare,
+.album-detail__holo:hover .album-detail__glare {
+  opacity: 0.9;
 }
 
 @media (prefers-reduced-motion: reduce) {
@@ -2301,8 +2366,21 @@ select {
 }
 
 /* 浅色主题：玻璃面是亮的，柔光和眩光要收敛，否则一片发白 */
+[data-theme='light'] .album-detail__sparkle {
+  mix-blend-mode: overlay;
+  filter: brightness(1.02) contrast(1.1) saturate(1.35);
+}
+
+[data-theme='light'] .album-detail__holo[data-holo-active] .album-detail__sparkle {
+  opacity: calc(0.04 + var(--distance, 0) * 0.08);
+}
+
 [data-theme='light'] .album-detail__glare {
-  opacity: 0.22;
+  mix-blend-mode: soft-light;
+}
+
+[data-theme='light'] .album-detail__holo[data-holo-active] .album-detail__glare {
+  opacity: 0.7;
 }
 
 [data-theme='light'] .album-card__sheen {

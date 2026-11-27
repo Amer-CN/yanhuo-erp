@@ -25,8 +25,8 @@ export default function AlbumCardDetail({
   const reduce = useReducedMotion();
   const rotate = useMotionValue(0);
   const drag = useRef<{ x: number; y: number; moved: number } | null>(null);
-  // 指针倾斜交给 Tilt；陀螺仪用 react-holo-card 的实现（重力向量 + 平滑 + 基准 + iOS 授权）
-  const holo = useHoloTilt(10, true);
+  // 指针倾斜交给 Tilt；这里只借 react-holo-card 的镭射膜/眩光跟随（陀螺仪先关掉）
+  const holo = useHoloTilt(10, false);
 
   const flip = useCallback(() => {
     const target = rotate.get() > 90 ? 0 : 180;
@@ -72,7 +72,6 @@ export default function AlbumCardDetail({
           <Tilt
             className="album-detail__tilt"
             gyroscope={false}
-            tiltEnable={!holo.gyroLive}
             tiltMaxAngleX={10}
             tiltMaxAngleY={10}
             perspective={1200}
@@ -101,12 +100,14 @@ export default function AlbumCardDetail({
                   }
                 }}
               >
-                <div className={faceClass(card)}>
+                <div className={faceClass(card)} data-rarity={card.rarity}>
                   <FireworkArt
                     name={card.name}
                     category={card.category}
                     className="album-detail__art"
                   />
+                  <span className="album-detail__sparkle" aria-hidden="true" />
+                  <span className="album-detail__glare" aria-hidden="true" />
                   <span className="album-card__rarity">{card.rarity}</span>
                 </div>
                 <div className={`${faceClass(card)} album-detail__face--back`}>
@@ -116,20 +117,6 @@ export default function AlbumCardDetail({
               </motion.div>
             </div>
           </Tilt>
-        </div>
-
-        <div className="album-gyro-status">
-          {!holo.supported ? (
-            <span className="tiny-text">这台设备或浏览器不支持体感，手指拖动也能倾斜</span>
-          ) : holo.gyroLive ? (
-            <span className="tiny-text">体感已开启，晃动手机看光泽</span>
-          ) : holo.needsPermission ? (
-            <Btn size="sm" variant="secondary" block={false} onClick={() => holo.requestGyro()}>
-              开启体感倾斜
-            </Btn>
-          ) : (
-            <span className="tiny-text">体感已就绪：晃动手机试试</span>
-          )}
         </div>
 
         <p className="muted-text" style={{ margin: 0 }}>
