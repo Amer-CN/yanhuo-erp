@@ -72,6 +72,7 @@ export default function AlbumCardDetail({
           <Tilt
             className="album-detail__tilt"
             gyroscope={false}
+            tiltReverse
             tiltMaxAngleX={10}
             tiltMaxAngleY={10}
             perspective={1200}
