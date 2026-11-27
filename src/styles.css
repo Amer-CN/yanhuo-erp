@@ -2315,3 +2315,8 @@ select {
   place-items: center;
   transform-style: preserve-3d;
 }
+/* react-holo-card 的陀螺仪把 --rx/--ry 写在卡片外层：这里把它们变成实际旋转 */
+.album-detail__holo {
+  transform: rotateX(var(--rx, 0deg)) rotateY(var(--ry, 0deg));
+  transform-style: preserve-3d;
+}
